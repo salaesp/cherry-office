@@ -438,7 +438,7 @@ App.OficinaPixel = (function () {
   function solapa(p, q) { return p[0] < q[2] && q[0] < p[2] && p[1] < q[3] && q[1] < p[3]; }
   function atras(A, B) { return A[2] <= B[0] + 1e-6 || A[3] <= B[1] + 1e-6; }
   function antes(A, B) { var ab = atras(A.b, B.b), ba = atras(B.b, A.b); if (ab && !ba) return true; if (ba && !ab) return false;
-    if (!ab && !ba && A.enSofa !== B.enSofa) return !!B.enSofa;   // quien está sentado en un sillón queda dentro de su caja: se dibuja encima de él
+    if (!ab && !ba && !!A.enSofa !== !!B.enSofa) return !!B.enSofa;   // quien está sentado en un sillón queda dentro de su caja: se dibuja encima de él
     return A.d < B.d; }
   function prepararEstaticos() {
     var Ls = items.filter(function (i) { return i.b; });
