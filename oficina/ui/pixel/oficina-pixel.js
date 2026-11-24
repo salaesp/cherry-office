@@ -295,10 +295,14 @@ App.OficinaPixel = (function () {
     if (f.modo === 'ocio' && f.spot && f.spot.sofa) return 'dormir';
     return 'quieto';
   }
+  var ATRAS_SILLA = 0;
   function orient(m) { return { '+x': ['se', false], '+y': ['se', true], '-y': ['ne', false], '-x': ['ne', true] }[m] || ['se', false]; }
   function dibujarFigura(f, t) {
-    var p = iso(f.x, f.y); f.sx = R(p[0]); f.sy = R(p[1]);
-    var st = poseDe(f), sit = f.sit && !f.ruta;
+    var sit = f.sit && !f.ruta;
+    /* sentado en una silla (no en un sillón) el cuerpo se apoya contra el respaldo: un poco hacia atrás del centro del asiento */
+    var AT = sit && !(f.spot && f.spot.sofa) ? ATRAS_SILLA : 0, bx = f.x - (f.mira === '+x' ? AT : f.mira === '-x' ? -AT : 0), by = f.y - (f.mira === '+y' ? AT : f.mira === '-y' ? -AT : 0);
+    var p = iso(bx, by); f.sx = R(p[0]); f.sy = R(p[1]);
+    var st = poseDe(f);
     if ((f.mira === '-y' || f.mira === '-x') && st === 'pensar') st = 'tipear';
     var o = orient(f.mira);
     if (!sit) { g.fillStyle = 'rgba(40,25,30,.28)'; for (var y = -1; y <= 1; y++) { var w = y === 0 ? 8 : 6; g.fillRect(f.sx - w, f.sy + y, w * 2, 1); } }
@@ -418,7 +422,7 @@ App.OficinaPixel = (function () {
   function solapa(p, q) { return p[0] < q[2] && q[0] < p[2] && p[1] < q[3] && q[1] < p[3]; }
   function atras(A, B) { return A[2] <= B[0] + 1e-6 || A[3] <= B[1] + 1e-6; }
   function antes(A, B) { var ab = atras(A.b, B.b), ba = atras(B.b, A.b); if (ab && !ba) return true; if (ba && !ab) return false;
-    if (!ab && !ba && A.enSofa !== B.enSofa) return !!B.enSofa;   // quien está sentado en un sillón queda dentro de su caja: se dibuja encima de él
+    if (!ab && !ba && !!A.enSofa !== !!B.enSofa) return !!B.enSofa;   // quien está sentado en un sillón queda dentro de su caja: se dibuja encima de él
     return A.d < B.d; }
   function prepararEstaticos() {
     var Ls = items.filter(function (i) { return i.b; });
