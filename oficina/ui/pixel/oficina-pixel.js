@@ -79,12 +79,12 @@ App.OficinaPixel = (function () {
     var deptos = (oficina.departamentos || []).slice(), ag = oficina.agentes || [];
     var porDepto = {}; ag.forEach(function (a) { var k = a.departamento && deptos.some(function (d) { return d.id === a.departamento; }) ? a.departamento : '_sin'; (porDepto[k] = porDepto[k] || []).push(a); });
     if (porDepto._sin) deptos.push({ id: '_sin', nombre: 'Sin departamento', color: '#9a9a9a' });
+    var juegos = { tipo: 'juegos', nombre: 'Juegos y café', w: 7.6, color: '#d9b86a' };
     var fijas = [
       { tipo: 'direccion', nombre: perfil && perfil.nombre ? 'Despacho de ' + perfil.nombre : 'Tu despacho', w: 4.6, color: '#8fae9a' },
       { tipo: 'reunion', nombre: 'Sala de reuniones', w: 6.6, color: '#9c88c0' },
-      { tipo: 'biblioteca', nombre: 'Biblioteca', w: 4.6, color: '#b39b7e' },
-      { tipo: 'juegos', nombre: 'Juegos y café', w: 7.6, color: '#d9b86a' }];
-    var anchoFijas = fijas.reduce(function (s, r) { return s + r.w; }, 0), maxAncho = Math.max(anchoFijas, 22);
+      { tipo: 'biblioteca', nombre: 'Biblioteca', w: 4.6, color: '#b39b7e' }];
+    var anchoFijas = fijas.reduce(function (s, r) { return s + r.w; }, juegos.w), maxAncho = Math.max(anchoFijas, 22);
     var filas = [fijas], fila = [{ tipo: 'recepcion', nombre: (oficina.nombre || 'Oficina') + ' · Recepción', w: 4.2, color: null }], ancho = 4.2;
     deptos.forEach(function (d) {
       var n = (porDepto[d.id] || []).length, w = anchoDepto(n);
@@ -93,9 +93,17 @@ App.OficinaPixel = (function () {
     });
     filas.push(fila);
     var largoFila = function (f) { return f.reduce(function (s, r) { return s + r.w; }, 0); };
+    /* no hay espacios comunes: Juegos y café va al final de la fila que más hueco deja y se estira hasta el borde
+       (cuanto más ancha, más rincones para descansar). En las otras filas, lo que falta se reparte entre sus salas */
+    var largos = filas.map(largoFila), tope = Math.max.apply(null, largos), fJuegos = 0;
+    largos.forEach(function (l, i) { if (tope - l > tope - largos[fJuegos] + .01) fJuegos = i; });
+    filas[fJuegos].push(juegos);
     var maxFila = Math.max.apply(null, filas.map(largoFila));
-    // lo que sobra al final de una fila corta es un espacio común (como en la maqueta 3D)
-    filas.forEach(function (f) { var falta = maxFila - largoFila(f); if (falta >= 3) f.push({ tipo: 'comun', nombre: 'Espacio común', w: falta, color: '#a7b9a0' }); });
+    filas.forEach(function (f, i) {
+      var falta = maxFila - largoFila(f);
+      if (i === fJuegos || falta <= 0) return;
+      var total = largoFila(f); f.forEach(function (r) { r.w += falta * r.w / total; });
+    });
     FX = LAT + maxFila;
     FY = filas.length * (PROF + PAS);
     salas = [];
@@ -121,7 +129,7 @@ App.OficinaPixel = (function () {
       paredY(LAT - WT, y0, y0 + PROF - WT, []);
       f.forEach(function (s, j) { if (j > 0) paredY(s.r[0] - WT, y0, y0 + PROF - WT, decorPared(s)); else if (s.tipo !== 'recepcion') decorPrimera(s); });
     });
-    salas.forEach(function (s) { ({ direccion: salaDireccion, reunion: salaReunion, biblioteca: salaBiblioteca, juegos: salaJuegos, recepcion: salaRecepcion, depto: salaDepto, comun: salaComun }[s.tipo])(s, perfil); });
+    salas.forEach(function (s) { ({ direccion: salaDireccion, reunion: salaReunion, biblioteca: salaBiblioteca, juegos: salaJuegos, recepcion: salaRecepcion, depto: salaDepto }[s.tipo])(s, perfil); });
     EST = null;
   }
   function decorPared(s) { var y0 = s.r[1]; return s.tipo === 'reunion' ? [['pizarra', y0 + 1.4, 3]] : s.tipo === 'depto' ? [['pizarra', y0 + 1.2, 3], ['cuadro', y0 + 3.8, 5, { color: s.color }]] : s.tipo === 'direccion' ? [['cuadro', y0 + 2.2, 5, { color: '#4a80c6' }]] : []; }
@@ -152,14 +160,14 @@ App.OficinaPixel = (function () {
     });
   }
   function salaReunion(s) {
-    var x0 = s.r[0], y0 = s.r[1];
+    var x0 = s.r[0] + Math.max(0, (s.r[2] - s.r[0] - 6.6) / 2), y0 = s.r[1];   // si la sala se ensanchó, la mesa queda al centro
     put('mesaReunion', x0 + 1.2, y0 + 2.3, { w: 4.0, d: 1.3 });
     for (var i = 0; i < 5; i++) {
       var xs = x0 + 1.6 + i * .8, pn = { x: xs, y: y0 + 1.95 }, ps = { x: xs, y: y0 + 3.98 };
       silla(pn, '+y'); silla(ps, '-y');
       sillasReu.push({ x: pn.x, y: pn.y, mira: '+y', sala: s, aisle: { x: pn.x, y: pn.y - .55 } }, { x: ps.x, y: ps.y, mira: '-y', sala: s, aisle: { x: ps.x, y: ps.y + .55 } });
     }
-    put('tvPie', s.r[2] - .7, y0 + 2.4, { mira: '-x' }); put('planta', x0 + .3, y0 + .35, { tipo: 'alta' });
+    put('tvPie', x0 + 5.9, y0 + 2.4, { mira: '-x' }); put('planta', s.r[0] + .3, y0 + .35, { tipo: 'alta' });
     at(9999, function () { M.lamparaColgante(x0 + 2.2, y0 + 2.9, { zTecho: WH - 4, luz: LUZ }); M.lamparaColgante(x0 + 3.9, y0 + 2.9, { zTecho: WH - 4, luz: LUZ }); });
   }
   function salaDireccion(s, perfil) {
@@ -198,14 +206,26 @@ App.OficinaPixel = (function () {
       { x: x0 + 1.15, y: y0 + 1.6, mira: '+y', sit: false, sala: s }, { x: x0 + 2.9, y: y0 + 1.6, mira: '+y', sit: false, sala: s }, { x: x0 + 2.5, y: y0 + 3.85, mira: '+x', sit: false, sala: s },
       { x: x0 + 4.65, y: y0 + 3.85, mira: '-x', sit: false, sala: s }, { x: x0 + 1.8, y: y0 + 1.15, mira: '-y', sit: false, sala: s });
     cafeYo = { x: x0 + .85, y: y0 + .8, mira: '-y', sit: false, sala: s };   // vos, frente a la cafetera
-  }
-  function salaComun(s) {
-    var x0 = s.r[0], y0 = s.r[1], w = s.r[2] - x0;
-    put('planta', x0 + .3, y0 + .35, { tipo: 'alta' });
-    // sólo decorado: los agentes sin trabajo van a Juegos y café (y a leer a la Biblioteca), no acá
-    if (w >= 4) { put('sillon2', x0 + .6, y0 + 2.2, { mira: '+x', color: '#7a9a6a' }); put('mesaRatona', x0 + 1.6, y0 + 2.6, {}); put('sillon1', x0 + 2.8, y0 + 2.5, { mira: '-x', color: '#c47a4a' }); }
-    if (w >= 6) { put('dispensador', s.r[2] - 1.6, y0 + .3, {}); put('planta', s.r[2] - 2.6, y0 + .35, { tipo: 'mediana' }); }
-    put('planta', x0 + .4, y0 + 5.0, { tipo: 'mediana' });
+    /* si la sala quedó más ancha (se estiró hasta el borde de su fila), suma rincones de 3.4 de ancho, alternando
+       un living (sillón, mesa ratona, sillón chico y dos arcades contra la pared) y un bar (mesas altas, ping-pong
+       y expendedora). Cada rincón trae sus lugares para descansar; la franja de abajo queda libre para caminar */
+    for (var k = 0, lx = x0 + 6.0; lx + 3.4 <= s.r[2] - .4; k++, lx += 3.4) {
+      if (k % 2 === 0) {
+        put('arcade', lx + .4, y0 + .2, { mira: '+y' }); put('arcade', lx + 1.0, y0 + .2, { mira: '+y' }); put('planta', lx + 2.8, y0 + .35, { tipo: 'alta' });
+        put('sillon2', lx + .3, y0 + 2.2, { mira: '+x', color: ['#7a9a6a', '#5d7fb3', '#a0644a'][(k / 2) % 3] }); put('mesaRatona', lx + 1.15, y0 + 2.6, {});
+        put('sillon1', lx + 2.3, y0 + 2.5, { mira: '-x', color: '#c47a4a' }); put('puff', lx + 1.3, y0 + 3.6, { color: '#9c88c0' });
+        spotsOcio.push({ x: lx + .7, y: y0 + 2.6, mira: '+x', sit: true, sofa: true, sala: s }, { x: lx + .7, y: y0 + 3.1, mira: '+x', sit: true, sofa: true, sala: s },
+          { x: lx + 2.5, y: y0 + 2.8, mira: '-x', sit: true, sofa: true, sala: s }, { x: lx + .9, y: y0 + 1.0, mira: '-y', sit: false, sala: s });
+      } else {
+        put('expendedora', lx + .3, y0 + .15, {}); put('dispensador', lx + 1.3, y0 + .3, {});
+        put('mesaAlta', lx + .3, y0 + 1.6, {}); put('banqueta', lx + .0, y0 + 1.4, {}); put('banqueta', lx + .9, y0 + 2.1, {});
+        put('mesaAlta', lx + 2.0, y0 + 1.6, {}); put('banqueta', lx + 1.7, y0 + 1.4, {}); put('banqueta', lx + 2.6, y0 + 2.1, {});
+        put('pingpong', lx + .9, y0 + 3.3, {});
+        spotsOcio.push({ x: lx + .75, y: y0 + 1.3, mira: '+y', sit: false, sala: s }, { x: lx + 2.45, y: y0 + 1.3, mira: '+y', sit: false, sala: s },
+          { x: lx + .6, y: y0 + 3.75, mira: '+x', sit: false, sala: s }, { x: lx + 2.75, y: y0 + 3.75, mira: '-x', sit: false, sala: s });
+      }
+    }
+    if (s.r[2] - x0 > 8.6) put('planta', s.r[2] - .7, y0 + .35, { tipo: 'mediana' });
   }
   function salaRecepcion(s) {
     var x0 = s.r[0], y0 = s.r[1];
