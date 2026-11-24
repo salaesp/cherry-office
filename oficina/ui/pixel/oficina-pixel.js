@@ -202,8 +202,8 @@ App.OficinaPixel = (function () {
   function salaComun(s) {
     var x0 = s.r[0], y0 = s.r[1], w = s.r[2] - x0;
     put('planta', x0 + .3, y0 + .35, { tipo: 'alta' });
-    if (w >= 4) { put('sillon2', x0 + .6, y0 + 2.2, { mira: '+x', color: '#7a9a6a' }); put('mesaRatona', x0 + 1.6, y0 + 2.6, {}); put('sillon1', x0 + 2.8, y0 + 2.5, { mira: '-x', color: '#c47a4a' });
-      spotsOcio.push({ x: x0 + 1.0, y: y0 + 2.6, mira: '+x', sit: true, sofa: true, sala: s }); }
+    // sólo decorado: los agentes sin trabajo van a Juegos y café (y a leer a la Biblioteca), no acá
+    if (w >= 4) { put('sillon2', x0 + .6, y0 + 2.2, { mira: '+x', color: '#7a9a6a' }); put('mesaRatona', x0 + 1.6, y0 + 2.6, {}); put('sillon1', x0 + 2.8, y0 + 2.5, { mira: '-x', color: '#c47a4a' }); }
     if (w >= 6) { put('dispensador', s.r[2] - 1.6, y0 + .3, {}); put('planta', s.r[2] - 2.6, y0 + .35, { tipo: 'mediana' }); }
     put('planta', x0 + .4, y0 + 5.0, { tipo: 'mediana' });
   }
