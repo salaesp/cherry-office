@@ -295,14 +295,10 @@ App.OficinaPixel = (function () {
     if (f.modo === 'ocio' && f.spot && f.spot.sofa) return 'dormir';
     return 'quieto';
   }
-  var ATRAS_SILLA = 0;
   function orient(m) { return { '+x': ['se', false], '+y': ['se', true], '-y': ['ne', false], '-x': ['ne', true] }[m] || ['se', false]; }
   function dibujarFigura(f, t) {
-    var sit = f.sit && !f.ruta;
-    /* sentado en una silla (no en un sillón) el cuerpo se apoya contra el respaldo: un poco hacia atrás del centro del asiento */
-    var AT = sit && !(f.spot && f.spot.sofa) ? ATRAS_SILLA : 0, bx = f.x - (f.mira === '+x' ? AT : f.mira === '-x' ? -AT : 0), by = f.y - (f.mira === '+y' ? AT : f.mira === '-y' ? -AT : 0);
-    var p = iso(bx, by); f.sx = R(p[0]); f.sy = R(p[1]);
-    var st = poseDe(f);
+    var p = iso(f.x, f.y); f.sx = R(p[0]); f.sy = R(p[1]);
+    var st = poseDe(f), sit = f.sit && !f.ruta;
     if ((f.mira === '-y' || f.mira === '-x') && st === 'pensar') st = 'tipear';
     var o = orient(f.mira);
     if (!sit) { g.fillStyle = 'rgba(40,25,30,.28)'; for (var y = -1; y <= 1; y++) { var w = y === 0 ? 8 : 6; g.fillRect(f.sx - w, f.sy + y, w * 2, 1); } }
