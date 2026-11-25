@@ -479,7 +479,6 @@ App.OficinaPixel = (function () {
     dibujarPiezas(now);
     var F = FASE;
     if (F.tint) { g.globalCompositeOperation = 'multiply'; if (F.glow > 0) g.drawImage(luzPara(F), 0, 0); else { g.fillStyle = F.tint; g.fillRect(0, 0, W, H); } g.globalCompositeOperation = 'destination-in'; g.drawImage(pisoPara(F.k), 0, 0); g.globalCompositeOperation = 'source-over'; }
-    if (F.glow > 0) { g.globalCompositeOperation = 'lighter'; g.drawImage(brilloPara(F), 0, 0); g.globalCompositeOperation = 'source-over'; }
   }
   /* ---------- sprites de los muebles fijos ----------
      Cada mueble se pinta con miles de fillRect de 1 px. Los que no se animan se graban una vez por fase del día
@@ -507,23 +506,12 @@ App.OficinaPixel = (function () {
     if (rec.ops.length) { cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(b[2]) - x0); cv.height = Math.max(1, Math.ceil(b[3]) - y0); volcar(rec, cv.getContext('2d'), x0, y0); g.drawImage(cv, x0, y0); }
     it.spr = { k: FASE.k, cv: cv, x: x0, y: y0 };
   }
-  /* el brillo de las salas de noche es un tramado píxel a píxel (decenas de miles de fillRect): se pinta una vez por fase
-     en su propia capa y después solo se copia */
-  function brilloPara(F) {
-    if (pisos['brillo:' + F.k]) return pisos['brillo:' + F.k];
-    var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-    var g0 = N.g; N.g = cv.getContext('2d'); N.g.globalCompositeOperation = 'lighter';
-    salas.forEach(function (s) { var p = iso((s.r[0] + s.r[2]) / 2, (s.r[1] + s.r[3]) / 2); N.dith(p[0], p[1] + 6, 90, 45, '#ffcf8c', .07 * F.glow); });
-    N.g = g0; pisos['brillo:' + F.k] = cv; return cv;
-  }
-
   /* ---------- luces prendidas de noche ----------
      El tinte de la hora se multiplica sobre todo; de noche ese tinte es un mapa de luz: cada sala tiene sus luces de
      techo (una cada ~5 baldosas) y las lámparas suman su charco. Dentro de un charco el tinte se aclara hacia una luz
-     cálida, en escalones tramados (Bayer 4×4) para que siga pareciendo pixel art. La luz no pasa a otra sala: cada
+     cálida con una caída suave (sin tramar: escalado en pantalla, el tramado se veía como ruido). La luz no pasa a otra sala: cada
      charco se recorta a la caja de su sala (piso + muebles altos); los pasillos y las ventanas quedan en penumbra.
      Se arma una vez por fase y después solo se copia. */
-  var BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
   function hex(c) { var n = parseInt(c.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; }
   function cascara(pts) {   // envolvente convexa (monotone chain), en sentido horario en pantalla
     pts = pts.slice().sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
@@ -544,8 +532,8 @@ App.OficinaPixel = (function () {
         if (!dentro) continue;
         var dx = (x - cx) / rx, dy = (y - cy) / ry, d = Math.sqrt(dx * dx + dy * dy), v = d >= 1 ? 0 : 1 - d * d;
         v = Math.max(base, v * fuerza);
-        var q = Math.floor(v * 5 + BAYER[(y & 3) * 4 + (x & 3)] / 16) / 5, o = y * W + x;   // 5 escalones tramados
-        if (q > I[o]) I[o] = q;
+        var o = y * W + x;
+        if (v > I[o]) I[o] = v;
       }
     }
     salas.forEach(function (s) {
