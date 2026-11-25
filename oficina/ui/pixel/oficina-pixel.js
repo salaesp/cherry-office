@@ -561,6 +561,18 @@ App.OficinaPixel = (function () {
         var q = up(iso(l.x, l.y), l.z * .4); charco(caja, q[0], q[1], l.r * 12 * S * 1.2, l.r * 6 * S * 1.5, 1.15, 0);
       });
     });
+    /* los pasillos: spots de techo más tenues, uno cada ~3.5 baldosas; su luz moja el pie de las paredes que los bordean */
+    function pasillo(x0, y0, x1, y1, largoX) {
+      var esq = []; [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach(function (c) { var p = iso(c[0], c[1]); esq.push(p, up(p, WHI)); });
+      var caja = cascara(esq), largo = largoX ? x1 - x0 : y1 - y0, n = Math.max(1, Math.round(largo / 3.5)), r = largo / n;
+      for (var i = 0; i < n; i++) {
+        var m = largoX ? iso(x0 + r * (i + .5), (y0 + y1) / 2) : iso((x0 + x1) / 2, y0 + r * (i + .5)), p = up(m, 3);
+        charco(caja, p[0], p[1], r * 12 * S * .75, r * 6 * S * .9, .6, .12);
+      }
+    }
+    var filas = {}; salas.forEach(function (s) { filas[s.fila] = s.r[3]; });
+    Object.keys(filas).forEach(function (k) { pasillo(LAT, filas[k] - WT, FX, filas[k] + PAS, true); });
+    pasillo(0, 0, LAT, FY, false);
     var t = hex(F.tint), c = hex('#fff1dc'), k = .8 * F.glow, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     var ctx = cv.getContext('2d'), img = ctx.createImageData(W, H), dd = img.data;
     for (var o = 0, j = 0; o < I.length; o++, j += 4) { var m = Math.min(1, I[o]) * k; dd[j] = t[0] + (c[0] - t[0]) * m; dd[j + 1] = t[1] + (c[1] - t[1]) * m; dd[j + 2] = t[2] + (c[2] - t[2]) * m; dd[j + 3] = 255; }
