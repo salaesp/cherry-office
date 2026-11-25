@@ -509,8 +509,8 @@ App.OficinaPixel = (function () {
   /* ---------- luces prendidas de noche ----------
      El tinte de la hora se multiplica sobre todo; de noche ese tinte es un mapa de luz: cada sala tiene sus luces de
      techo (una cada ~5 baldosas) y las lámparas suman su charco. Dentro de un charco el tinte se aclara hacia una luz
-     cálida con una caída suave (sin tramar: escalado en pantalla, el tramado se veía como ruido). La luz no pasa a otra sala: cada
-     charco se recorta a la caja de su sala (piso + muebles altos); los pasillos y las ventanas quedan en penumbra.
+     cálida con una caída suave (sin tramar: escalado en pantalla, el tramado se veía como ruido). La luz no atraviesa
+     paredes: cada charco solo pinta los píxeles donde se ve su zona (ver zonas()); las ventanas quedan en penumbra.
      Se arma una vez por fase y después solo se copia. */
   function hex(c) { var n = parseInt(c.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; }
   function cascara(pts) {   // envolvente convexa (monotone chain), en sentido horario en pantalla
@@ -520,47 +520,52 @@ App.OficinaPixel = (function () {
     for (i = pts.length - 1; i >= 0; i--) { while (hi.length > 1 && cr(hi[hi.length - 2], hi[hi.length - 1], pts[i]) <= 0) hi.pop(); hi.push(pts[i]); }
     return lo.slice(0, -1).concat(hi.slice(0, -1));
   }
+  /* qué zona (sala o pasillo) se ve en cada píxel: se pintan los pisos y después la caja de cada mueble y pared en el
+     orden de dibujo, cada una con el número de la zona hacia donde mira su cara visible. Así la luz respeta las paredes. */
+  function zonas() {
+    var filas = [], lista = [];
+    salas.forEach(function (s, i) { lista.push({ r: s.r, id: i + 1 }); if (filas.indexOf(s.r[3]) < 0) filas.push(s.r[3]); });
+    filas.forEach(function (y, i) { lista.push({ r: [LAT, y, FX, y + PAS], id: salas.length + 1 + i, pasillo: true }); });
+    lista.push({ r: [0, 0, LAT, FY], id: salas.length + 1 + filas.length, pasillo: true, lateral: true });
+    function zonaEn(x, y) { for (var i = 0; i < lista.length; i++) { var r = lista[i].r; if (x >= r[0] && x < r[2] && y >= r[1] && y < r[3]) return lista[i].id; } return 0; }
+    var cv = document.createElement('canvas'); cv.width = W; cv.height = H; var ctx = cv.getContext('2d'), g0 = N.g; N.g = ctx;
+    var col = function (id) { return 'rgb(' + id + ',0,0)'; };
+    lista.forEach(function (z) { N.quad(z.r[0], z.r[1], z.r[2], z.r[3], col(z.id)); });
+    ordenar().forEach(function (it) {
+      var b = it.b; if (!b || b.length < 5 || it.enSofa !== undefined) return;
+      var x = b[2] - b[0] < .3 ? b[2] + .05 : (b[0] + b[2]) / 2, y = b[3] - b[1] < .3 ? b[3] + .05 : (b[1] + b[3]) / 2, pts = [];
+      [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].forEach(function (c) { var q = iso(c[0], c[1]); pts.push(q, up(q, b[4])); });
+      N.poly(cascara(pts), col(zonaEn(x, y)));
+    });
+    N.g = g0;
+    var d = ctx.getImageData(0, 0, W, H).data, Z = new Uint8Array(W * H);
+    for (var o = 0; o < Z.length; o++) Z[o] = d[o * 4 + 3] > 200 ? d[o * 4] : 0;
+    return { Z: Z, lista: lista };
+  }
   function luzPara(F) {
     var key = 'luz:' + F.k; if (pisos[key]) return pisos[key];
-    var I = new Float32Array(W * H), ZT = 20;
-    function charco(caja, cx, cy, rx, ry, fuerza, base) {
+    var I = new Float32Array(W * H), zz = zonas(), Z = zz.Z, piso = [0];
+    zz.lista.forEach(function (z) { piso[z.id] = z.pasillo ? .12 : .22; });   // luz mínima de cada zona, en toda la zona
+    for (var o0 = 0; o0 < I.length; o0++) I[o0] = piso[Z[o0]] || 0;
+    function charco(id, cx, cy, rx, ry, fuerza) {
       var bx0 = Math.max(0, Math.floor(cx - rx)), bx1 = Math.min(W - 1, Math.ceil(cx + rx)), by0 = Math.max(0, Math.floor(cy - ry)), by1 = Math.min(H - 1, Math.ceil(cy + ry));
-      var n = caja.length;
       for (var y = by0; y <= by1; y++) for (var x = bx0; x <= bx1; x++) {
-        var dentro = true;
-        for (var k = 0; k < n; k++) { var a = caja[k], b = caja[(k + 1) % n]; if ((b[0] - a[0]) * (y + .5 - a[1]) - (b[1] - a[1]) * (x + .5 - a[0]) < 0) { dentro = false; break; } }
-        if (!dentro) continue;
-        var dx = (x - cx) / rx, dy = (y - cy) / ry, d = Math.sqrt(dx * dx + dy * dy), v = d >= 1 ? 0 : 1 - d * d;
-        v = Math.max(base, v * fuerza);
-        var o = y * W + x;
+        var o = y * W + x; if (Z[o] !== id) continue;
+        var dx = (x - cx) / rx, dy = (y - cy) / ry, d = Math.sqrt(dx * dx + dy * dy), v = (d >= 1 ? 0 : 1 - d * d) * fuerza;
         if (v > I[o]) I[o] = v;
       }
     }
-    salas.forEach(function (s) {
-      var x0 = s.r[0] - WT, y0 = s.r[1] - WT, x1 = s.r[2], y1 = s.r[3], esq = [];
-      [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach(function (c) { var p = iso(c[0], c[1]); esq.push(p, up(p, ZT)); });
-      var caja = cascara(esq), w = s.r[2] - s.r[0], n = Math.max(1, Math.round(w / 5)), cy = (s.r[1] + s.r[3]) / 2;
-      for (var i = 0; i < n; i++) {
-        var p = up(iso(s.r[0] + w * (i + .5) / n, cy), 8), ancho = w / n + PROF;
-        charco(caja, p[0], p[1], ancho * 12 * S * .62, ancho * 6 * S * .9, 1, .22);
+    zz.lista.forEach(function (z) {
+      var r = z.r, w = r[2] - r[0], h = r[3] - r[1], i, p;
+      if (!z.pasillo) {   // salas: luces de techo, una cada ~5 baldosas, más las lámparas de la sala
+        var n = Math.max(1, Math.round(w / 5)), ancho = w / n + PROF, cy = (r[1] + r[3]) / 2;
+        for (i = 0; i < n; i++) { p = up(iso(r[0] + w * (i + .5) / n, cy), 8); charco(z.id, p[0], p[1], ancho * 12 * S * .62, ancho * 6 * S * .9, 1); }
+        luces.forEach(function (l) { if (l.x < r[0] || l.x > r[2] || l.y < r[1] || l.y > r[3]) return; var q = up(iso(l.x, l.y), l.z * .4); charco(z.id, q[0], q[1], l.r * 12 * S * 1.2, l.r * 6 * S * 1.5, 1.15); });
+      } else {            // pasillos: spots más tenues, uno cada ~3.5 baldosas
+        var largo = z.lateral ? h : w, m = Math.max(1, Math.round(largo / 3.5)), rr = largo / m;
+        for (i = 0; i < m; i++) { p = up(z.lateral ? iso((r[0] + r[2]) / 2, r[1] + rr * (i + .5)) : iso(r[0] + rr * (i + .5), (r[1] + r[3]) / 2), 3); charco(z.id, p[0], p[1], rr * 12 * S * .75, rr * 6 * S * .9, .6); }
       }
-      luces.forEach(function (l) {
-        if (l.x < s.r[0] || l.x > s.r[2] || l.y < s.r[1] || l.y > s.r[3]) return;
-        var q = up(iso(l.x, l.y), l.z * .4); charco(caja, q[0], q[1], l.r * 12 * S * 1.2, l.r * 6 * S * 1.5, 1.15, 0);
-      });
     });
-    /* los pasillos: spots de techo más tenues, uno cada ~3.5 baldosas; su luz moja el pie de las paredes que los bordean */
-    function pasillo(x0, y0, x1, y1, largoX) {
-      var esq = []; [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach(function (c) { var p = iso(c[0], c[1]); esq.push(p, up(p, WHI)); });
-      var caja = cascara(esq), largo = largoX ? x1 - x0 : y1 - y0, n = Math.max(1, Math.round(largo / 3.5)), r = largo / n;
-      for (var i = 0; i < n; i++) {
-        var m = largoX ? iso(x0 + r * (i + .5), (y0 + y1) / 2) : iso((x0 + x1) / 2, y0 + r * (i + .5)), p = up(m, 3);
-        charco(caja, p[0], p[1], r * 12 * S * .75, r * 6 * S * .9, .6, .12);
-      }
-    }
-    var filas = {}; salas.forEach(function (s) { filas[s.fila] = s.r[3]; });
-    Object.keys(filas).forEach(function (k) { pasillo(LAT, filas[k] - WT, FX, filas[k] + PAS, true); });
-    pasillo(0, 0, LAT, FY, false);
     var t = hex(F.tint), c = hex('#fff1dc'), k = .8 * F.glow, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     var ctx = cv.getContext('2d'), img = ctx.createImageData(W, H), dd = img.data;
     for (var o = 0, j = 0; o < I.length; o++, j += 4) { var m = Math.min(1, I[o]) * k; dd[j] = t[0] + (c[0] - t[0]) * m; dd[j + 1] = t[1] + (c[1] - t[1]) * m; dd[j + 2] = t[2] + (c[2] - t[2]) * m; dd[j + 3] = 255; }
