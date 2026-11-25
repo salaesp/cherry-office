@@ -12,7 +12,7 @@ App.OficinaPixel = (function () {
   /* ---------- estado del módulo ---------- */
   var cont = null, vista = null, vc = null, capa = null, mundo = null, g = null, W = 800, H = 600, FX = 20, FY = 14;
   var cbAgente = function () {}, cbLugar = function () {}, cbPasar = null;
-  var salas = [], items = [], EST = null, figs = {}, orden = [], puestos = {}, sillasReu = [], spotsOcio = [], recepcion = null, despacho = null, bandeja = null, recepcionYo = null, cafeYo = null, puestoBib = null;
+  var salas = [], items = [], luces = [], EST = null, figs = {}, orden = [], puestos = {}, sillasReu = [], spotsOcio = [], recepcion = null, despacho = null, bandeja = null, recepcionYo = null, cafeYo = null, puestoBib = null;
   /* el bibliotecario de la memoria: vive detrás del mostrador de la Biblioteca; con la tablet en la mano mientras ordena
      la memoria y con un aviso encima si hay algo para decidir. El estado lo manda la Biblioteca (App.Biblioteca.vigilarEstado) */
   var BIB_ID = '__bibliotecario', bibDatos = { corriendo: false, pendientes: 0 };
@@ -41,6 +41,7 @@ App.OficinaPixel = (function () {
     o = o || {}; var h = hu(n, o), al = n === 'planta' ? ({ alta: 30, mediana: 20, chica: 10 }[o.tipo] || 20) : (ALTO_MU[n] || 10);
     // con funciones en las opciones (los monitores de un escritorio) depende del estado de los agentes: se dibuja siempre
     var vivo = Object.keys(o).some(function (k) { return typeof o[k] === 'function'; });
+    if (n === 'lamparaPie') luces.push({ x: x + h.w / 2, y: y + h.d / 2, z: 20, r: 1.6 });
     items.push({ b: [x, y, x + h.w, y + h.d, al], d: x + h.w / 2 + y + h.d / 2, vivo: vivo, det: true, f: function (t) { if (M[n]) M[n](x, y, conT(t, o)); } });
     return h;
   }
@@ -117,7 +118,7 @@ App.OficinaPixel = (function () {
 
   /* ---------- muebles de cada sala ---------- */
   function amueblar(perfil) {
-    items = []; puestos = {}; sillasReu = []; spotsOcio = []; recepcion = null; despacho = null; bandeja = null; recepcionYo = null; cafeYo = null; puestoBib = null;
+    items = []; luces = []; puestos = {}; sillasReu = []; spotsOcio = []; recepcion = null; despacho = null; bandeja = null; recepcionYo = null; cafeYo = null; puestoBib = null;
     var filas = {}; salas.forEach(function (s) { (filas[s.fila] = filas[s.fila] || []).push(s); });
     Object.keys(filas).forEach(function (k) {
       var f = filas[k], y0 = f[0].r[1], i = +k;
@@ -168,6 +169,7 @@ App.OficinaPixel = (function () {
       sillasReu.push({ x: pn.x, y: pn.y, mira: '+y', sala: s, aisle: { x: pn.x, y: pn.y - .55 } }, { x: ps.x, y: ps.y, mira: '-y', sala: s, aisle: { x: ps.x, y: ps.y + .55 } });
     }
     put('tvPie', x0 + 5.9, y0 + 2.4, { mira: '-x' }); put('planta', s.r[0] + .3, y0 + .35, { tipo: 'alta' });
+    luces.push({ x: x0 + 2.2, y: y0 + 2.9, z: 20, r: 2.2 }, { x: x0 + 3.9, y: y0 + 2.9, z: 20, r: 2.2 });
     at(9999, function () { M.lamparaColgante(x0 + 2.2, y0 + 2.9, { zTecho: WH - 4, luz: LUZ }); M.lamparaColgante(x0 + 3.9, y0 + 2.9, { zTecho: WH - 4, luz: LUZ }); });
   }
   function salaDireccion(s, perfil) {
@@ -176,6 +178,7 @@ App.OficinaPixel = (function () {
     var p = { x: x0 + 1.75, y: y0 + 2.0 }; silla(p, '+y');
     despacho = { x: p.x, y: p.y, mira: '+y', sala: s, perfil: perfil, aisle: { x: x0 + 3.0, y: p.y } };   // entra y sale por detrás del escritorio, sin pisar las sillas de visita
     bandeja = { x: x0 + 1.95, y: y0 + 2.55, sala: s };
+    luces.push({ x: x0 + 1.3, y: y0 + 2.8, z: 9, r: 1.3 });
     at(50, function (t) { M.notebook(x0 + 1.35, y0 + 2.5, { mira: '-y' }); dibujarBandeja(); M.lamparaEscritorio(x0 + 1.25, y0 + 2.75, { luz: LUZ }); }, [x0 + 1.2, y0 + 2.4, x0 + 2.3, y0 + 3.0, 16]);
     put('sillaVisita', x0 + 1.5, y0 + 3.4, { mira: '-y' }); put('sillaVisita', x0 + 2.2, y0 + 3.4, { mira: '-y' });
     put('planta', x0 + .3, y0 + .35, { tipo: 'alta' }); put('sillon1', x0 + .3, y0 + 4.6, { mira: '+x', color: '#7a5d8a' }); put('lamparaPie', x0 + .3, y0 + 3.9, {});
@@ -475,7 +478,7 @@ App.OficinaPixel = (function () {
     ordenar().forEach(dibujarItem);
     dibujarPiezas(now);
     var F = FASE;
-    if (F.tint) { g.globalCompositeOperation = 'multiply'; g.fillStyle = F.tint; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'destination-in'; g.drawImage(pisoPara(F.k), 0, 0); g.globalCompositeOperation = 'source-over'; }
+    if (F.tint) { g.globalCompositeOperation = 'multiply'; if (F.glow > 0) g.drawImage(luzPara(F), 0, 0); else { g.fillStyle = F.tint; g.fillRect(0, 0, W, H); } g.globalCompositeOperation = 'destination-in'; g.drawImage(pisoPara(F.k), 0, 0); g.globalCompositeOperation = 'source-over'; }
     if (F.glow > 0) { g.globalCompositeOperation = 'lighter'; g.drawImage(brilloPara(F), 0, 0); g.globalCompositeOperation = 'source-over'; }
   }
   /* ---------- sprites de los muebles fijos ----------
@@ -512,6 +515,56 @@ App.OficinaPixel = (function () {
     var g0 = N.g; N.g = cv.getContext('2d'); N.g.globalCompositeOperation = 'lighter';
     salas.forEach(function (s) { var p = iso((s.r[0] + s.r[2]) / 2, (s.r[1] + s.r[3]) / 2); N.dith(p[0], p[1] + 6, 90, 45, '#ffcf8c', .07 * F.glow); });
     N.g = g0; pisos['brillo:' + F.k] = cv; return cv;
+  }
+
+  /* ---------- luces prendidas de noche ----------
+     El tinte de la hora se multiplica sobre todo; de noche ese tinte es un mapa de luz: cada sala tiene sus luces de
+     techo (una cada ~5 baldosas) y las lámparas suman su charco. Dentro de un charco el tinte se aclara hacia una luz
+     cálida, en escalones tramados (Bayer 4×4) para que siga pareciendo pixel art. La luz no pasa a otra sala: cada
+     charco se recorta a la caja de su sala (piso + muebles altos); los pasillos y las ventanas quedan en penumbra.
+     Se arma una vez por fase y después solo se copia. */
+  var BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  function hex(c) { var n = parseInt(c.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; }
+  function cascara(pts) {   // envolvente convexa (monotone chain), en sentido horario en pantalla
+    pts = pts.slice().sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    var cr = function (o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); }, lo = [], hi = [], i;
+    for (i = 0; i < pts.length; i++) { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], pts[i]) <= 0) lo.pop(); lo.push(pts[i]); }
+    for (i = pts.length - 1; i >= 0; i--) { while (hi.length > 1 && cr(hi[hi.length - 2], hi[hi.length - 1], pts[i]) <= 0) hi.pop(); hi.push(pts[i]); }
+    return lo.slice(0, -1).concat(hi.slice(0, -1));
+  }
+  function luzPara(F) {
+    var key = 'luz:' + F.k; if (pisos[key]) return pisos[key];
+    var I = new Float32Array(W * H), ZT = 20;
+    function charco(caja, cx, cy, rx, ry, fuerza, base) {
+      var bx0 = Math.max(0, Math.floor(cx - rx)), bx1 = Math.min(W - 1, Math.ceil(cx + rx)), by0 = Math.max(0, Math.floor(cy - ry)), by1 = Math.min(H - 1, Math.ceil(cy + ry));
+      var n = caja.length;
+      for (var y = by0; y <= by1; y++) for (var x = bx0; x <= bx1; x++) {
+        var dentro = true;
+        for (var k = 0; k < n; k++) { var a = caja[k], b = caja[(k + 1) % n]; if ((b[0] - a[0]) * (y + .5 - a[1]) - (b[1] - a[1]) * (x + .5 - a[0]) < 0) { dentro = false; break; } }
+        if (!dentro) continue;
+        var dx = (x - cx) / rx, dy = (y - cy) / ry, d = Math.sqrt(dx * dx + dy * dy), v = d >= 1 ? 0 : 1 - d * d;
+        v = Math.max(base, v * fuerza);
+        var q = Math.floor(v * 5 + BAYER[(y & 3) * 4 + (x & 3)] / 16) / 5, o = y * W + x;   // 5 escalones tramados
+        if (q > I[o]) I[o] = q;
+      }
+    }
+    salas.forEach(function (s) {
+      var x0 = s.r[0] - WT, y0 = s.r[1] - WT, x1 = s.r[2], y1 = s.r[3], esq = [];
+      [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach(function (c) { var p = iso(c[0], c[1]); esq.push(p, up(p, ZT)); });
+      var caja = cascara(esq), w = s.r[2] - s.r[0], n = Math.max(1, Math.round(w / 5)), cy = (s.r[1] + s.r[3]) / 2;
+      for (var i = 0; i < n; i++) {
+        var p = up(iso(s.r[0] + w * (i + .5) / n, cy), 8), ancho = w / n + PROF;
+        charco(caja, p[0], p[1], ancho * 12 * S * .62, ancho * 6 * S * .9, 1, .22);
+      }
+      luces.forEach(function (l) {
+        if (l.x < s.r[0] || l.x > s.r[2] || l.y < s.r[1] || l.y > s.r[3]) return;
+        var q = up(iso(l.x, l.y), l.z * .4); charco(caja, q[0], q[1], l.r * 12 * S * 1.2, l.r * 6 * S * 1.5, 1.15, 0);
+      });
+    });
+    var t = hex(F.tint), c = hex('#fff1dc'), k = .8 * F.glow, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    var ctx = cv.getContext('2d'), img = ctx.createImageData(W, H), dd = img.data;
+    for (var o = 0, j = 0; o < I.length; o++, j += 4) { var m = Math.min(1, I[o]) * k; dd[j] = t[0] + (c[0] - t[0]) * m; dd[j + 1] = t[1] + (c[1] - t[1]) * m; dd[j + 2] = t[2] + (c[2] - t[2]) * m; dd[j + 3] = 255; }
+    ctx.putImageData(img, 0, 0); pisos[key] = cv; return cv;
   }
 
   /* ---------- etiquetas (las mismas clases que la maqueta 3D) ---------- */
