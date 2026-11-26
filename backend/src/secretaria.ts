@@ -636,7 +636,7 @@ export class ServicioSecretaria {
     const wa = whatsappDe(this.s)
     return {
       config: cfg ? cfgJSON(cfg) : null,
-      agente: def ? { id: def.id, nombre: def.nombre } : null,
+      agente: def ? { id: def.id, nombre: def.nombre, departamento: def.departamento, permisos: def.permisos ?? [] } : null,
       corriendo: !!this.store.corriendo(act.carpeta),
       fuentes: this.fuentes.map((f) => {
         const fc = cfg?.fuentes.find((x) => x.id === f.id)

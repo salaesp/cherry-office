@@ -79,6 +79,24 @@
           h('label.ajuste-check', activa, h('span', 'Revisa sola')),
           h('button.btn.chico', { onclick: function () { if (App.Agente) App.Agente.abrir(ag.id, 'chat'); } }, App.icono('charla'), 'Charlar'))));
 
+      /* una secretaría armada antes de que existiera la recepción: ofrecer pasarla, y sacarle el permiso que ya no usa */
+      if (ag.departamento !== 'recepcion' || (ag.permisos || []).indexOf('whatsapp') >= 0) {
+        var acomodar = h('button.btn', { onclick: function () {
+          acomodar.disabled = true;
+          var cambios = { departamento: 'recepcion' };
+          if ((ag.permisos || []).indexOf('whatsapp') >= 0) cambios.permisos = ag.permisos.filter(function (x) { return x !== 'whatsapp'; });
+          api().patch('/api/agentes/' + encodeURIComponent(ag.id), cambios).then(function (r) {
+            if (r.oficina && App.actualizar) App.actualizar(r.oficina);
+            App.guardado(ag.nombre + ' ya está en la recepción.');
+            return cargar();
+          }).catch(function (e) { App.fallo(e); acomodar.disabled = false; });
+        } }, 'Pasar a la recepción');
+        var por = [];
+        if (ag.departamento !== 'recepcion') por.push('se sienta en la recepción, al lado del mostrador');
+        if ((ag.permisos || []).indexOf('whatsapp') >= 0) por.push('le saca «Puede leer WhatsApp», que ya no hace falta (lee los chats que elijas acá)');
+        caja.appendChild(App.ajuste('Acomodar a ' + ag.nombre, 'La secretaría ahora vive en la recepción. Con esto ' + por.join(' y ') + '.', acomodar));
+      }
+
       /* WhatsApp: elegir chats de la lista completa y cada cuánto */
       var marcados = (fWa && fWa.chats) || [];
       function guardarWa(cambio, texto) {
