@@ -542,7 +542,7 @@ App.Flujos = (function () {
       var nombre = h('input.campo', { value: ed.nombre, maxlength: 80, placeholder: 'Producción de una clase', oninput: function () { ed.nombre = nombre.value; sucio = true; } });
       var desc = h('textarea.campo', { rows: 2, maxlength: 600, placeholder: 'Para qué sirve este flujo (opcional)', oninput: function () { ed.descripcion = desc.value; sucio = true; } });
       desc.value = ed.descripcion;
-      var estado = App.elegir({ forma: 'chips', etiqueta: 'Estado', valor: ed.activo,
+      var estado = App.elegir({ forma: 'interruptor', etiqueta: 'Estado', valor: ed.activo,
         opciones: [{ valor: true, titulo: 'Activo' }, { valor: false, titulo: 'Pausado' }],
         alCambiar: function (v) { ed.activo = v; sucio = true; } });
       /* «Al terminar, seguir con…»: otro flujo de la oficina (no este) que arranca solo con la última entrega como contexto */
@@ -640,8 +640,8 @@ App.Flujos = (function () {
       consigna.value = p.consigna;
       var recibe = h('input.campo', { value: p.recibe, maxlength: 600, placeholder: 'Por ejemplo: el tema de la clase', oninput: function () { p.recibe = recibe.value; sucio = true; } });
       var entrega = h('input.campo', { value: p.entrega, maxlength: 600, placeholder: 'Por ejemplo: ficha, guion y ejercicios', oninput: function () { p.entrega = entrega.value; sucio = true; } });
-      var aprob = App.elegir({ forma: 'chips', etiqueta: 'Aprobación', valor: !!p.aprobacion,
-        opciones: [{ valor: false, titulo: 'Sigue solo' }, { valor: true, titulo: 'Espera tu OK', icono: 'escudo' }],
+      var aprob = App.elegir({ forma: 'interruptor', etiqueta: 'Aprobación', valor: !!p.aprobacion,
+        opciones: [{ valor: true, titulo: 'Espera tu OK' }, { valor: false, titulo: 'Sigue solo' }],
         alCambiar: function (v) { p.aprobacion = v; sucio = true; } });
       var plazo = h('input.campo', { type: 'number', min: 1, max: 60, value: p.plazoDias, placeholder: '2', oninput: function () { p.plazoDias = plazo.value; sucio = true; } });
       var espera = h('input.campo', { type: 'number', min: 1, max: 90, value: p.esperaDias, placeholder: 'Enseguida', oninput: function () { p.esperaDias = espera.value; sucio = true; } });

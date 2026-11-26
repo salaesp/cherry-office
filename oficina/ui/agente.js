@@ -721,7 +721,10 @@
           var ops = [{ valor: 'no', titulo: 'No' }];
           if (hayLeer) ops.push({ valor: 'leer', titulo: 'Leer' });
           if (hayActuar) ops.push({ valor: 'actuar', titulo: hayLeer ? 'Leer y actuar' : 'Actuar', sub: 'Actuar siempre pide tu aprobación' });
-          control = App.elegir({ forma: 'chips', etiqueta: nombreServ(s.nombre), opciones: ops, valor: nivelActual(s), alCambiar: function (v) { cambiarConector(s, v); } });
+          /* de menos a más permiso: deslizador (o interruptor si solo hay una forma de usarlo, con «No» como apagado) */
+          var formaCon = ops.length > 2 ? 'deslizador' : ops.length === 2 ? 'interruptor' : 'chips';
+          if (formaCon === 'interruptor') ops.reverse();
+          control = App.elegir({ forma: formaCon, etiqueta: nombreServ(s.nombre), opciones: ops, valor: nivelActual(s), alCambiar: function (v) { cambiarConector(s, v); } });
         }
         return App.ajuste(nombreServ(s.nombre), null, control);
       });
