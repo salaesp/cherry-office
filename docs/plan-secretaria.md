@@ -160,6 +160,23 @@ verificado y necesita webhooks públicos). El camino es un **cliente no oficial*
 6. **Desconexión visible.** Si la sesión se revoca, el teléfono no se conecta hace más de 12 días (a los 14 WhatsApp
    desvincula) o la captura está caída, la fuente lo informa en `estado()`: aparece un aviso (`s.avisos.fuentes`, tipo
    `secretaria`) con «Volver a vincular» y el próximo reporte lo menciona.
+7. **Cómo se eligen los chats.** En Ajustes › Conectores › WhatsApp, después del QR, de dos formas:
+   - **de una lista** con buscador (por nombre o número): la arman los chats recientes y los grupos que WhatsApp manda
+     al vincular (`messaging-history.set` sin historial, `groupFetchAllParticipating`) más los chats que van escribiendo
+     después. Muestra nombre, número (o «grupo · N participantes») y cuándo fue el último mensaje. De un chat no
+     elegido se guarda solo eso, **nunca el texto**;
+   - **por número**: se escribe el número con código de país y queda elegido aunque nadie haya escrito todavía desde
+     ahí. Es lo más directo para un contacto conocido.
+
+   Al elegir un chat se le pone un **nombre** («Mamá»; es el que ve el secretario) y una **nota** opcional para el
+   secretario («es mi mamá, tiene turnos médicos seguido y me avisa por acá»), que va en el material de la revisión
+   como contexto. Se lee **desde que se elige**: lo anterior no se recupera. Dejar de elegirlo borra sus mensajes. En
+   un grupo elegido se leen todos los participantes (filtrar por participante queda para después). Estados y canales
+   no aparecen.
+
+   La lista es de la app (hay un solo WhatsApp); cada oficina marca, entre los chats elegidos, cuáles revisa su
+   secretaría (`fuentes[].chats`). Un chat agregado por número tiene que reconocer el primer mensaje que llegue con su
+   id `@lid`: la captura usa el mapeo número↔`@lid` de Baileys y, si lo encuentra, suma el `@lid` a `wa_chats.lids`.
 
 ## Configuración
 `secretaria` en `oficina.json`:
@@ -184,11 +201,12 @@ asigne.
 | GET | `/api/secretaria` | | `{config, fuentes:[{id, nombre, tipo, estado?, ultimaRevision?, proxima?}], revisiones:[últimas 20]}` |
 | PUT | `/api/secretaria` | `{agente?, franja?, reporteVacio?, fuentes?}` | `{config}`; 400 si un intervalo queda fuera de 5 minutos a 24 horas o la fuente no existe |
 | POST | `/api/secretaria/revisar` | `{fuentes?: [id]}` | `{revision}`; bajo demanda. 409 si ya hay una corriendo |
-| GET | `/api/whatsapp` | | `{estado: "apagado"\|"esperando_qr"\|"conectando"\|"conectado"\|"revocado"\|"caido", numero?, telefonoVisto?, chats:[{jid, nombre, elegido, grupo, ultimo}]}` |
+| GET | `/api/whatsapp` | | `{estado: "apagado"\|"esperando_qr"\|"conectando"\|"conectado"\|"revocado"\|"caido", numero?, telefonoVisto?, chats:[{jid, nombre, nota?, elegido, grupo, participantes?, ultimo?}]}` |
 | POST | `/api/whatsapp/vincular` | `{aceptoRiesgo: true}` | `{estado}`; arranca la captura. 400 sin `aceptoRiesgo` |
 | GET | `/api/whatsapp/qr` | | `{qr: <data URL PNG>}` o 404 si no hay QR vigente (rota cada ~20 s) |
 | POST | `/api/whatsapp/desvincular` | | `{estado:"apagado"}`; cierra sesión en WhatsApp y borra `<datosDir>/whatsapp/` |
-| PUT | `/api/whatsapp/chats` | `{elegidos:[jid], nombres?:{jid: nombre}}` | `{chats}`; dejar de elegir un chat borra sus mensajes |
+| PUT | `/api/whatsapp/chats/:jid` | `{elegido?, nombre?, nota?}` | `{chat}`; `elegido: false` borra sus mensajes. 400 si se elige sin nombre |
+| POST | `/api/whatsapp/chats` | `{numero, nombre, nota?}` | `{chat}`; agrega y elige por número (`+54 9 11 …` → JID). 400 si el número no es válido; 409 si ya está |
 
 ## Fases
 ### S0: spike de WhatsApp (sin tocar la app)
@@ -206,7 +224,7 @@ asigne.
 ### S1: WhatsApp conectado y legible
 **Backend** (`backend/src/whatsapp.ts`, módulo `whatsapp`, orden 77; captura en `backend/src/whatsapp-captura.ts`)
 - Tablas en `hq.db`:
-  - `wa_chats(jid PRIMARY KEY, lids TEXT, nombre, elegido, grupo, ultimo)`;
+  - `wa_chats(jid PRIMARY KEY, lids TEXT, nombre, nota, elegido, grupo, participantes, ultimo)`;
   - `wa_mensajes(id, chat, de, propio, ts, tipo, texto, cita, editado, borrado, PRIMARY KEY(chat,id))` con índice
     `(chat, ts)` y FTS5 sobre `texto`;
   - `wa_estado(clave PRIMARY KEY, valor)`: estado de la conexión, última conexión del teléfono y número vinculado.
@@ -272,3 +290,4 @@ automatizar.
   vinculación y desde ese momento.
 - **Frecuencia configurable** como intervalo en minutos u horas.
 - **Grupos de WhatsApp incluidos** en la primera versión, elegidos de a uno.
+- **Chats elegidos de una lista o por número**, con nombre y nota para el secretario (decisión 7 de WhatsApp).
