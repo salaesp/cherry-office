@@ -18,7 +18,7 @@ App.Nav = (function () {
   var SECCIONES = [
     { id: 'bandeja', texto: 'Bandeja', icono: 'bandeja', ruta: '#/bandeja', movil: true },
     { id: 'oficina', texto: 'Oficina', icono: 'edificio', ruta: '#/oficina' },
-    { id: 'equipo', texto: 'Chats', icono: 'charla', ruta: '#/equipo', movil: true },
+    { id: 'equipo', texto: 'Equipo', icono: 'personas', ruta: '#/equipo', movil: true },
     { id: 'archivos', texto: 'Archivos', icono: 'carpeta', ruta: '#/archivos', movil: true },
     { id: 'trabajo', texto: 'Trabajo', icono: 'reloj', ruta: '#/trabajo' }
   ];
@@ -402,7 +402,10 @@ App.Nav = (function () {
       var q = buscarEq.trim().toLowerCase();
       App.vaciar(cuerpo);
       if (eqTab === 'reuniones') { cuerpo.appendChild(listaReuniones(q)); return; }
-      App.add(cuerpo, App.dom.equipo, h('div.lista-grupo', 'La oficina'),
+      var nDeps = (App.E.oficina.departamentos || []).length;
+      var grupoOficina = h('div.lista-grupo', 'La oficina', h('span.cuenta', nDeps + ' ' + (nDeps === 1 ? 'departamento' : 'departamentos')),
+        h('button.btn.icono.chico', { title: 'Nuevo departamento', 'aria-label': 'Nuevo departamento', onclick: function () { App.Departamentos.agregar(); } }, App.icono('mas')));
+      App.add(cuerpo, App.dom.equipo, grupoOficina,
         filtroFila('capas', 'Departamentos', sub === 'departamentos', function () { ir('#/equipo/departamentos'); }));
       /* filtrar a la gente sin rearmar la lista (las filas las pinta app.js) */
       App.dom.equipo.querySelectorAll('.persona[data-id]').forEach(function (el) {
