@@ -12,3 +12,7 @@ oficina/config.json
 
 # log del backend que escribe actualizar.sh
 backend.log
+
+# lo que deja el claude falso de los tests cuando corre sin carpeta de log
+backend/test/fixtures/events.log
+backend/test/fixtures/cwd.log
