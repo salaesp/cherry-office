@@ -41,18 +41,19 @@ Lo que ya existe en la oficina y se reusa:
    disco (ver decisión 6); «Desvincular» los borra.
 4. **Inyección de prompts.** Cualquiera en un chat elegido le escribe texto al secretario. Mitigación: el secretario no
    puede mandar nada, toda acción pasa por `proponer_accion` con los argumentos a la vista, y los mensajes entran
-   delimitados como datos (decisión 8). En el peor caso hay una sugerencia rara y la persona la descarta.
+   delimitados como datos (decisión 8). En el peor caso hay una sugerencia rara y la persona la descarta. Un grupo
+   amplía quiénes pueden escribirle: por eso se eligen de a uno.
 5. **Mantenimiento.** WhatsApp cambia el protocolo y Baileys se rompe hasta que lo arreglan. Mitigación: la captura está
    aislada en su propio proceso, y si falla la oficina avisa sin caerse.
 
 ## Conceptos
 - **Captura**: el proceso hijo con Baileys. Mantiene la sesión, filtra por chats elegidos y anota mensajes. No sabe nada
   de agentes.
-- **Chat elegido**: un chat que la persona marcó para leer. Se identifica por su JID de número **y** por sus ids `@lid`
-  (WhatsApp usa los dos; la lista se completa sola cuando llega un mensaje del mismo contacto con el otro id). Por
-  defecto no se eligen grupos; se pueden elegir de a uno.
+- **Chat elegido**: un chat individual o un grupo que la persona marcó para leer. Un contacto se identifica por su JID
+  de número **y** por sus ids `@lid` (WhatsApp usa los dos; la lista se completa sola cuando llega un mensaje del mismo
+  contacto con el otro id). Un grupo, por su JID `@g.us`. Los estados y los canales nunca se leen.
 - **Mensaje**: `{id, chat, de, propio, ts, tipo, texto?, cita?, editado?, borrado?}`. `propio` = lo mandó la persona
-  desde su teléfono. Se guardan los dos sentidos: si la persona ya contestó «listo, lo agendé», el secretario no tiene que
+  desde su teléfono. En un grupo, `de` es el participante que lo mandó. Se guardan los dos sentidos: si la persona ya contestó «listo, lo agendé», el secretario no tiene que
   sugerir nada.
 - **Revisión**: una corrida del secretario con los mensajes nuevos de una tanda.
 - **Cursor**: hasta qué mensaje se revisó, **por chat**. Avanza solo con confirmación (decisión 5).
@@ -65,16 +66,19 @@ Lo que ya existe en la oficina y se reusa:
    Topes: `--max-old-space-size=256` para el hijo. El tope de CPU queda sin equivalente portable; se mide en la fase W0.
 2. **La conexión es de la app, no de la oficina.** Hay un solo WhatsApp por persona: la sesión vive en
    `<datosDir>/whatsapp/` y los mensajes en `hq.db`. Cada oficina decide en su `oficina.json` si lo usa, qué chats lee
-   y qué agente es el secretario (`whatsapp: {secretario, chats:[...], horarios}`). Como el programador, solo revisa la
+   y qué agente es el secretario (`whatsapp: {secretario, chats:[...], cada}`). Como el programador, solo revisa la
    oficina activa; lo que llegó mientras tanto queda para cuando se abra.
-3. **Dos fuentes posibles, el mismo formato.** (a) **Captura propia** (lo normal). (b) **Leer un `messages.jsonl` ya
-   existente**, como el del monitor actual de la persona: la oficina sigue ese archivo (por posición y tamaño) y lo
-   importa sin vincular otro dispositivo. Esto evita tener **dos clientes no oficiales en el mismo número**, que es más
-   huella para la detección y gasta uno de los 4 dispositivos vinculados. Recomendación: mientras el monitor existente
-   ande, usar (b).
-4. **Revisión por tandas, no por mensaje.** Dos disparadores, los dos configurables:
-   - **horarios fijos** (por defecto 8, 12, 16 y 20 h, como el monitor actual);
-   - **en caliente** (apagado por defecto): cuando un chat elegido queda quieto 5 minutos después de un mensaje nuevo.
+3. **Grupos desde la primera versión, elegidos de a uno.** Un grupo elegido se guarda entero, con quién dijo cada cosa.
+   El nombre de cada participante sale de los nombres que la persona puso a sus contactos en Ajustes; si no tiene uno,
+   se muestra el número, nunca el `pushName` que manda cada uno (decisión 8). Se guarda **a partir de la vinculación**:
+   no se importa historial previo (`syncFullHistory: false`), ni de grupos ni de chats individuales. Como un grupo
+   suma más terceros, la lista de chats lo marca y la pantalla de activación lo menciona.
+4. **Revisión por tandas, cada cuánto lo elige la persona.** La frecuencia se configura como un intervalo en minutos
+   u horas (`cada: {valor, unidad: "minutos"|"horas"}`; mínimo 5 minutos, máximo 24 horas; por defecto 4 horas). Se puede
+   limitar a una franja horaria (`franja: {desde: "08:00", hasta: "22:00"}`, opcional) para no revisar de noche; lo que
+   llega fuera de la franja se revisa en la primera vuelta del día. Una revisión empieza cuando pasó el intervalo desde
+   la última y, para no cortar una conversación a la mitad, espera hasta que el chat quede quieto 2 minutos (tope:
+   10 minutos de espera).
 
    En cada disparo: si no hay mensajes nuevos ni alerta, **no se lanza claude** (cero costo). Si hay, se lanza un
    encargo del secretario (`Programador.encargarLibre`, id `whatsapp:<n>`) con los nuevos más hasta 10 anteriores de
@@ -120,19 +124,16 @@ Lo que ya existe en la oficina y se reusa:
   - `wa_estado(clave PRIMARY KEY, valor)`: estado de la conexión, última conexión del teléfono y número vinculado.
 - La captura guarda en disco solo los mensajes de chats elegidos. De los demás guarda solo `jid`, nombre y `ultimo`,
   para que la persona pueda elegirlos en la lista. Nunca el texto.
-- Fuente jsonl (decisión 3): `whatsapp.fuente = {tipo:'jsonl', ruta}` en `config.json`. Se lee cada 60 s desde el último
-  byte leído y se mapea al mismo `wa_mensajes`.
 - Retención: mensajes de más de 90 días se borran (configurable).
 
 **API**
 | Método | Ruta | Cuerpo | Respuesta |
 |---|---|---|---|
-| GET | `/api/whatsapp` | | `{estado: "apagado"\|"esperando_qr"\|"conectando"\|"conectado"\|"revocado"\|"caido", numero?, fuente, telefonoVisto?, chats:[{jid, nombre, elegido, grupo, ultimo}]}` |
+| GET | `/api/whatsapp` | | `{estado: "apagado"\|"esperando_qr"\|"conectando"\|"conectado"\|"revocado"\|"caido", numero?, telefonoVisto?, chats:[{jid, nombre, elegido, grupo, ultimo}]}` |
 | POST | `/api/whatsapp/vincular` | `{aceptoRiesgo: true}` | `{estado}`; arranca la captura. 400 sin `aceptoRiesgo` |
 | GET | `/api/whatsapp/qr` | | `{qr: <data URL PNG>}` o 404 si no hay QR vigente (rota cada ~20 s) |
 | POST | `/api/whatsapp/desvincular` | | `{estado:"apagado"}`; cierra sesión en WhatsApp y borra `<datosDir>/whatsapp/` |
 | PUT | `/api/whatsapp/chats` | `{elegidos:[jid], nombres?:{jid: nombre}}` | `{chats}`; dejar de elegir un chat borra sus mensajes |
-| PUT | `/api/whatsapp/fuente` | `{tipo:"captura"}` o `{tipo:"jsonl", ruta}` | `{fuente}` |
 
 **Front** (Ajustes › Conectores › WhatsApp, `oficina/ui/`)
 - Pantalla de activación con el aviso de riesgos (baneo, terceros, sesión) y la casilla «Entiendo los riesgos».
@@ -148,8 +149,9 @@ Lo que ya existe en la oficina y se reusa:
 - Sirve para usar WhatsApp a mano y para medir el riesgo de baneo antes de automatizar.
 
 ## Fase W3: secretario automático
-- `whatsapp` en `oficina.json`: `{secretario: <id>, chats:[jid], horarios:["08:00","12:00","16:00","20:00"],
-  enCaliente: false}`. Editable desde la ficha del secretario.
+- `whatsapp` en `oficina.json`: `{secretario: <id>, chats:[jid], cada: {valor: 4, unidad: "horas"}, franja?: {desde,
+  hasta}}`. Editable desde la ficha del secretario («Revisar WhatsApp cada [4] [horas]», con la franja opcional).
+  `PUT /api/oficina/whatsapp` lo guarda; 400 si el intervalo queda fuera de 5 minutos a 24 horas.
 - Tabla `wa_revisiones(id, oficina, chat, desde_ts, hasta_ts, estado, ejecucion, creada)` y `wa_cursores(oficina, chat,
   hasta_ts)`.
 - Disparo (decisión 4) dentro del ciclo de 30 s del programador. Consigna: quién es cada contacto, los mensajes nuevos
@@ -168,8 +170,9 @@ Lo que ya existe en la oficina y se reusa:
 
 ## Pruebas
 - Unitarias (vitest):
-  - filtro por chat con `@lid`;
-  - mapeo de mensajes de Baileys y del jsonl al mismo formato;
+  - filtro por chat con `@lid` y por grupo, descartando estados y canales;
+  - mapeo de mensajes de Baileys, con el participante en los grupos;
+  - cálculo del próximo disparo con intervalo, franja horaria y espera a que el chat quede quieto;
   - cursor que no avanza con ejecución fallida o incierta;
   - tope de tandas;
   - que no se lanza claude sin novedades;
@@ -177,7 +180,8 @@ Lo que ya existe en la oficina y se reusa:
 - La captura se prueba con un doble del socket de Baileys: nada de la suite toca WhatsApp de verdad.
 - A mano: W0 y W1 con número secundario, y una semana conectado antes de habilitar W3.
 
-## Preguntas abiertas
-- ¿Se arranca leyendo el `messages.jsonl` del monitor actual (fuente b) o con captura propia y se apaga el monitor?
-- ¿Horarios fijos alcanzan, o el caso de los turnos pide «en caliente»?
-- ¿Grupos (por ejemplo «Familia») entran en la primera versión o quedan para después?
+## Decisiones de la persona
+- **Sin importar el monitor existente:** la oficina no va a tener acceso a su `messages.jsonl`. Se captura con su propia
+  vinculación y solo desde ese momento.
+- **Frecuencia configurable** como intervalo en minutos u horas (decisión 4).
+- **Grupos incluidos** en la primera versión, elegidos de a uno (decisión 3).
