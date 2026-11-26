@@ -201,50 +201,40 @@ asigne.
 | GET | `/api/secretaria` | | `{config, fuentes:[{id, nombre, tipo, estado?, ultimaRevision?, proxima?}], revisiones:[últimas 20]}` |
 | PUT | `/api/secretaria` | `{agente?, franja?, reporteVacio?, fuentes?}` | `{config}`; 400 si un intervalo queda fuera de 5 minutos a 24 horas o la fuente no existe |
 | POST | `/api/secretaria/revisar` | `{fuentes?: [id]}` | `{revision}`; bajo demanda. 409 si ya hay una corriendo |
-| GET | `/api/whatsapp` | | `{estado: "apagado"\|"esperando_qr"\|"conectando"\|"conectado"\|"revocado"\|"caido", numero?, telefonoVisto?, chats:[{jid, nombre, nota?, elegido, grupo, participantes?, ultimo?}]}` |
-| POST | `/api/whatsapp/vincular` | `{aceptoRiesgo: true}` | `{estado}`; arranca la captura. 400 sin `aceptoRiesgo` |
-| GET | `/api/whatsapp/qr` | | `{qr: <data URL PNG>}` o 404 si no hay QR vigente (rota cada ~20 s) |
-| POST | `/api/whatsapp/desvincular` | | `{estado:"apagado"}`; cierra sesión en WhatsApp y borra `<datosDir>/whatsapp/` |
-| PUT | `/api/whatsapp/chats/:jid` | `{elegido?, nombre?, nota?}` | `{chat}`; `elegido: false` borra sus mensajes. 400 si se elige sin nombre |
-| POST | `/api/whatsapp/chats` | `{numero, nombre, nota?}` | `{chat}`; agrega y elige por número (`+54 9 11 …` → JID). 400 si el número no es válido; 409 si ya está |
+Las rutas de WhatsApp (`/api/whatsapp*`) ya están implementadas: ver la sección «WhatsApp» de [backend/API.md](../backend/API.md).
 
 ## Fases
-### S0: spike de WhatsApp (sin tocar la app)
-- Script suelto en `tools/whatsapp-spike/` que se vincula por QR en la terminal, filtra un chat (número y `@lid`) y un
-  grupo, y anota en jsonl, con las opciones de Baileys para no marcar leído ni presencia (`markOnlineOnConnect: false`,
-  sin `readMessages`, `syncFullHistory: false`).
-- Verificar:
-  - que empaqueta con `esbuild` para Electron (Baileys es ESM y tiene dependencias opcionales de imágenes: dejarlas
-    afuera);
-  - el consumo real de memoria y CPU en una semana;
-  - qué pasa al reconectar después de horas cerradas (llegan los mensajes atrasados);
-  - que el teléfono sigue mostrando notificaciones normalmente.
-- Correr con un número secundario.
+### S0: spike de WhatsApp (hecho)
+`tools/whatsapp-spike/`, probado con un WhatsApp real durante poco tiempo (no la semana prevista). Lo que se aprendió:
+- **Al vincular llega mucho historial** aunque `syncFullHistory` sea false: unos 25.000 mensajes recientes en tandas
+  (`syncType` 3, del 20 % al 100 %). Se aceptan, como hace WhatsApp Web, y se descartan sin guardar. La pantalla muestra
+  «Trayendo la lista de chats (N %)» mientras dura.
+- **Los nombres de la agenda llegan después**, por otra vía (unos 200 de 670 entradas, todos los grupos con nombre). El
+  resto se muestra con el nombre que cada uno eligió para sí, como pista («~Juli»), o con el número. Los agentes nunca
+  ven esa pista: ven el nombre que la persona puso al elegir el chat.
+- **Una persona puede aparecer con su número y con su `@lid`**: la lista las junta (`wa_lids`).
+- **`@lid` de un elegido por número:** se averigua al conectar (`getLIDForPN`); en grupos, el remitente llega con su
+  número (`participantAlt`).
+- Consumo esperando el QR o conectado sin actividad: unos 100 a 115 MB de RAM y cerca de 1 % de CPU.
+- Empaqueta con esbuild en un solo archivo ESM con el WebAssembly adentro.
+- Quedaron sin medir: una semana corriendo, reconexión tras horas cerrada, notificaciones del teléfono y si un mensaje
+  nuevo de un elegido por número llega con `via: "alternativo"`.
 
-### S1: WhatsApp conectado y legible
-**Backend** (`backend/src/whatsapp.ts`, módulo `whatsapp`, orden 77; captura en `backend/src/whatsapp-captura.ts`)
-- Tablas en `hq.db`:
-  - `wa_chats(jid PRIMARY KEY, lids TEXT, nombre, nota, elegido, grupo, participantes, ultimo)`;
-  - `wa_mensajes(id, chat, de, propio, ts, tipo, texto, cita, editado, borrado, PRIMARY KEY(chat,id))` con índice
-    `(chat, ts)` y FTS5 sobre `texto`;
-  - `wa_estado(clave PRIMARY KEY, valor)`: estado de la conexión, última conexión del teléfono y número vinculado.
-- La captura guarda solo los mensajes de chats elegidos. De los demás guarda solo `jid`, nombre y `ultimo`, para que
-  la persona pueda elegirlos. Nunca el texto.
-- Retención: mensajes de más de 90 días se borran (configurable).
-- Herramientas MCP de solo lectura, para el agente de la secretaría:
-  - `whatsapp_chats`: los chats elegidos, con nombre y último mensaje;
-  - `whatsapp_leer {chat, desde?, hasta?, limite?≤100}`;
-  - `whatsapp_buscar {texto, chat?, limite?≤20}`.
-
-  Todas devuelven los mensajes en el bloque delimitado de la decisión 8.
-
-**Front** (Ajustes › Conectores › WhatsApp, `oficina/ui/`)
-- Pantalla de activación con el aviso de riesgos (baneo, terceros, sesión, grupos) y la casilla «Entiendo los riesgos».
-- QR que se refresca solo, estado de la conexión, lista de chats con buscador para elegir y ponerles nombre, y
-  «Desvincular».
-
-Al terminar S1 ya se puede charlar con el agente sobre los chats. Sirve para medir el riesgo de baneo antes de
-automatizar.
+### S1: WhatsApp conectado y legible (hecho)
+Implementado como se describe en la sección «WhatsApp» de [backend/API.md](../backend/API.md). Cambios respecto de lo
+planeado:
+- **Qué agente lee:** mientras no exista la secretaría (S2), lo decide un permiso del agente (`"whatsapp"`, el
+  interruptor «Puede leer WhatsApp» en su ficha), y lee todos los chats elegidos. En S2 la secretaría lo reemplaza o lo
+  acota por oficina.
+- **Búsqueda** con `LIKE` sobre el texto sin acentos (`norm`), no FTS5: son pocos mensajes (solo chats elegidos, 90 días).
+- **Ajustes › WhatsApp** es una sección propia de «Toda la app», no parte de Conectores (que es de cada oficina).
+- **Desvincular** borra todo: sesión, lista de chats, relaciones número↔`@lid` y mensajes.
+- **Sesión cifrada** con una clave aleatoria guardada con `safeStorage` (`desktop/src/whatsapp.ts`); la captura cifra
+  cada archivo con AES-256-GCM.
+- **Pendiente:** el aviso de «el teléfono no se conecta hace más de 12 días» (decisión 6 de WhatsApp) no está: Baileys
+  no da esa fecha de forma directa. Quedan los avisos de sesión revocada y de captura caída.
+- **Sin probar todavía:** la app de escritorio empaquetada (la captura lanzada con `fork` desde Electron y fuera
+  del asar) y una vinculación real desde la app. En modo desarrollo, la captura real llega hasta el QR.
 
 ### S2: la secretaría, con WhatsApp como primera fuente
 - `backend/src/secretaria.ts` (módulo `secretaria`, orden 78): interfaz `Fuente`, registro de fuentes, cálculo de la

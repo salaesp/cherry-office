@@ -18,6 +18,7 @@ import { infoClaude, rutasChat } from './rutas-chat.js'
 import { rutasOficinas } from './rutas-oficinas.js'
 import { modulosRegistrados, type Servicios } from './servicios.js'
 import { Store } from './store.js'
+import type { HostWhatsApp } from './whatsapp.js'
 
 export type OpcionesBackend = {
   config: Config
@@ -25,6 +26,8 @@ export type OpcionesBackend = {
   claudePath?: string
   /** Entorno para los procesos hijos y las variables HQ_*. */
   env?: NodeJS.ProcessEnv
+  /** Lo que pone la carcasa para WhatsApp: dónde está la captura empaquetada y la clave del llavero (whatsapp.ts). */
+  whatsapp?: HostWhatsApp
 }
 
 export interface Backend {
@@ -41,7 +44,7 @@ export interface Backend {
   shutdown(): Promise<void>
 }
 
-export function createBackend({ config, claudePath, env = process.env }: OpcionesBackend): Backend {
+export function createBackend({ config, claudePath, env = process.env, whatsapp }: OpcionesBackend): Backend {
   const log = new HQLog(config.datosDir)
   const store = new Store(path.join(config.datosDir, 'hq.db'))
   const oficinas = new Oficinas(config, log)
@@ -55,7 +58,7 @@ export function createBackend({ config, claudePath, env = process.env }: Opcione
   const s: Servicios = {
     config, store, runner, oficinas, avisos, entregas, log, env, canal,
     router: undefined as unknown as Router,
-    huecos: {}, alAbrir: [], validaciones: [], alCerrar: [], despuesDeProcesos: [], alArrancar: [],
+    huecos: whatsapp ? { whatsappHost: whatsapp } : {}, alAbrir: [], validaciones: [], alCerrar: [], despuesDeProcesos: [], alArrancar: [],
   }
   const router = new Router(() => s.listo?.() ?? Promise.resolve())
   ;(s as { router: Router }).router = router

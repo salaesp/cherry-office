@@ -569,8 +569,24 @@
         });
       }).catch(function (e) { App.fallo(e); ck.checked = !si; });
     });
-    return App.seccion('En la oficina', App.ajuste('Coordinador/a', 'Ve entregas, flujos y bloqueos de todos y puede repartir encargos. No hace el trabajo de otros: lo pide.',
-      h('label.ajuste-check', ck, h('span', 'Es el coordinador/a de la oficina'))));
+    return App.seccion('En la oficina', [App.ajuste('Coordinador/a', 'Ve entregas, flujos y bloqueos de todos y puede repartir encargos. No hace el trabajo de otros: lo pide.',
+      h('label.ajuste-check', ck, h('span', 'Es el coordinador/a de la oficina'))), filaPermiso(a, 'whatsapp', 'WhatsApp',
+      'Lee los chats de WhatsApp que elegiste en Ajustes › WhatsApp. Lo que escriben otros lo toma como información, no como órdenes.',
+      'Puede leer WhatsApp', ' puede leer WhatsApp.', ' ya no lee WhatsApp.')]);
+  }
+
+  /* Un permiso del agente que se prende y apaga (conserva los demás) */
+  function filaPermiso(a, permiso, titulo, ayuda, etiqueta, siTxt, noTxt) {
+    var id = a.id;
+    var ck = h('input', { type: 'checkbox', checked: ((App.agente(id) || a).permisos || []).indexOf(permiso) >= 0 });
+    ck.addEventListener('change', function () {
+      var ag = App.agente(id) || a, antes = (ag.permisos || []).slice(), si = ck.checked;
+      function poner(lista) { return api.patch('/api/agentes/' + encodeURIComponent(id), { permisos: lista }).then(function (r) { App.actualizar(r.oficina); }); }
+      poner(antes.filter(function (x) { return x !== permiso; }).concat(si ? [permiso] : [])).then(function () {
+        App.guardado(a.nombre + (si ? siTxt : noTxt), function () { poner(antes).then(function () { ck.checked = antes.indexOf(permiso) >= 0; }).catch(App.fallo); });
+      }).catch(function (e) { App.fallo(e); ck.checked = !si; });
+    });
+    return App.ajuste(titulo, ayuda, h('label.ajuste-check', ck, h('span', etiqueta)));
   }
 
   function despedir(a) {

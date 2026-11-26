@@ -95,6 +95,9 @@
         "repo": "cherry-office",
         "releaseType": "release"
       }
+    ],
+    "asarUnpack": [
+      "dist/whatsapp-captura.mjs"
     ]
   }
 }

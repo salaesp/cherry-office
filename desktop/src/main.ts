@@ -16,6 +16,7 @@ import { Config } from '../../backend/src/config.js'
 import { ejecutable, resolver } from './abrir.js'
 import * as actualizaciones from './actualizaciones.js'
 import { archivo, mime, raices } from './estaticos.js'
+import { hostWhatsApp } from './whatsapp.js'
 import onboardingHTML from './onboarding.html'
 
 const esMac = process.platform === 'darwin'
@@ -47,7 +48,7 @@ async function arrancar() {
   const env = process.env
   const config = Config.load(os.homedir(), env)
   config.version = app.getVersion()
-  backend = createBackend({ config, env })
+  backend = createBackend({ config, env, whatsapp: hostWhatsApp(config.datosDir, __dirname) })
   const r = raices(app.isPackaged, process.resourcesPath, path.resolve(__dirname, '../..'))
 
   protocol.handle('hq', async (req) => {

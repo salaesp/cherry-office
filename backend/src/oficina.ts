@@ -187,6 +187,8 @@ function decodificarOficina(v: unknown): Oficina {
 
 export const ValidarAgenteExtra = {
   permisoCoordinador: 'coordinador',
+  /** Puede leer los chats de WhatsApp elegidos (whatsapp.ts). */
+  permisoWhatsapp: 'whatsapp',
   maxItemsLimites: 12,
   maxLargoLimite: 300,
   maxServidores: 12,
@@ -227,7 +229,7 @@ export const ValidarAgenteExtra = {
   permisos(ps: string[]) {
     const vistos = new Set<string>()
     for (const p of ps) {
-      if (p !== this.permisoCoordinador) throw new ErrorAPI(400, `Permiso inválido: «${p}» (el único permiso es «coordinador»).`)
+      if (p !== this.permisoCoordinador && p !== this.permisoWhatsapp) throw new ErrorAPI(400, `Permiso inválido: «${p}» (los permisos son «coordinador» y «whatsapp»).`)
       if (vistos.has(p)) throw new ErrorAPI(400, `Permiso repetido: «${p}».`)
       vistos.add(p)
     }

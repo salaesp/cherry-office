@@ -268,6 +268,7 @@ App.Ajustes = (function () {
     { id: 'permisos', grupo: 'app', texto: 'Permisos de los agentes', icono: 'escudo', nota: modoPermisos,
       visible: function () { return !!(App.Permisos && (App.Permisos.pintarModo || App.Permisos.abrirModo)); }, pintar: permisos },
     { id: 'ia', grupo: 'app', texto: 'Modelos y consumo', icono: 'medidor', pintar: iaAjustes },
+    { id: 'whatsapp', grupo: 'app', texto: 'WhatsApp', icono: 'charla', visible: function () { return !!App.WhatsApp; }, pintar: function (c) { App.WhatsApp.pintar(c); } },
     { id: 'apariencia', grupo: 'app', texto: 'Apariencia', icono: 'capas', nota: function () { return App.estiloOficina === 'lego' ? 'Maqueta LEGO' : 'Pixel'; }, pintar: apariencia },
   ];
 

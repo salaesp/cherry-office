@@ -18,6 +18,13 @@ const comun = {
 }
 await build({ ...comun, entryPoints: [path.join(raiz, 'src/main.ts')], outfile: path.join(raiz, 'dist/main.cjs'), loader: { '.html': 'text' } })
 await build({ ...comun, entryPoints: [path.join(raiz, 'src/preload.ts')], outfile: path.join(raiz, 'dist/preload.cjs') })
+// La captura de WhatsApp corre en su propio proceso (backend/src/whatsapp.ts la lanza). Baileys es ESM: va aparte, como
+// módulo ES, con su WebAssembly adentro. Las dependencias opcionales de imágenes, audio y vistas previas quedan afuera.
+await build({
+  ...comun, format: 'esm', define: {}, entryPoints: [path.join(repo, 'backend/src/whatsapp-captura.ts')],
+  outfile: path.join(raiz, 'dist/whatsapp-captura.mjs'), external: ['sharp', 'jimp', 'link-preview-js', 'audio-decode'],
+  banner: { js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);" },
+})
 
 if (process.argv.includes('--recursos')) {
   const dest = path.join(raiz, 'build/recursos/oficina')

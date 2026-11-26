@@ -171,10 +171,18 @@ export const TodosConectores = {
   },
 }
 
+/** Leer los chats de WhatsApp elegidos (whatsapp.ts): solo los agentes con el permiso «whatsapp». */
+export const WhatsAppAgente = {
+  permiso: 'whatsapp',
+  nombresMCP: ['whatsapp_chats', 'whatsapp_leer', 'whatsapp_buscar'],
+  puede: (a: AgenteDef) => a.permisos?.includes('whatsapp') ?? false,
+  herramientasMCP: (_o: Oficina, a: AgenteDef) => (WhatsAppAgente.puede(a) ? WhatsAppAgente.nombresMCP.map((n) => 'mcp__hq__' + n) : []),
+}
+
 export const HerramientasMCPAgente = {
   lista(o: Oficina, a: AgenteDef): string[] {
     const out: string[] = []
-    for (const h of [...herramientasMCP, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, a), ...Acciones.herramientasMCP(o, a)]) if (!out.includes(h)) out.push(h)
+    for (const h of [...herramientasMCP, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, a), ...Acciones.herramientasMCP(o, a), ...WhatsAppAgente.herramientasMCP(o, a)]) if (!out.includes(h)) out.push(h)
     return out
   },
 }
