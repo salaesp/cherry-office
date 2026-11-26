@@ -87,7 +87,7 @@ describe('secretaría', () => {
     const r = await configurar(b)
     expect(r.status).toBe(200)
     expect(r.obj.config).toMatchObject({ agente: 'sofia', activa: true, fuentes: [{ id: 'whatsapp', chats: [MAMA] }] })
-    expect(r.obj.agente).toEqual({ id: 'sofia', nombre: 'Sofia' })
+    expect(r.obj.agente).toMatchObject({ id: 'sofia', nombre: 'Sofia' })
     expect(r.obj.fuentes[0]).toMatchObject({ id: 'whatsapp', activa: true, disponible: true, problema: null, novedades: false })
     expect(r.obj.chatsWhatsApp.map((c: any) => c.nombre).sort()).toEqual(['Familia', 'Mamá'])
 
@@ -340,7 +340,7 @@ describe('contratar en un paso', () => {
     catalogoDe(b.servicios)!.fijar(catalogo)
     const r = await llamar(b, 'POST', '/api/secretaria/contratar', { nombre: 'Rosa' })
     expect(r.status).toBe(200)
-    expect(r.obj.agente).toEqual({ id: 'rosa', nombre: 'Rosa' })
+    expect(r.obj.agente).toMatchObject({ id: 'rosa', nombre: 'Rosa' })
     expect(r.obj.config.fuentes.map((f: any) => f.id)).toEqual(['whatsapp', 'gmail', 'calendario'])
     expect(r.obj.config.fuentes[0].chats.sort()).toEqual([GRUPO, MAMA].sort())
     const o = b.servicios.oficinas.activa()!.oficina

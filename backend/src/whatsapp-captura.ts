@@ -1,6 +1,7 @@
 // Captura de WhatsApp (docs/plan-secretaria.md, «Fuente WhatsApp»): proceso hijo que lanza y supervisa `whatsapp.ts`.
 // Mantiene la sesión de dispositivo vinculado con Baileys, filtra por los chats elegidos y le pasa al backend, por IPC,
-// solo los mensajes de esos chats y los metadatos de los demás para la lista (nunca su texto).
+// solo los mensajes de esos chats y los metadatos de los demás para la lista (nunca su texto). En un grupo con filtro de
+// personas, los mensajes de quienes quedaron afuera tampoco salen de este proceso (`FiltroElegidos`).
 //
 // SOLO LECTURA: este archivo nunca llama a sendMessage, readMessages, sendPresenceUpdate ni chatModify. No manda
 // mensajes, no marca leído y no aparece «en línea». Si algún día hace falta mandar algo, no va acá.
@@ -14,7 +15,7 @@ import makeWASocket, {
   type AuthenticationCreds, type AuthenticationState, type SignalDataTypeMap, type WASocket,
 } from 'baileys'
 import {
-  FiltroElegidos, cifrarBytes, cifrarSesion, descifrarSesion, esGrupo, maxBytesMedia, mediaQueSeBaja, nombreMedia, mapearMensaje, metaChat, normalizarJid, seIgnora, segundos,
+  FiltroElegidos, cifrarBytes, mapearMiembros, cifrarSesion, descifrarSesion, esGrupo, maxBytesMedia, mediaQueSeBaja, nombreMedia, mapearMensaje, metaChat, normalizarJid, seIgnora, segundos,
   type ACaptura, type DeCaptura, type MensajeWA, type MetaChatWA,
 } from './whatsapp-mapeo.js'
 
@@ -113,12 +114,43 @@ function anotarChat(jid: unknown, datos: Omit<MetaChatWA, 'jid' | 'grupo'> = {})
   }
 }
 
+// MARK: - actividad del teléfono (por tandas; solo el momento, nunca el contenido)
+
+let telefonoMax = 0
+let telefonoEnviado = 0
+let tandaTelefono: NodeJS.Timeout | undefined
+/** Hubo actividad propia a esta hora (un mensaje propio en cualquier chat): indicio de que el teléfono está conectado. */
+function telefonoVisto(ts: number | undefined) {
+  const ahora = Math.floor(Date.now() / 1000)
+  if (!ts || ts > ahora + 60) return
+  telefonoMax = Math.max(telefonoMax, ts)
+  if (tandaTelefono || telefonoMax <= telefonoEnviado) return
+  tandaTelefono = setTimeout(() => {
+    tandaTelefono = undefined
+    if (telefonoMax <= telefonoEnviado) return
+    telefonoEnviado = telefonoMax
+    enviar({ tipo: 'telefono', ts: telefonoEnviado })
+  }, 30_000)
+}
+
+// MARK: - integrantes de los grupos (sin texto)
+
+function miembros(grupo: unknown, participantes: unknown, modo?: 'sumar' | 'quitar') {
+  const g = normalizarJid(grupo)
+  if (!g || !esGrupo(g)) return
+  const lista = mapearMiembros(participantes)
+  for (const m of lista) if (m.pn && m.lid) alias(m.pn, m.lid)
+  if (lista.length === 0 && modo) return
+  enviar({ tipo: 'miembros', grupo: g, miembros: lista, ...(modo ? { modo } : {}) })
+}
+
 const mapeosEnviados = new Set<string>()
 function alias(pn: unknown, lid: unknown) {
   const p = normalizarJid(pn), l = normalizarJid(lid)
   if (!p || !l || !p.endsWith('@s.whatsapp.net') || !l.endsWith('@lid')) return
   const chat = elegidos.resolver(p, l)
   if (chat) { elegidos.sumarAlias(chat, p); elegidos.sumarAlias(chat, l) }
+  elegidos.sumarPersona(p, l)
   const k = p + '|' + l
   if (mapeosEnviados.has(k)) return
   mapeosEnviados.add(k)
@@ -196,7 +228,14 @@ async function conectar() {
   s.ev.on('contacts.upsert', (cs) => cs.forEach(contacto))
   s.ev.on('contacts.update', (cs) => cs.forEach((c) => contacto(c as any)))
   s.ev.on('chats.upsert', (cs) => cs.forEach((c) => anotarChat(c.id, { agenda: c.name ?? undefined, ultimo: segundos(c.conversationTimestamp) })))
-  s.ev.on('groups.upsert', (gs) => gs.forEach((g) => anotarChat(g.id, { agenda: g.subject, participantes: g.participants?.length })))
+  s.ev.on('groups.upsert', (gs) => gs.forEach((g) => {
+    anotarChat(g.id, { agenda: g.subject, participantes: g.participants?.length })
+    miembros(g.id, g.participants)
+  }))
+  s.ev.on('group-participants.update', (u) => {
+    if (u.action === 'add') miembros(u.id, u.participants, 'sumar')
+    else if (u.action === 'remove') miembros(u.id, u.participants, 'quitar')
+  })
   s.ev.on('groups.update', (gs) => gs.forEach((g) => g.id && g.subject && anotarChat(g.id, { agenda: g.subject })))
   s.ev.on('lid-mapping.update', (p) => alias(p.pn, p.lid))
 
@@ -205,6 +244,8 @@ async function conectar() {
       const k = wa.key ?? {}
       if (seIgnora(k.remoteJid)) continue
       const ts = segundos(wa.messageTimestamp)
+      // un mensaje propio, de cualquier chat, muestra que el teléfono estuvo conectado (solo se manda la hora)
+      if (k.fromMe) telefonoVisto(ts)
       // el número y el @lid de quien escribe (para no repetir a nadie en la lista)
       if (!esGrupo(k.remoteJid)) alias(k.remoteJidAlt ?? k.remoteJid, k.remoteJid)
       else if (k.participant && k.participantAlt) alias(k.participantAlt, k.participant)
@@ -249,7 +290,10 @@ async function bajarMedia(s: WASocket, wa: Parameters<typeof downloadMediaMessag
 async function alAbrir(s: WASocket) {
   try {
     const grupos = await s.groupFetchAllParticipating()
-    for (const g of Object.values(grupos)) anotarChat(g.id, { agenda: g.subject, participantes: g.participants?.length })
+    for (const g of Object.values(grupos)) {
+      anotarChat(g.id, { agenda: g.subject, participantes: g.participants?.length })
+      miembros(g.id, g.participants)
+    }
   } catch (e) { logger.warn(String(e), 'grupos') }
   await resolverLids(s)
 }

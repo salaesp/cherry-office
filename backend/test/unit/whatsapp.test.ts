@@ -7,9 +7,9 @@ import { describe, expect, test } from 'vitest'
 import { mcpDe } from '../../src/consultas.js'
 import type { AgenteDef, Oficina } from '../../src/oficina.js'
 import { HerramientasMCPAgente, WhatsAppAgente } from '../../src/permisos.js'
-import { ServicioWhatsApp, WhatsAppStore, whatsappDe, type ProcesoCaptura } from '../../src/whatsapp.js'
+import { ServicioWhatsApp, WhatsAppStore, modelosTranscripcion, whatsappDe, type ProcesoCaptura } from '../../src/whatsapp.js'
 import { procesarMCP } from '../../src/mcp-protocolo.js'
-import { FiltroElegidos, cifrarBytes, cifrarSesion, descifrarBytes, descifrarSesion, nombreMedia, contenido, jidDeNumero, mapearMensaje, metaChat, normalizarJid, seIgnora, type ACaptura, type DeCaptura } from '../../src/whatsapp-mapeo.js'
+import { FiltroElegidos, cifrarBytes, cifrarSesion, descifrarBytes, descifrarSesion, nombreMedia, contenido, jidDeNumero, mapearMensaje, mapearMiembros, metaChat, normalizarJid, seIgnora, type ACaptura, type DeCaptura } from '../../src/whatsapp-mapeo.js'
 import { SQLiteDB } from '../../src/sqlite.js'
 import { Sandbox, U, esperar } from '../support/sandbox.js'
 import { arrancar, llamar, oficina } from '../support/en-proceso.js'
@@ -74,6 +74,39 @@ describe('mapeo', () => {
     expect(descifrarSesion(texto, undefined)).toBe(texto)
   })
 
+  test('grupo con solo algunas personas: lo demás no sale, salvo lo propio; por número o por @lid', () => {
+    const LID_TIO = '777000111222@lid', OTRO = '5491199999999@s.whatsapp.net', OTRO_LID = '888000111222@lid'
+    const f = new FiltroElegidos([{ jid: GRUPO, solo: [TIO] }, { jid: MAMA }])
+    const msg = (id: string, key: Record<string, unknown>) => mapearMensaje({ key: { remoteJid: GRUPO, id, ...key }, message: { conversation: 'hola ' + id } }, f)
+    expect(msg('a', { participant: LID_TIO, participantAlt: TIO })?.de).toBe(TIO)
+    expect(msg('b', { participant: OTRO_LID, participantAlt: OTRO })).toBeUndefined()
+    expect(msg('c', { participant: OTRO_LID })).toBeUndefined()
+    expect(msg('d', {})).toBeUndefined()
+    expect(msg('e', { fromMe: true })).toMatchObject({ de: 'yo', propio: true })
+    // el @lid solo no alcanza hasta que se aprende que es el mismo
+    expect(msg('f', { participant: LID_TIO })).toBeUndefined()
+    f.sumarPersona(TIO, LID_TIO)
+    expect(msg('g', { participant: LID_TIO })?.de).toBe(LID_TIO)
+    // también las ediciones y borrados salen por el mismo filtro
+    expect(mapearMensaje({ key: { remoteJid: GRUPO, id: 'h', participant: OTRO_LID, participantAlt: OTRO }, message: { protocolMessage: { type: 0, key: { id: 'a' } } } }, f)).toBeUndefined()
+    // sin filtro se lee a todos; un chat individual no se filtra
+    expect(mapearMensaje({ key: { remoteJid: MAMA, id: 'i' }, message: { conversation: 'x' } }, f)).toBeDefined()
+    const todos = new FiltroElegidos([{ jid: GRUPO }])
+    expect(mapearMensaje({ key: { remoteJid: GRUPO, participant: OTRO_LID, participantAlt: OTRO, id: 'j' }, message: { conversation: 'x' } }, todos)?.de).toBe(OTRO)
+    expect(f.filtraPersonas(GRUPO)).toBe(true)
+    expect(todos.filtraPersonas(GRUPO)).toBe(false)
+  })
+
+  test('integrantes de un grupo: solo número y @lid', () => {
+    expect(mapearMiembros([
+      { id: '5491177777777:3@s.whatsapp.net', lid: '777@lid', admin: 'admin', name: 'Tío' },
+      { id: '888@lid', phoneNumber: '5491199999999@s.whatsapp.net' },
+      { id: '999@lid' },
+      TIO, { id: 'raro' }, null,
+    ])).toEqual([{ pn: TIO, lid: '777@lid' }, { pn: '5491199999999@s.whatsapp.net', lid: '888@lid' }, { lid: '999@lid' }, { pn: TIO }])
+    expect(mapearMiembros(undefined)).toEqual([])
+  })
+
   test('metaChat nunca lleva texto', () => {
     expect(metaChat('5491100000000:3@s.whatsapp.net', { agenda: 'Juan', ultimo: 1 })).toEqual({ jid: '5491100000000@s.whatsapp.net', grupo: false, agenda: 'Juan', ultimo: 1 })
     expect(metaChat('status@broadcast')).toBeUndefined()
@@ -122,6 +155,40 @@ describe('store', () => {
     expect(st.mensajes(MAMA, { limite: 10 })).toEqual([])
     expect(st.chat(MAMA)).toMatchObject({ elegido: false })
     expect(st.chat(MAMA)?.nombre).toBeUndefined()
+  })
+
+  test('integrantes de grupos y filtro de personas: se borra lo ya guardado de quienes quedan afuera', () => {
+    const st = nuevo()
+    const OTRO = '5491199999999@s.whatsapp.net', OTRO_LID = '888000111222@lid', TIO_LID = '777000111222@lid'
+    st.anotarChats([{ jid: GRUPO, grupo: true, agenda: 'Familia' }])
+    st.anotarMiembros(GRUPO, [{ pn: TIO, lid: TIO_LID }, { lid: OTRO_LID }, { pn: MAMA }])
+    expect(st.miembros(GRUPO).sort()).toEqual([MAMA, OTRO_LID, TIO].sort())
+    // al saber el número del @lid, no queda repetido
+    st.anotarAlias(OTRO, OTRO_LID)
+    expect(st.miembros(GRUPO).sort()).toEqual([MAMA, OTRO, TIO].sort())
+    st.anotarMiembros(GRUPO, [{ pn: '5491100000009@s.whatsapp.net' }], 'sumar')
+    expect(st.miembros(GRUPO)).toHaveLength(4)
+    st.anotarMiembros(GRUPO, [{ lid: OTRO_LID }], 'quitar')
+    expect(st.miembros(GRUPO)).not.toContain(OTRO)
+    st.anotarMiembros(GRUPO, [{ pn: TIO }, { pn: OTRO }])
+    expect(st.miembros(GRUPO).sort()).toEqual([OTRO, TIO].sort())
+
+    st.elegir(GRUPO, 'Familia', undefined)
+    const m = (id: string, de: string, extra = {}) => ({ id, chat: GRUPO, de, propio: de === 'yo', ts: 1000 + Number(id.slice(1)), tipo: 'texto', texto: 'texto ' + id, ...extra })
+    const arch = nombreMedia(GRUPO, 'm4')
+    st.guardar(m('m1', TIO)); st.guardar(m('m2', OTRO)); st.guardar(m('m3', 'yo')); st.guardar(m('m5', OTRO_LID)); st.guardar(m('m6', ''))
+    st.guardar(m('m4', OTRO, { tipo: 'imagen', media: { archivo: arch, mime: 'image/png', bytes: 3 } }))
+    // lo que se lee: el tío (por número o por @lid) y lo propio
+    expect(st.ponerSolo(GRUPO, [TIO])).toEqual([arch])
+    expect(st.chat(GRUPO)?.solo).toEqual([TIO])
+    expect(st.mensajes(GRUPO, { limite: 10 }).map((x) => x.id)).toEqual(['m1', 'm3'])
+    expect(st.equivalentes([TIO]).has(TIO_LID)).toBe(true)
+    // volver a leer a todos no borra nada
+    expect(st.ponerSolo(GRUPO, null)).toEqual([])
+    expect(st.chat(GRUPO)?.solo).toBeUndefined()
+    // dejar de leer el grupo limpia el filtro
+    st.ponerSolo(GRUPO, [TIO]); st.quitar(GRUPO)
+    expect(st.chat(GRUPO)?.solo).toBeUndefined()
   })
 
   test('purgar borra lo viejo', () => {
@@ -270,6 +337,176 @@ describe('rutas', () => {
     expect(fs.existsSync(path.join(sb.datos, 'whatsapp'))).toBe(false)
     expect(wa.store.mensajes(MAMA, { limite: 5 })).toEqual([])
     expect(wa.activo).toBe(false)
+  })
+})
+
+describe('teléfono, grupos con filtro y transcripción (mejoras de S4)', () => {
+  const OTRO = '5491199999999@s.whatsapp.net', OTRO_LID = '888000111222@lid', TIO_LID = '777000111222@lid'
+  const ruta = (jid: string) => '/api/whatsapp/chats/' + encodeURIComponent(jid)
+
+  test('aviso de que el teléfono no se conecta hace días: solo con un indicio y pasados 12 días', async () => {
+    const { b, capturas, wa } = await preparar()
+    const avisos = async () => JSON.stringify((await llamar(b, 'GET', '/api/avisos')).obj)
+    await llamar(b, 'POST', '/api/whatsapp/vincular', { aceptoRiesgo: true })
+    const c = capturas[0]!
+    c.emitir({ tipo: 'estado', estado: 'conectado' })
+    // nunca se vio: no avisa
+    expect((await llamar(b, 'GET', '/api/whatsapp')).obj.telefonoVisto).toBeNull()
+    expect(await avisos()).not.toContain('teléfono no se conecta')
+    const ahora = Math.floor(Date.now() / 1000)
+    c.emitir({ tipo: 'telefono', ts: ahora - 3 * 86400 })
+    expect((await llamar(b, 'GET', '/api/whatsapp')).obj.telefonoVisto).toBe(ahora - 3 * 86400)
+    expect(await avisos()).not.toContain('teléfono no se conecta')
+    // un indicio más viejo no pisa al nuevo, ni uno del futuro
+    c.emitir({ tipo: 'telefono', ts: ahora - 20 * 86400 })
+    c.emitir({ tipo: 'telefono', ts: ahora + 10 * 86400 })
+    expect(wa.telefonoVisto).toBe(ahora - 3 * 86400)
+    // 13 días sin actividad: avisa, diciendo que es una estimación y qué hacer
+    wa.store.ponerEstado('telefonoVisto', String(ahora - 13 * 86400))
+    const a = await avisos()
+    expect(a).toContain('Calculamos que el teléfono no se conecta a WhatsApp hace unos 13 días')
+    expect(a).toContain('es una estimación')
+    expect(a).toContain('Abrí WhatsApp en el teléfono')
+    // 11 días: todavía no
+    wa.store.ponerEstado('telefonoVisto', String(ahora - 11 * 86400))
+    expect(await avisos()).not.toContain('teléfono no se conecta')
+    // con la sesión revocada, el aviso es el otro
+    wa.store.ponerEstado('telefonoVisto', String(ahora - 13 * 86400))
+    c.salir(2)
+    const r = await avisos()
+    expect(r).toContain('volvé a vincularlo')
+    expect(r).not.toContain('teléfono no se conecta')
+  })
+
+  test('grupo con filtro de personas: integrantes, PUT solo, lo que viaja a la captura y lo que se borra', async () => {
+    const { b, capturas, wa } = await preparar()
+    await llamar(b, 'POST', '/api/whatsapp/vincular', { aceptoRiesgo: true })
+    const c = capturas[0]!
+    c.emitir({ tipo: 'estado', estado: 'conectado', numero: '5491100000001@s.whatsapp.net' })
+    c.emitir({ tipo: 'chats', chats: [{ jid: GRUPO, grupo: true, agenda: 'Familia', participantes: 4 }, { jid: TIO, grupo: false, agenda: 'Tío Carlos' }, { jid: MAMA, grupo: false }] })
+    c.emitir({ tipo: 'miembros', grupo: GRUPO, miembros: [{ pn: TIO, lid: TIO_LID }, { lid: OTRO_LID }, { pn: MAMA }, { pn: '5491100000001@s.whatsapp.net' }] })
+    // los integrantes se ven recién cuando el grupo está elegido
+    expect((await llamar(b, 'GET', '/api/whatsapp')).obj.chats.find((x: any) => x.jid === GRUPO).miembros).toBeUndefined()
+    expect((await llamar(b, 'PUT', ruta(TIO), { elegido: true, solo: [MAMA] })).status).toBe(400)
+    await llamar(b, 'PUT', ruta(GRUPO), { elegido: true })
+    const g = (await llamar(b, 'GET', '/api/whatsapp')).obj.chats.find((x: any) => x.jid === GRUPO)
+    // sin filtro: todos seleccionados; sin yo; con el nombre de la agenda, o «Número desconocido»
+    expect(g.solo).toBeUndefined()
+    expect(g.miembros.map((x: any) => [x.jid, x.nombre, x.seleccionado]).sort()).toEqual([
+      [MAMA, '+5491155551234', true], [TIO, 'Tío Carlos', true], [OTRO_LID, 'Número desconocido', true],
+    ].sort())
+    expect(g.miembros.find((x: any) => x.jid === TIO).numero).toBe('+5491177777777')
+    expect(c.ultimosElegidos()?.chats.find((x) => x.jid === GRUPO)?.solo).toBeUndefined()
+
+    const ahora = Math.floor(Date.now() / 1000)
+    const msg = (id: string, de: string, extra = {}) => c.emitir({ tipo: 'mensaje', m: { id, chat: GRUPO, de, propio: de === 'yo', ts: ahora - 100 + Number(id.slice(1)), tipo: 'texto', texto: 'dice ' + id, ...extra } })
+    fs.mkdirSync(wa.dirMedia, { recursive: true })
+    const archivo = nombreMedia(GRUPO, 'm4')
+    fs.writeFileSync(path.join(wa.dirMedia, archivo), 'datos')
+    msg('m1', TIO); msg('m2', MAMA); msg('m3', 'yo'); msg('m4', MAMA, { tipo: 'imagen', media: { archivo, mime: 'image/png', bytes: 5 } })
+    expect(wa.store.cantidad(GRUPO)).toBe(4)
+
+    // validaciones
+    for (const solo of [[], 'x', [5], ['raro'], ['5491100000000@g.us'], {}]) expect((await llamar(b, 'PUT', ruta(GRUPO), { solo })).status).toBe(400)
+    expect(wa.store.chat(GRUPO)?.solo).toBeUndefined()
+
+    // quedarse solo con el tío (se manda por su @lid, que se pasa a número): lo de mamá se borra, con su archivo
+    const r = await llamar(b, 'PUT', ruta(GRUPO), { solo: [TIO_LID] })
+    expect(r.status).toBe(200)
+    expect(r.obj.chat.solo).toEqual([TIO])
+    expect(r.obj.chat.miembros.map((x: any) => [x.jid, x.seleccionado]).sort()).toEqual([[MAMA, false], [TIO, true], [OTRO_LID, false]].sort())
+    expect(wa.store.mensajes(GRUPO, { limite: 10 }).map((m) => m.id)).toEqual(['m1', 'm3'])
+    expect(fs.existsSync(path.join(wa.dirMedia, archivo))).toBe(false)
+    // la captura recibe el filtro con las equivalencias conocidas
+    const el = c.ultimosElegidos()!.chats.find((x) => x.jid === GRUPO)!
+    expect(new Set(el.solo)).toEqual(new Set([TIO, TIO_LID]))
+    // segunda barrera: un mensaje de otro que llega igual no se guarda; el del tío y lo propio sí
+    msg('m5', MAMA); msg('m6', TIO_LID); msg('m7', 'yo')
+    expect(wa.store.mensajes(GRUPO, { limite: 10 }).map((m) => m.id)).toEqual(['m1', 'm3', 'm6', 'm7'])
+
+    // editar el nombre sin tocar solo lo deja como está; solo con null vuelve a leer a todos
+    expect((await llamar(b, 'PUT', ruta(GRUPO), { nombre: 'Flia' })).obj.chat.solo).toEqual([TIO])
+    const t = await llamar(b, 'PUT', ruta(GRUPO), { solo: null })
+    expect(t.obj.chat.solo).toBeUndefined()
+    expect(t.obj.chat.miembros.every((x: any) => x.seleccionado)).toBe(true)
+    expect(c.ultimosElegidos()!.chats.find((x) => x.jid === GRUPO)!.solo).toBeUndefined()
+    msg('m8', MAMA)
+    expect(wa.store.cantidad(GRUPO)).toBe(5)
+
+    // dejar de leer el grupo limpia el filtro
+    await llamar(b, 'PUT', ruta(GRUPO), { solo: [TIO] })
+    await llamar(b, 'PUT', ruta(GRUPO), { elegido: false })
+    expect(wa.store.chat(GRUPO)?.solo).toBeUndefined()
+  })
+
+  test('una persona elegida que todavía no aparece entre los integrantes igual se muestra', async () => {
+    const { b, capturas } = await preparar()
+    await llamar(b, 'POST', '/api/whatsapp/vincular', { aceptoRiesgo: true })
+    const c = capturas[0]!
+    c.emitir({ tipo: 'chats', chats: [{ jid: GRUPO, grupo: true, agenda: 'Familia' }] })
+    // elegir el grupo y a la vez a quién leer
+    const r = await llamar(b, 'PUT', ruta(GRUPO), { elegido: true, solo: [OTRO] })
+    expect(r.obj.chat.solo).toEqual([OTRO])
+    expect(r.obj.chat.miembros).toEqual([{ jid: OTRO, nombre: '+5491199999999', numero: '+5491199999999', seleccionado: true }])
+    expect(c.ultimosElegidos()!.chats[0]!.solo).toEqual([OTRO])
+  })
+
+  test('modelo e idioma de la transcripción: se validan, se guardan y llegan al transcriptor', async () => {
+    const sb = new Sandbox()
+    const b = arrancar(sb)
+    await oficina(b, [{ id: 'sofia', permisos: ['whatsapp'] }])
+    const capturas: CapturaDoble[] = []
+    class Tr extends EventEmitter implements ProcesoCaptura {
+      pedidos: any[] = []
+      vivo = true
+      constructor(readonly env: NodeJS.ProcessEnv) { super() }
+      send(m: any) { if (m.tipo === 'transcribir') this.pedidos.push(m); return true }
+      kill() { this.vivo = false; this.emit('exit', 1); return true }
+    }
+    const trs: Tr[] = []
+    b.servicios.huecos.whatsappHost = {
+      lanzar: () => { const c = new CapturaDoble(); capturas.push(c); return c },
+      lanzarTranscriptor: (_r: string, env: NodeJS.ProcessEnv) => { const t = new Tr(env); trs.push(t); return t },
+    }
+    const wa = whatsappDe(b.servicios)!
+    const g = (await llamar(b, 'GET', '/api/whatsapp')).obj
+    expect(g).toMatchObject({ modelo: 'normal', idioma: 'es', transcribir: false })
+    expect(g.modelos).toEqual([{ id: 'rapido', nombre: 'Rápido', mb: 40 }, { id: 'normal', nombre: 'Normal', mb: 80 }, { id: 'mejor', nombre: 'Mejor', mb: 250 }])
+    expect(g.idiomas).toEqual([{ id: 'es', nombre: 'Español' }, { id: 'auto', nombre: 'Detectar automáticamente' }])
+    expect(modelosTranscripcion.rapido.modelo).toBe('onnx-community/whisper-tiny')
+
+    for (const cuerpo of [{}, { modelo: 'enorme' }, { modelo: 5 }, { idioma: 'klingon' }, { transcribir: 'si' }, { transcribir: true, idioma: 'fr' }])
+      expect((await llamar(b, 'PUT', '/api/whatsapp/ajustes', cuerpo)).status).toBe(400)
+    expect(wa.transcribir).toBe(false)
+
+    // se puede cambiar de a una cosa
+    expect((await llamar(b, 'PUT', '/api/whatsapp/ajustes', { modelo: 'mejor' })).obj).toMatchObject({ modelo: 'mejor', idioma: 'es', transcribir: false })
+    expect((await llamar(b, 'PUT', '/api/whatsapp/ajustes', { transcribir: true, idioma: 'auto' })).obj).toMatchObject({ modelo: 'mejor', idioma: 'auto', transcribir: true })
+
+    await llamar(b, 'POST', '/api/whatsapp/vincular', { aceptoRiesgo: true })
+    const c = capturas[0]!
+    c.emitir({ tipo: 'chats', chats: [{ jid: MAMA, grupo: false, agenda: 'Mamá' }] })
+    await llamar(b, 'PUT', ruta(MAMA), { elegido: true })
+    c.emitir({ tipo: 'mensaje', m: { id: 'v1', chat: MAMA, de: MAMA, propio: false, ts: 1000, tipo: 'nota_de_voz', media: { archivo: nombreMedia(MAMA, 'v1'), mime: 'audio/ogg', bytes: 3 } } })
+    const t1 = trs[0]!
+    expect(t1.env).toMatchObject({ HQ_WA_MODELO: 'onnx-community/whisper-small', HQ_WA_IDIOMA: 'auto' })
+    expect(t1.pedidos.map((p) => p.id)).toEqual(['v1'])
+
+    // cambiar el modelo con el transcriptor corriendo lo corta; el audio pendiente lo toma uno nuevo con el modelo nuevo
+    const r = await llamar(b, 'PUT', '/api/whatsapp/ajustes', { modelo: 'rapido', idioma: 'es' })
+    expect(r.obj).toMatchObject({ modelo: 'rapido', idioma: 'es' })
+    expect(t1.vivo).toBe(false)
+    expect(trs.length).toBe(2)
+    expect(trs[1]!.env).toMatchObject({ HQ_WA_MODELO: 'onnx-community/whisper-tiny', HQ_WA_IDIOMA: 'spanish' })
+    expect(trs[1]!.pedidos.map((p) => p.id)).toEqual(['v1'])
+    // repetir lo mismo no lo corta
+    await llamar(b, 'PUT', '/api/whatsapp/ajustes', { modelo: 'rapido', idioma: 'es' })
+    expect(trs[1]!.vivo).toBe(true)
+    expect(trs.length).toBe(2)
+    // lo de siempre (normal, español) es el valor por defecto y no queda guardado
+    await llamar(b, 'PUT', '/api/whatsapp/ajustes', { modelo: 'normal' })
+    expect(wa.store.estado('modelo')).toBeUndefined()
+    expect(trs[2]!.env).toMatchObject({ HQ_WA_MODELO: 'onnx-community/whisper-base', HQ_WA_IDIOMA: 'spanish' })
   })
 })
 

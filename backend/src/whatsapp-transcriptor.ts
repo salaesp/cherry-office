@@ -1,9 +1,10 @@
 // Transcriptor de notas de voz de WhatsApp (docs/plan-secretaria.md, fase S4): proceso hijo que lanza `whatsapp.ts`
-// cuando hay audios para transcribir y que se apaga solo cuando no tiene trabajo. Todo pasa en la compu: Whisper (modelo
-// base, ~80 MB, se baja la primera vez a `HQ_WA_MODELOS`) con Transformers.js y onnxruntime.
+// cuando hay audios para transcribir y que se apaga solo cuando no tiene trabajo. Todo pasa en la compu: Whisper (por
+// defecto el modelo base, ~80 MB, se baja la primera vez a `HQ_WA_MODELOS`) con Transformers.js y onnxruntime.
 //
 // Entorno: HQ_WA_MODELOS (carpeta de modelos), HQ_WA_CLAVE (opcional: los audios están cifrados con ella),
-// HQ_WA_MODELO (opcional, por defecto onnx-community/whisper-base) y HQ_WA_IDIOMA (por defecto spanish).
+// HQ_WA_MODELO (opcional, por defecto onnx-community/whisper-base) y HQ_WA_IDIOMA (por defecto spanish; «auto» detecta el
+// idioma de cada audio: Transformers.js no lo hace solo, si no se le dice `language` transcribe como si fuera inglés).
 import fs from 'node:fs'
 import process from 'node:process'
 import { descifrarBytes, type ATranscriptor, type DeTranscriptor } from './whatsapp-mapeo.js'
@@ -17,14 +18,18 @@ if (!process.send) {
 const CLAVE = /^[0-9a-f]{64}$/i.test(process.env.HQ_WA_CLAVE ?? '') ? Buffer.from(process.env.HQ_WA_CLAVE!, 'hex') : undefined
 const MODELO = process.env.HQ_WA_MODELO || 'onnx-community/whisper-base'
 const IDIOMA = process.env.HQ_WA_IDIOMA || 'spanish'
+const detectaIdioma = IDIOMA === 'auto'
+/** Si no se puede detectar el idioma de un audio, se transcribe como español (para eso es la app). */
+const idiomaPorDefecto = 'es'
 /** Más de 10 minutos de audio no se transcribe (tarda y gasta memoria). */
 const maxSegundos = 10 * 60
 
 type Reconocedor = (audio: Float32Array, op: Record<string, unknown>) => Promise<{ text?: string } | { text?: string }[]>
-let reconocedor: Promise<Reconocedor | undefined> | undefined
+type Motor = { asr: Reconocedor; detectar: (audio: Float32Array) => Promise<string> }
+let reconocedor: Promise<Motor | undefined> | undefined
 
 /** Carga el motor y el modelo una sola vez. Si falta el motor (no está instalado), avisa y queda inútil. */
-function cargar(): Promise<Reconocedor | undefined> {
+function cargar(): Promise<Motor | undefined> {
   reconocedor ??= (async () => {
     try {
       const t = await import('@huggingface/transformers')
@@ -44,13 +49,33 @@ function cargar(): Promise<Reconocedor | undefined> {
         },
       })
       enviar({ tipo: 'listo' })
-      return asr as unknown as Reconocedor
+      return { asr: asr as unknown as Reconocedor, detectar: (audio) => detectarIdioma(t, asr, audio) }
     } catch (e) {
       enviar({ tipo: 'sin_motor', error: e instanceof Error ? e.message : String(e) })
       return undefined
     }
   })()
   return reconocedor
+}
+
+/** Idioma de un audio, con el mismo modelo: un solo paso del decodificador sobre los primeros 30 s, y gana el token de idioma con
+ *  más puntaje. Devuelve el código de Whisper («es», «en»…). */
+async function detectarIdioma(t: typeof import('@huggingface/transformers'), asr: unknown, audio: Float32Array): Promise<string> {
+  try {
+    const a = asr as { model: any; processor: any }
+    const gc = a.model.generation_config
+    const { input_features } = await a.processor(audio.subarray(0, 30 * 16000))
+    const inicio = new t.Tensor('int64', BigInt64Array.from([BigInt(gc.decoder_start_token_id)]), [1, 1])
+    const { logits } = await a.model.forward({ input_features, decoder_input_ids: inicio })
+    let mejor = idiomaPorDefecto, puntaje = -Infinity
+    for (const [token, id] of Object.entries(gc.lang_to_id as Record<string, number>)) {
+      const v = logits.data[id] as number
+      if (v > puntaje) { puntaje = v; mejor = token.replace(/^<\||\|>$/g, '') }
+    }
+    return mejor
+  } catch {
+    return idiomaPorDefecto
+  }
 }
 
 /** OGG/Opus (las notas de voz de WhatsApp) a 16 kHz mono, como lo espera Whisper. */
@@ -85,10 +110,10 @@ function transcribir(t: Extract<ATranscriptor, { tipo: 'transcribir' }>) {
   cola = cola.then(async () => {
     try {
       if (!/ogg|opus/i.test(t.mime)) throw new Error(`formato de audio no soportado (${t.mime})`)
-      const asr = await cargar()
-      if (!asr) return
+      const motor = await cargar()
+      if (!motor) return
       const audio = await decodificar(descifrarBytes(fs.readFileSync(t.archivo), CLAVE))
-      const r = await asr(audio, { language: IDIOMA, task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 })
+      const r = await motor.asr(audio, { language: detectaIdioma ? await motor.detectar(audio) : IDIOMA, task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 })
       const texto = (Array.isArray(r) ? r.map((x) => x.text ?? '').join(' ') : r.text ?? '').replace(/\s+/g, ' ').trim()
       enviar({ tipo: 'texto', chat: t.chat, id: t.id, texto })
     } catch (e) {

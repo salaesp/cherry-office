@@ -284,6 +284,22 @@ permisos de WhatsApp, elegir chats en dos lugares, asignar conectores). Ahora:
 - **Todo en una pantalla**: los chats se eligen desde la lista completa (elegir uno ahí lo elige en WhatsApp) y prender
   Gmail o Calendario asigna el conector. En la ficha del agente queda un resumen con «Configurar».
 
+### Tres mejoras de WhatsApp (después de S4)
+- **Aviso de «el teléfono no se conecta hace días»:** WhatsApp desvincula el dispositivo a los 14 días sin conexión del
+  teléfono. Baileys no da esa fecha, así que la captura manda como indicio la hora de cualquier mensaje propio que ve
+  (en cualquier chat, sin su contenido) y el backend avisa a los 12 días, diciendo que es una estimación y que hay que
+  abrir WhatsApp en el teléfono. Se ve también en Ajustes › WhatsApp. Sin indicio, no avisa.
+- **Filtrar personas en un grupo:** en un grupo elegido se puede leer a todos o solo a algunos integrantes (más lo
+  propio). El filtro se aplica en la captura: lo que no pasa no sale del proceso hijo. Los integrantes llegan por IPC y
+  se guardan en `wa_miembros`; lo ya guardado de quienes quedan afuera se borra (con sus archivos).
+- **Modelo e idioma de la transcripción:** Rápido (tiny, ~40 MB), Normal (base, ~80 MB, por defecto) y Mejor (small,
+  ~250 MB); español o detectar automáticamente. Probado con los modelos de verdad: Transformers.js no detecta el idioma
+  (sin `language` asume inglés), así que «automático» lo detecta el propio transcriptor con un paso del decodificador;
+  verificado con una nota en inglés y otra en español rioplatense.
+- **Sin probar todavía:** el aviso del teléfono y el filtro de integrantes contra un WhatsApp real (se probaron con la
+  captura doble y con la lógica pura de Baileys): hay que confirmar con un número de prueba que `participantAlt` y los
+  `@lid` de los integrantes llegan como se espera, y cuánto tarda en aparecer el primer mensaje propio.
+
 ## Pruebas
 - Unitarias (vitest):
   - WhatsApp: filtro por chat con `@lid` y por grupo, descartando estados y canales; mapeo de mensajes de Baileys con

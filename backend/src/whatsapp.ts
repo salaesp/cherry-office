@@ -24,7 +24,7 @@ import { num, txt, type Fila, type SQLiteDB, type SQLValor } from './sqlite.js'
 import { largo, plegar, prefijo } from './validar.js'
 import {
   descifrarBytes, esGrupo, esLid, esNumero, jidDeNumero, mediaQueSeBaja, normalizarJid, numeroVisible,
-  type ACaptura, type DeCaptura, type DeTranscriptor, type MensajeWA, type MetaChatWA,
+  type ACaptura, type DeCaptura, type DeTranscriptor, type MensajeWA, type MetaChatWA, type MiembroWA,
 } from './whatsapp-mapeo.js'
 
 // MARK: - host (lo que pone la carcasa)
@@ -84,6 +84,8 @@ export type ChatWA = {
   participantes?: number
   ultimo?: number
   elegidoDesde?: number
+  /** Solo en un grupo elegido: las únicas personas (número o @lid) cuyos mensajes se guardan, más los propios. Sin esto, todas. */
+  solo?: string[]
 }
 
 /** `fila`: orden de llegada (rowid): el cursor de la secretaría, que no se confunde con mensajes del mismo segundo ni con
@@ -113,6 +115,11 @@ export class WhatsAppStore {
         pn TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS wa_lids_pn ON wa_lids(pn);
+    CREATE TABLE IF NOT EXISTS wa_miembros (
+        grupo TEXT NOT NULL,
+        jid TEXT NOT NULL,
+        PRIMARY KEY (grupo, jid)
+    );
     CREATE TABLE IF NOT EXISTS wa_mensajes (
         chat TEXT NOT NULL,
         id TEXT NOT NULL,
@@ -143,6 +150,9 @@ export class WhatsAppStore {
     if (!cols.includes('media')) this.db.exec('ALTER TABLE wa_mensajes ADD COLUMN media TEXT')
     if (!cols.includes('transcripcion')) this.db.exec('ALTER TABLE wa_mensajes ADD COLUMN transcripcion TEXT')
     if (!cols.includes('media_estado')) this.db.exec('ALTER TABLE wa_mensajes ADD COLUMN media_estado TEXT')
+    // filtro de personas de un grupo (JSON con la lista de ids)
+    const colsChats = this.db.query("SELECT name FROM pragma_table_info('wa_chats')").map((f) => txt(f.name))
+    if (!colsChats.includes('solo')) this.db.exec('ALTER TABLE wa_chats ADD COLUMN solo TEXT')
   }
 
   // estado
@@ -164,6 +174,8 @@ export class WhatsAppStore {
     const pa = optNum(f.participantes); if (pa !== undefined) c.participantes = pa
     const u = optNum(f.ultimo); if (u) c.ultimo = u
     const d = optNum(f.elegido_desde); if (d) c.elegidoDesde = d
+    const so = optTxt(f.solo)
+    if (so) { try { const l = JSON.parse(so); if (Array.isArray(l)) c.solo = l.filter((x): x is string => typeof x === 'string') } catch {} }
     return c
   }
 
@@ -201,6 +213,9 @@ export class WhatsAppStore {
     const previo = this.numeroDeLid(lid)
     if (previo === pn) return false
     this.db.run('INSERT INTO wa_lids(lid, pn) VALUES (?, ?) ON CONFLICT(lid) DO UPDATE SET pn=excluded.pn', [lid, pn])
+    // los integrantes de grupos que se conocían por el @lid pasan a ser el número (sin repetir a nadie)
+    this.db.run('UPDATE OR IGNORE wa_miembros SET jid=? WHERE jid=?', [pn, lid])
+    this.db.run('DELETE FROM wa_miembros WHERE jid=?', [lid])
     const fila = this.chat(lid)
     if (fila) {
       this.anotarChats([{ jid: pn, grupo: false, agenda: fila.agenda, pista: fila.pista, ultimo: fila.ultimo }])
@@ -228,10 +243,57 @@ export class WhatsAppStore {
     if (cambios.nota !== undefined) this.db.run('UPDATE wa_chats SET nota=? WHERE jid=?', [cambios.nota, jid])
   }
 
+  // integrantes de los grupos y filtro de personas
+
+  /** Un id y todos los que corresponden a la misma persona (su número y sus @lid conocidos). */
+  equivalentes(jids: Iterable<string>): Set<string> {
+    const out = new Set<string>()
+    for (const j of jids) {
+      out.add(j)
+      const pn = esLid(j) ? this.numeroDeLid(j) : esNumero(j) ? j : undefined
+      if (pn) { out.add(pn); for (const l of this.lidsDe(pn)) out.add(l) }
+    }
+    return out
+  }
+
+  /** La lista de integrantes de un grupo. `modo`: reemplaza (por defecto), suma o quita. Un @lid con número conocido se
+   *  guarda como número; si llegan los dos, se aprende la relación. */
+  anotarMiembros(grupo: string, miembros: MiembroWA[], modo: 'reemplazar' | 'sumar' | 'quitar' = 'reemplazar') {
+    const ids = new Set<string>()
+    for (const m of miembros) {
+      if (m.pn && m.lid) this.anotarAlias(m.pn, m.lid)
+      const id = m.pn ?? (m.lid ? this.numeroDeLid(m.lid) ?? m.lid : undefined)
+      if (id) ids.add(id)
+    }
+    if (modo === 'reemplazar') this.db.run('DELETE FROM wa_miembros WHERE grupo=?', [grupo])
+    for (const id of ids) {
+      if (modo === 'quitar') for (const e of this.equivalentes([id])) this.db.run('DELETE FROM wa_miembros WHERE grupo=? AND jid=?', [grupo, e])
+      else this.db.run('INSERT OR IGNORE INTO wa_miembros(grupo, jid) VALUES (?, ?)', [grupo, id])
+    }
+  }
+
+  miembros(grupo: string): string[] { return this.db.query('SELECT jid FROM wa_miembros WHERE grupo=?', [grupo]).map((f) => txt(f.jid)) }
+
+  /** El grupo pasa a leer solo a estas personas (o a todas, con `null`). Los mensajes ya guardados de quienes quedaron afuera se
+   *  borran: devuelve los archivos de audios e imágenes que hay que borrar. */
+  ponerSolo(jid: string, solo: string[] | null): string[] {
+    this.db.run('UPDATE wa_chats SET solo=? WHERE jid=?', [solo ? JSON.stringify(solo) : null, jid])
+    if (!solo) return []
+    const permitidos = this.equivalentes(solo)
+    const sobran = this.db.query('SELECT rowid AS fila, de, media FROM wa_mensajes WHERE chat=? AND propio=0', [jid]).filter((f) => !permitidos.has(txt(f.de)))
+    const archivos: string[] = []
+    for (const f of sobran) {
+      const md = optTxt(f.media)
+      if (md) { try { const a = String(JSON.parse(md).archivo ?? ''); if (/^[0-9a-f]{32}\.bin$/.test(a)) archivos.push(a) } catch {} }
+      this.db.run('DELETE FROM wa_mensajes WHERE rowid=?', [num(f.fila)])
+    }
+    return archivos
+  }
+
   /** Deja de leerlo y borra sus mensajes. Devuelve los archivos de audios e imágenes que hay que borrar. */
   quitar(jid: string): string[] {
     const archivos = this.archivosDe('chat=?', [jid])
-    this.db.run('UPDATE wa_chats SET elegido=0, nombre=NULL, nota=NULL, elegido_desde=NULL WHERE jid=?', [jid])
+    this.db.run('UPDATE wa_chats SET elegido=0, nombre=NULL, nota=NULL, elegido_desde=NULL, solo=NULL WHERE jid=?', [jid])
     this.db.run('DELETE FROM wa_mensajes WHERE chat=?', [jid])
     return archivos
   }
@@ -336,9 +398,30 @@ export class WhatsAppStore {
   }
 
   borrarTodo() {
-    this.db.exec('DELETE FROM wa_mensajes; DELETE FROM wa_chats; DELETE FROM wa_lids; DELETE FROM wa_estado;')
+    this.db.exec('DELETE FROM wa_mensajes; DELETE FROM wa_chats; DELETE FROM wa_lids; DELETE FROM wa_miembros; DELETE FROM wa_estado;')
   }
 }
+
+// MARK: - modelos de transcripción
+
+/** Los modelos de Whisper que se pueden elegir (Transformers.js, q8). `mb`: lo que se baja la primera vez, aproximado. */
+export const modelosTranscripcion = {
+  rapido: { modelo: 'onnx-community/whisper-tiny', nombre: 'Rápido', mb: 40 },
+  normal: { modelo: 'onnx-community/whisper-base', nombre: 'Normal', mb: 80 },
+  mejor: { modelo: 'onnx-community/whisper-small', nombre: 'Mejor', mb: 250 },
+} as const
+export type ModeloTr = keyof typeof modelosTranscripcion
+/** `es`: se le dice a Whisper que es español; `auto`: que lo detecte. El valor de `HQ_WA_IDIOMA` del transcriptor. */
+export const idiomasTranscripcion = {
+  es: { nombre: 'Español', env: 'spanish' },
+  auto: { nombre: 'Detectar automáticamente', env: 'auto' },
+} as const
+export type IdiomaTr = keyof typeof idiomasTranscripcion
+const esModeloTr = (v: unknown): v is ModeloTr => typeof v === 'string' && Object.hasOwn(modelosTranscripcion, v)
+const esIdiomaTr = (v: unknown): v is IdiomaTr => typeof v === 'string' && Object.hasOwn(idiomasTranscripcion, v)
+
+/** Pasados estos días sin ver actividad del teléfono, se avisa: WhatsApp desvincula a los 14. */
+export const diasAvisoTelefono = 12
 
 // MARK: - servicio (supervisa la captura)
 
@@ -364,6 +447,8 @@ export class ServicioWhatsApp {
 
   get dir() { return path.join(this.s.config.datosDir, 'whatsapp') }
   get numero() { return this.store.estado('numero') }
+  /** Última vez que la captura vio actividad del teléfono (segundos), si alguna vez. Es un indicio, no un dato exacto. */
+  get telefonoVisto(): number | undefined { const n = Number(this.store.estado('telefonoVisto')); return Number.isFinite(n) && n > 0 ? n : undefined }
   get activo() { return this.store.estado('activo') === '1' }
   /** La sesión se guarda cifrada (hay clave del llavero). */
   get cifrado() { return !!this.clave() }
@@ -414,6 +499,25 @@ export class ServicioWhatsApp {
   private ocioso?: NodeJS.Timeout
   static ociosoTranscriptor = 5 * 60_000
 
+  get modelo(): ModeloTr { const v = this.store.estado('modelo'); return esModeloTr(v) ? v : 'normal' }
+  get idioma(): IdiomaTr { const v = this.store.estado('idioma'); return esIdiomaTr(v) ? v : 'es' }
+
+  /** Cambia el modelo o el idioma de la transcripción. Si había un transcriptor corriendo, se corta: el próximo (si quedan
+   *  audios pendientes, ya) arranca con lo nuevo. */
+  ponerModeloIdioma(modelo: ModeloTr | undefined, idioma: IdiomaTr | undefined) {
+    const cambia = (modelo !== undefined && modelo !== this.modelo) || (idioma !== undefined && idioma !== this.idioma)
+    if (!cambia) return
+    if (modelo !== undefined) this.store.ponerEstado('modelo', modelo === 'normal' ? undefined : modelo)
+    if (idioma !== undefined) this.store.ponerEstado('idioma', idioma === 'es' ? undefined : idioma)
+    const p = this.procTr
+    clearTimeout(this.ocioso)
+    this.procTr = undefined
+    this.enCola.clear()
+    this.transcriptor = { estado: 'apagado' }
+    if (p) { p.removeAllListeners('message'); try { p.kill() } catch {} }
+    try { this.transcribirPendientes() } catch {}
+  }
+
   ponerTranscribir(si: boolean) {
     this.store.ponerEstado('transcribir', si ? '1' : undefined)
     if (si && this.transcriptor.estado === 'sin_motor') this.transcriptor = { estado: 'apagado' }
@@ -443,7 +547,10 @@ export class ServicioWhatsApp {
       this.transcriptor = { estado: 'sin_motor', error: 'No encuentro el transcriptor.' }
       return undefined
     }
-    const env: NodeJS.ProcessEnv = { ...this.s.env, ...(host?.transcriptor?.env ?? {}), HQ_WA_MODELOS: path.join(this.s.config.datosDir, 'modelos') }
+    const env: NodeJS.ProcessEnv = {
+      ...this.s.env, ...(host?.transcriptor?.env ?? {}), HQ_WA_MODELOS: path.join(this.s.config.datosDir, 'modelos'),
+      HQ_WA_MODELO: modelosTranscripcion[this.modelo].modelo, HQ_WA_IDIOMA: idiomasTranscripcion[this.idioma].env,
+    }
     delete env.HQ_WA_CLAVE
     const clave = this.clave()
     if (clave) env.HQ_WA_CLAVE = clave
@@ -572,8 +679,14 @@ export class ServicioWhatsApp {
       case 'alias':
         if (this.store.anotarAlias(m.pn, m.lid) && this.store.chat(m.pn)?.elegido) this.enviarElegidos()
         break
+      case 'telefono':
+        if (typeof m.ts === 'number' && m.ts > (this.telefonoVisto ?? 0) && m.ts <= Date.now() / 1000 + 60) this.store.ponerEstado('telefonoVisto', String(Math.floor(m.ts)))
+        break
+      case 'miembros':
+        if (esGrupo(m.grupo) && Array.isArray(m.miembros)) this.store.anotarMiembros(m.grupo, m.miembros, m.modo)
+        break
       case 'mensaje':
-        if (m.m && typeof m.m.chat === 'string' && this.store.guardar(m.m, { transcribir: this.transcribir })) this.transcribirPendientes()
+        if (m.m && typeof m.m.chat === 'string' && this.leeA(m.m) && this.store.guardar(m.m, { transcribir: this.transcribir })) this.transcribirPendientes()
         break
       case 'cerrada':
         this.desvinculando?.()
@@ -613,9 +726,19 @@ export class ServicioWhatsApp {
     this.reintento.unref?.()
   }
 
-  /** Le pasa a la captura los chats que se leen, con sus @lid conocidos. */
+  /** Segunda barrera del filtro de personas de un grupo (la primera es la captura): un mensaje que llegó con la lista vieja no se guarda. */
+  private leeA(m: MensajeWA): boolean {
+    if (m.propio || !esGrupo(m.chat)) return true
+    const solo = this.store.chat(m.chat)?.solo
+    return !solo || this.store.equivalentes(solo).has(m.de)
+  }
+
+  /** Le pasa a la captura los chats que se leen, con sus @lid conocidos y, en un grupo con filtro, las personas que se leen. */
   enviarElegidos() {
-    const chats = this.store.elegidos().map((c) => ({ jid: c.jid, lids: esNumero(c.jid) ? this.store.lidsDe(c.jid) : [] }))
+    const chats = this.store.elegidos().map((c) => ({
+      jid: c.jid, lids: esNumero(c.jid) ? this.store.lidsDe(c.jid) : [],
+      ...(c.grupo && c.solo ? { solo: [...this.store.equivalentes(c.solo)] } : {}),
+    }))
     try { this.proceso?.send({ tipo: 'elegidos', chats }) } catch {}
   }
 
@@ -672,7 +795,7 @@ export function nombreVisible(c: Pick<ChatWA, 'jid' | 'nombre' | 'agenda' | 'pis
   return c.nombre ?? c.agenda ?? (c.pista ? '~' + c.pista : numeroVisible(c.jid) ?? (esLid(c.jid) ? 'Número desconocido' : c.jid))
 }
 
-export function chatJSON(c: ChatWA): Obj {
+export function chatJSON(c: ChatWA, miembros?: Obj[]): Obj {
   const o: Obj = { jid: c.jid, nombre: nombreVisible(c), elegido: c.elegido, grupo: c.grupo }
   if (c.nombre) o.nombreElegido = c.nombre
   if (c.agenda) o.agenda = c.agenda
@@ -683,7 +806,26 @@ export function chatJSON(c: ChatWA): Obj {
   if (c.participantes !== undefined) o.participantes = c.participantes
   if (c.ultimo) o.ultimo = c.ultimo
   if (c.elegidoDesde) o.elegidoDesde = c.elegidoDesde
+  if (c.solo) o.solo = c.solo
+  if (miembros) o.miembros = miembros
   return o
+}
+
+const maxSolo = 1024
+
+/** El filtro de personas del cuerpo de un PUT: `null` = leer a todos, o la lista de ids (los @lid con número conocido pasan a número). */
+function soloValido(v: unknown, store: WhatsAppStore): string[] | null {
+  if (v === null) return null
+  if (!Array.isArray(v) || v.some((x) => typeof x !== 'string')) throw new ErrorAPI(400, '«solo» tiene que ser una lista de personas, o null para leer a todos.')
+  const ids = new Set<string>()
+  for (const x of v as string[]) {
+    const n = normalizarJid(x)
+    if (!n || !(esNumero(n) || esLid(n))) throw new ErrorAPI(400, 'Hay una persona que no reconozco en la lista.')
+    ids.add(esLid(n) ? store.numeroDeLid(n) ?? n : n)
+  }
+  if (ids.size === 0) throw new ErrorAPI(400, 'Elegí al menos una persona, o leé a todos.')
+  if (ids.size > maxSolo) throw new ErrorAPI(400, `Se pueden elegir hasta ${maxSolo} personas.`)
+  return [...ids]
 }
 
 const maxNombre = 60
@@ -713,6 +855,32 @@ export class WhatsAppRouter implements SubRouter {
     return atrapar(async () => this.despachar(method, p, body))
   }
 
+  /** Los integrantes de un grupo elegido, con el nombre que se les ve y si se los lee. Ordenados por nombre. */
+  private miembrosJSON(c: ChatWA): Obj[] {
+    const st = this.wa.store
+    const yo = this.wa.numero
+    const lista: string[] = []
+    const vistos = new Set<string>()
+    for (const j of [...st.miembros(c.jid), ...(c.solo ?? [])]) {
+      if (vistos.has(j) || j === yo) continue
+      for (const e of st.equivalentes([j])) vistos.add(e)
+      lista.push(j)
+    }
+    const leidos = c.solo ? st.equivalentes(c.solo) : undefined
+    const nombrar = (j: string) => {
+      const pn = esLid(j) ? st.numeroDeLid(j) : j
+      const f = st.chat(j) ?? (pn ? st.chat(pn) : undefined)
+      return nombreVisible({ jid: j, agenda: f?.agenda, pista: f?.pista, nombre: undefined })
+    }
+    return lista.map((j) => {
+      const o: Obj = { jid: j, nombre: nombrar(j), seleccionado: !leidos || [...st.equivalentes([j])].some((e) => leidos.has(e)) }
+      const n = numeroVisible(j); if (n) o.numero = n
+      return o
+    }).sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es', { sensitivity: 'base' }))
+  }
+
+  private chatConMiembros(c: ChatWA): Obj { return chatJSON(c, c.elegido && c.grupo ? this.miembrosJSON(c) : undefined) }
+
   private estadoJSON(): Obj {
     const wa = this.wa
     return {
@@ -722,9 +890,14 @@ export class WhatsAppRouter implements SubRouter {
       sincronizando: wa.sincronizando ?? null,
       hayQR: !!wa.qr,
       retencionDias: ServicioWhatsApp.retencionDias,
+      telefonoVisto: wa.telefonoVisto ?? null,
       transcribir: wa.transcribir,
+      modelo: wa.modelo,
+      idioma: wa.idioma,
+      modelos: Object.entries(modelosTranscripcion).map(([id, m]) => ({ id, nombre: m.nombre, mb: m.mb })),
+      idiomas: Object.entries(idiomasTranscripcion).map(([id, i]) => ({ id, nombre: i.nombre })),
       transcriptor: { estado: wa.transcriptor.estado, progreso: wa.transcriptor.progreso ?? null, error: wa.transcriptor.error ?? null },
-      chats: wa.store.chats().map(chatJSON),
+      chats: wa.store.chats().map((c) => this.chatConMiembros(c)),
     }
   }
 
@@ -754,8 +927,12 @@ export class WhatsAppRouter implements SubRouter {
     if (p === '/api/whatsapp/ajustes') {
       if (method !== 'PUT') return no405
       const b = objeto(body)
-      if (typeof b.transcribir !== 'boolean') return [400, { error: '«transcribir» tiene que ser sí o no.' }]
-      wa.ponerTranscribir(b.transcribir)
+      if (b.transcribir !== undefined && typeof b.transcribir !== 'boolean') return [400, { error: '«transcribir» tiene que ser sí o no.' }]
+      if (b.modelo !== undefined && !esModeloTr(b.modelo)) return [400, { error: `«modelo» tiene que ser uno de: ${Object.keys(modelosTranscripcion).join(', ')}.` }]
+      if (b.idioma !== undefined && !esIdiomaTr(b.idioma)) return [400, { error: `«idioma» tiene que ser uno de: ${Object.keys(idiomasTranscripcion).join(', ')}.` }]
+      if (b.transcribir === undefined && b.modelo === undefined && b.idioma === undefined) return [400, { error: 'Decime qué cambiar: «transcribir», «modelo» o «idioma».' }]
+      wa.ponerModeloIdioma(b.modelo as ModeloTr | undefined, b.idioma as IdiomaTr | undefined)
+      if (b.transcribir !== undefined) wa.ponerTranscribir(b.transcribir)
       return [200, this.estadoJSON()]
     }
     if (p === '/api/whatsapp/chats') {
@@ -768,7 +945,7 @@ export class WhatsAppRouter implements SubRouter {
       if (wa.store.chat(jid)?.elegido) return [409, { error: 'Ese número ya está elegido.' }]
       wa.store.elegir(jid, nombre, nota)
       wa.enviarElegidos()
-      return [200, { chat: chatJSON(wa.store.chat(jid)!) }]
+      return [200, { chat: this.chatConMiembros(wa.store.chat(jid)!) }]
     }
     const m = /^\/api\/whatsapp\/chats\/([^/]+)$/.exec(p)
     if (m) {
@@ -783,18 +960,26 @@ export class WhatsAppRouter implements SubRouter {
         wa.enviarElegidos()
         return [200, { chat: chatJSON(wa.store.chat(jid)!) }]
       }
+      const solo = b.solo === undefined ? undefined : soloValido(b.solo, wa.store)
+      if (solo && !c.grupo) return [400, { error: 'Solo se puede elegir a quiénes leer en un grupo.' }]
       if (b.elegido === true && !c.elegido) {
         if (esLid(jid)) return [400, { error: 'Todavía no se sabe el número de este chat: agregalo por número.' }]
         wa.store.elegir(jid, nombreValido(b.nombre ?? c.agenda), notaValida(b.nota))
+        if (solo) wa.borrarArchivos(wa.store.ponerSolo(jid, solo))
         wa.enviarElegidos()
-        return [200, { chat: chatJSON(wa.store.chat(jid)!) }]
+        return [200, { chat: this.chatConMiembros(wa.store.chat(jid)!) }]
       }
       if (!c.elegido) return [400, { error: 'Ese chat no está elegido.' }]
       const cambios: { nombre?: string; nota?: string | null } = {}
       if (b.nombre !== undefined) cambios.nombre = nombreValido(b.nombre)
       if (b.nota !== undefined) cambios.nota = notaValida(b.nota) ?? null
       wa.store.editar(jid, cambios)
-      return [200, { chat: chatJSON(wa.store.chat(jid)!) }]
+      if (solo !== undefined) {
+        // los mensajes ya guardados de quienes quedaron afuera se borran, con sus archivos
+        wa.borrarArchivos(wa.store.ponerSolo(jid, solo))
+        wa.enviarElegidos()
+      }
+      return [200, { chat: this.chatConMiembros(wa.store.chat(jid)!) }]
     }
     return no404
   }
@@ -1003,6 +1188,17 @@ export function instalar(s: Servicios) {
     return [{
       id: 'whatsapp', tipo: 'whatsapp', agente: '', ref: '', creado: Date.now() / 1000,
       texto: wa.estado === 'revocado' ? 'WhatsApp cerró la sesión de la oficina: volvé a vincularlo en Ajustes › WhatsApp.' : 'La conexión con WhatsApp se cayó varias veces: revisala en Ajustes › WhatsApp.',
+    }]
+  })
+  // WhatsApp desvincula un dispositivo si el teléfono no se conecta en 14 días: se avisa a los 12, con lo que se alcanza a ver
+  s.avisos.fuentes.push(() => {
+    const visto = wa.telefonoVisto
+    if (!visto || !wa.activo || wa.estado === 'revocado' || wa.estado === 'caido') return []
+    const dias = Math.floor((Date.now() / 1000 - visto) / 86400)
+    if (dias < diasAvisoTelefono) return []
+    return [{
+      id: 'whatsapp-telefono', tipo: 'whatsapp', agente: '', ref: '', creado: visto + diasAvisoTelefono * 86400,
+      texto: `Calculamos que el teléfono no se conecta a WhatsApp hace unos ${dias} días (es una estimación: se mira la última actividad propia que vio la oficina). Si pasan 14, WhatsApp cierra la sesión de la oficina. Abrí WhatsApp en el teléfono para evitarlo.`,
     }]
   })
   if (s.env.HQ_WHATSAPP !== '0') s.alArrancar.push(() => wa.arrancar())

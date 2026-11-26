@@ -72,17 +72,64 @@ export function seIgnora(jid: unknown): boolean {
 /** «+5491155551234» para mostrar un JID de número; undefined si no es de número. */
 export const numeroVisible = (jid: string) => (esNumero(jid) ? '+' + jid.slice(0, jid.indexOf('@')) : undefined)
 
+/** Un chat elegido para la captura: sus `@lid` conocidos y, en un grupo, `solo` = las únicas personas (número o `@lid`) cuyos
+ *  mensajes se leen (más los propios). Sin `solo`, se lee a todos. */
+export type ElegidoCaptura = { jid: string; lids?: string[]; solo?: string[] }
+
+/** Un integrante de un grupo, con el número y/o el `@lid` con el que WhatsApp lo da. */
+export type MiembroWA = { pn?: string; lid?: string }
+
+/** Los integrantes de un grupo (`participants` de Baileys) sin datos de más: solo el número y el `@lid`, normalizados. */
+export function mapearMiembros(participantes: unknown): MiembroWA[] {
+  if (!Array.isArray(participantes)) return []
+  const out: MiembroWA[] = []
+  for (const p of participantes) {
+    const x = (typeof p === 'string' ? { id: p } : p) as Record<string, unknown> | null
+    if (!x || typeof x !== 'object') continue
+    const ids = [x.id, x.phoneNumber, x.lid].map(normalizarJid).filter((j): j is string => !!j)
+    const pn = ids.find(esNumero), lid = ids.find(esLid)
+    if (pn || lid) out.push({ ...(pn ? { pn } : {}), ...(lid ? { lid } : {}) })
+  }
+  return out
+}
+
 /** Chats elegidos con los ids alternativos con los que pueden aparecer (sus `@lid`). */
 export class FiltroElegidos {
   /** alias (número o lid) -> id canónico */
   private readonly alias = new Map<string, string>()
+  /** grupo -> ids (números y @lid) de las personas que se leen; sin entrada, se lee a todos */
+  private readonly solo = new Map<string, Set<string>>()
 
-  constructor(lista: { jid: string; lids?: string[] }[] = []) {
+  constructor(lista: ElegidoCaptura[] = []) {
     for (const c of lista) {
       const id = normalizarJid(c.jid)
       if (!id || seIgnora(id)) continue
       this.alias.set(id, id)
       for (const l of c.lids ?? []) { const n = normalizarJid(l); if (n) this.alias.set(n, id) }
+      if (esGrupo(id) && Array.isArray(c.solo)) {
+        this.solo.set(id, new Set(c.solo.map(normalizarJid).filter((j): j is string => !!j)))
+      }
+    }
+  }
+
+  /** Si es un grupo con filtro de personas. */
+  filtraPersonas(chat: string) { return this.solo.has(chat) }
+
+  /** ¿Se lee a esta persona en este grupo? Sin filtro, a todos; con filtro, solo a quienes están en la lista (por número o
+   *  por @lid). Sin saber quién es, no. */
+  leeA(chat: string, ...jids: unknown[]): boolean {
+    const s = this.solo.get(chat)
+    if (!s) return true
+    return jids.some((j) => { const n = normalizarJid(j); return !!n && s.has(n) })
+  }
+
+  /** Aprendió que este número y este @lid son la misma persona: el filtro de los grupos la reconoce por cualquiera. */
+  sumarPersona(pn: unknown, lid: unknown) {
+    const p = normalizarJid(pn), l = normalizarJid(lid)
+    if (!p || !l) return
+    for (const s of this.solo.values()) {
+      if (s.has(p)) s.add(l)
+      else if (s.has(l)) s.add(p)
     }
   }
 
@@ -181,6 +228,8 @@ export function mapearMensaje(wa: unknown, elegidos: FiltroElegidos): MensajeWA 
   const c = contenido(w!.message)
   if (c.tipo === 'vacio' || c.tipo === 'protocolo' || c.tipo === 'reaccion') return undefined
   const grupo = esGrupo(chat)
+  // el filtro de personas de un grupo se aplica acá, antes de que nada salga del proceso
+  if (grupo && !k.fromMe && !elegidos.leeA(chat, k.participantAlt, k.participant)) return undefined
   const de = k.fromMe ? 'yo' : grupo ? normalizarJid(k.participantAlt) ?? normalizarJid(k.participant) ?? '' : chat
   const out: MensajeWA = { id: String(k.id), chat, de, propio: !!k.fromMe, ts: segundos(w!.messageTimestamp) ?? Math.floor(Date.now() / 1000), tipo: c.tipo }
   if (c.texto !== undefined) out.texto = c.texto
@@ -211,11 +260,15 @@ export type DeCaptura =
   | { tipo: 'mensaje'; m: MensajeWA }
   | { tipo: 'chats'; chats: MetaChatWA[] }
   | { tipo: 'alias'; pn: string; lid: string }
+  /** Los integrantes de un grupo (solo número y @lid). `modo`: reemplaza la lista (por defecto), suma o quita. */
+  | { tipo: 'miembros'; grupo: string; miembros: MiembroWA[]; modo?: 'reemplazar' | 'sumar' | 'quitar' }
+  /** Último momento en que se vio actividad del teléfono (un mensaje propio en cualquier chat, sin su contenido). */
+  | { tipo: 'telefono'; ts: number }
   | { tipo: 'cerrada' }
   | { tipo: 'error'; texto: string }
 
 export type ACaptura =
-  | { tipo: 'elegidos'; chats: { jid: string; lids: string[] }[] }
+  | { tipo: 'elegidos'; chats: (ElegidoCaptura & { lids: string[] })[] }
   | { tipo: 'cerrar_sesion' }
   | { tipo: 'salir' }
 
