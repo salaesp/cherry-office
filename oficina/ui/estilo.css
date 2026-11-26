@@ -884,6 +884,8 @@ button.adjunto:hover { background: var(--panel-2); }
 .lista-grupo.plegable { cursor: pointer; }
 .lista-grupo.plegable svg { width: 13px; height: 13px; transform: rotate(-90deg); transition: transform .12s; }
 .lista-grupo.plegable.abierto svg { transform: none; }
+.lista-grupo .btn.icono.chico { width: 22px; height: 22px; padding: 0; flex: none; text-transform: none; }
+.lista-grupo .btn.icono.chico svg { width: 14px; height: 14px; }
 .lista-grupo .cuenta { margin-left: auto; flex: none; height: auto; padding: 0; border: 0; border-radius: 0; background: none; font-weight: 500; color: var(--tenue); }
 .lista-col .equipo { padding: 0; overflow: visible; flex: none; }
 .lista-item { display: flex; gap: 10px; align-items: center; padding: 7px 8px; border-radius: var(--radio-chico); cursor: pointer; }
@@ -1151,7 +1153,7 @@ button.adjunto:hover { background: var(--panel-2); }
   .app.en-seccion .derecho[data-modo="reunion"] { width: min(calc(var(--charla) + 290px), var(--panel-max)); }
   /* lo de escritorio (biblioteca, archivos, tareas, flujos…) necesita más ancho; la oficina conserva su franja */
   .app.en-seccion:is([data-seccion="bandeja"], [data-seccion="archivos"], [data-seccion="trabajo"]) .derecho:not([data-modo="vacio"]) { width: min(var(--escritorio), calc(var(--panel-max) - 240px)); min-width: min(440px, var(--panel-max)); }
-  .app.en-seccion[data-seccion] .derecho.abierto:is([data-modo="biblioteca"], [data-modo="conocimiento"], [data-modo="creador"], [data-modo="flujos-editor"], [data-modo="deptos"], [data-modo="contratar"]) { width: min(max(640px, calc(var(--panel-max) - 400px)), var(--escritorio-ancho)); max-width: var(--panel-max); }
+  .app.en-seccion[data-seccion] .derecho.abierto:is([data-modo="biblioteca"], [data-modo="conocimiento"], [data-modo="creador"], [data-modo="flujos-editor"], [data-modo="departamentos"], [data-modo="contratar"]) { width: min(max(640px, calc(var(--panel-max) - 400px)), var(--escritorio-ancho)); max-width: var(--panel-max); }
   /* la charla con su columna al costado: detalles (angosta) o ficha / lista completa (ancha) */
   .app.en-seccion .derecho.con-relacionado { --det: 290px; display: grid; width: calc(var(--charla) + var(--det)); max-width: var(--panel-max); grid-template-columns: minmax(0, 1fr) var(--det); grid-template-rows: auto auto minmax(0, 1fr) auto; }
   .app.en-seccion .derecho.con-relacionado[data-lado="ancho"] { --det: 400px; }

@@ -23,7 +23,7 @@ App.Paleta = (function () {
   }
 
   /* orden de los grupos de resultados */
-  var GRUPOS = ['Para revisar', 'Recientes', 'Chats', 'Lugares', 'Acciones', 'Buscar en'];
+  var GRUPOS = ['Para revisar', 'Recientes', 'Equipo', 'Lugares', 'Acciones', 'Buscar en'];
 
   function armar() {
     var o = App.E.oficina || { agentes: [], departamentos: [] }, act = App.E.actividad || {}, out = [];
@@ -40,15 +40,15 @@ App.Paleta = (function () {
     /* un solo lugar por agente: su charla (la ficha se abre desde ahí o desde Equipo) */
     o.agentes.forEach(function (a) {
       var t = act[a.id], d = App.depto(a.departamento);
-      ag('Chats', 'Charla', 'charla', a.nombre, (t ? (t.tarea || t.estado) : a.rol + (d ? ' · ' + d.nombre : '')) + ' · charla · ficha en Chats',
+      ag('Equipo', 'Charla', 'charla', a.nombre, (t ? (t.tarea || t.estado) : a.rol + (d ? ' · ' + d.nombre : '')) + ' · charla · ficha en Equipo',
         a.nombre + ' ' + a.rol + ' ' + (d ? d.nombre : '') + ' ficha perfil editar charla hablar',
         function () { App.Oficina3D.enfocarAgente(a.id); App.Agente.abrir(a.id); }, { activo: !!t });
     });
     o.departamentos.forEach(function (d) {
-      ag('Chats', 'Departamento', 'capas', d.nombre, 'departamento', 'departamento departamentos ' + d.nombre, function () { App.Nav.ir('#/equipo/departamentos'); });
+      ag('Equipo', 'Departamento', 'capas', d.nombre, 'departamento', 'departamento departamentos ' + d.nombre, function () { App.Nav.ir('#/equipo/departamentos'); });
     });
-    if (!o.departamentos.length) ag('Chats', 'Equipo', 'capas', 'Departamentos', '', 'departamentos', function () { App.Nav.ir('#/equipo/departamentos'); });
-    ag('Chats', 'Vos', 'personas', 'Tu perfil', App.Yo.nombre(), 'yo perfil quien dirige mi nombre dueño minifig', function () { App.Yo.abrir(); });
+    if (!o.departamentos.length) ag('Equipo', 'Departamento', 'capas', 'Departamentos', '', 'departamentos', function () { App.Nav.ir('#/equipo/departamentos'); });
+    ag('Equipo', 'Vos', 'personas', 'Tu perfil', App.Yo.nombre(), 'yo perfil quien dirige mi nombre dueño minifig', function () { App.Yo.abrir(); });
 
     ag('Lugares', 'Sala', 'reunion', 'Sala de reuniones', '', 'sala reuniones', function () { App.Oficina3D.enfocarLugar('reunion'); App.Reunion.abrir(); });
     ag('Lugares', 'Sala', 'libro', 'Biblioteca', 'Documentos y fichas', 'biblioteca archivos documentos', function () { App.Nav.ir('#/archivos/biblioteca'); });
@@ -60,7 +60,7 @@ App.Paleta = (function () {
      ['Armar con el Creador', 'chispa', 'Armá la oficina charlando', 'creador armar oficina', function () { App.Nav.ir('#/equipo/creador'); }],
      ['Contratar un agente', 'mas', '', 'contratar agente nuevo', function () { App.Nav.ir('#/equipo/contratar'); }],
      ['Llamar a reunión', 'reunion', '', 'llamar reunion', function () { App.Reunion.nueva(); }],
-     ['Nuevo departamento', 'capas', '', 'nuevo departamento', function () { App.Deptos.agregar(); }],
+     ['Nuevo departamento', 'capas', '', 'nuevo departamento', function () { App.Departamentos.agregar(); }],
      ['Ajustes', 'ajustes', '', 'ajustes configuracion', function () { App.Ajustes.abrir(); }],
      ['Nombre de la oficina y quién dirige', 'edificio', '', 'nombre oficina dirige general', function () { App.Ajustes.abrir('general'); }],
      ['Reglas de la oficina', 'regla', '', 'reglas oficina', function () { App.Ajustes.abrir('reglas'); }],

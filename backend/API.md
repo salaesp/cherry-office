@@ -25,9 +25,6 @@ Sin oficina abierta, `/api/chat`, `/api/historial`, `/api/oficina`, `/api/depart
 | GET / PATCH | `/api/oficina` | PATCH `{nombre?, duenio?}` | `{carpeta, oficina}` |
 | PUT | `/api/oficina/ia` | `{skills?, mcp?, conectores?}`: cada una lista de nombres (`[]` = nada) o `null` (= todo, sin tope); ausente = no se toca | `{carpeta, oficina}`. Lo habilitado para los agentes de la oficina (`ia` en oficina.json, habilitados.ts). Cada agente usa lo de su ficha (`skills`, `mcp` por PATCH: lista o `null` = hereda; `conectores`) recortado a esto: skills fuera = `skillOverrides` en `off`; MCP fuera = `--disallowedTools mcp__<servidor>` (ninguno = `--strict-mcp-config`); conectores fuera = vedados, también en modo «todos». 400 si una clave no existe o una lista no es válida |
 | DELETE | `/api/oficina` | | `{ok, carpeta}`: la oficina activa se cierra, sale de recientes y se borra todo lo suyo en `hq.db` (chats, Creador, reuniones, tareas, biblioteca, costos). La carpeta no se toca (la app de escritorio la manda a la papelera). 409 si hay agentes trabajando |
-| POST | `/api/departamentos` | `{nombre, color?, id?}` | `{departamento, oficina}` |
-| PATCH | `/api/departamentos/:id` | `{nombre?, color?}` | `{departamento, oficina}` |
-| DELETE | `/api/departamentos/:id` | `{moverA?}` (o `?moverA=`) | `{ok, oficina}`; 409 si tiene agentes y no hay `moverA`, o si es el último departamento |
 | GET | `/api/agentes` | | `{agentes:[AgenteDef]}` |
 | POST | `/api/agentes/borrador` | `{descripcion, departamento}` | `{id, nombre, rol, description, prompt, chips[≤3], sabeDe?[≤6], modelo, departamento}`; no escribe nada. 502 si Claude falla o no devuelve JSON usable |
 | POST | `/api/agentes` | `{nombre, rol, prompt, departamento, id?, description?, chips?, sabeDe?, modelo?, brief?, avatar?}` | `{agente, oficina}`; escribe el `.md` (plantilla fija con «Memoria de la oficina») y `conocimiento/agentes/<id>.md`. 409 si el id existe. `avatar.semilla` = id si no viene |
@@ -46,6 +43,22 @@ Sin oficina abierta, `/api/chat`, `/api/historial`, `/api/oficina`, `/api/depart
 Los ids son slugs (`^[a-z0-9][a-z0-9-]{0,40}$`). Los chats guardados antes de las oficinas quedan con oficina vacía.
 
 **Para reuniones** (`Backend` expone): `backend.oficinas` (`Oficinas`: `activa() -> OficinaActiva?` con `carpeta`, `oficina`, `ruta(rel)`), `backend.runner` (`correrSinAgente(prompt:timeout:cwd:)` para la síntesis, `turnoSoloLectura(agente:prompt:cwd:timeout:)` con `Read,Glob,Grep`, `conCarril(oficina:agente:_:)`), `backend.registrarReuniones(SubRouter)` para atender `/api/reuniones*`, y `Plantillas.anexarDecisiones(carpeta:decisiones:fecha:)`.
+
+## Departamentos
+Código: UI `oficina/ui/departamentos.js`, rutas `backend/src/rutas-departamentos.ts`, reglas `backend/src/departamentos.ts`.
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| POST | `/api/departamentos` | `{nombre, color?, id?, mision?}` | `{departamento, oficina}` |
+| PATCH | `/api/departamentos/:id` | `{nombre?, color?, mision?}` | `{departamento, oficina}` |
+| DELETE | `/api/departamentos/:id` | `{moverA?}` (o `?moverA=`) | `{ok, oficina}` |
+
+Reglas:
+- Máximo 12 departamentos por oficina (400 al pasarse). Nombre obligatorio, hasta 60 caracteres; `color` tipo `#a88bdc` (si falta, sale de la paleta); `id` es un slug y no puede repetirse (409).
+- `mision`: texto opcional de hasta 600 caracteres. En POST, vacío o ausente no la guarda. En PATCH, ausente no la toca; `null` o `""` la borran.
+- Al borrar, si el departamento tiene agentes, `moverA` es obligatorio (otro departamento existente, distinto del borrado; si no, 409 sin `moverA` y 400 si no es válido) y los agentes pasan a él.
+- No se puede borrar el último departamento (409). 404 si el id no existe.
+- Sin oficina abierta, todas responden `409 {"error":"No hay una oficina abierta"}`.
 
 ## Exportar e importar una oficina
 

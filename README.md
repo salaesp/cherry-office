@@ -51,6 +51,19 @@ En los dos casos hace falta **Claude Code** instalado y con la sesión iniciada.
 | `tools/` | Utilidades sueltas, como el empaquetado de piezas LDraw. |
 | `bocetos/` | Pruebas de diseño que no forman parte de la app. `bocetos/pixel/` es el boceto del que salió la oficina pixel, con su renderizador de sprites a PNG. Ver [bocetos/pixel/README.md](bocetos/pixel/README.md). |
 
+## Dónde está qué
+| Quiero tocar… | Archivos |
+|---|---|
+| Departamentos | UI: `oficina/ui/departamentos.js` · rutas: `backend/src/rutas-departamentos.ts` · reglas: `backend/src/departamentos.ts` · API: [backend/API.md#departamentos](backend/API.md#departamentos) |
+| Oficinas (abrir, crear, perfil) | `backend/src/oficinas.ts`, `backend/src/rutas-oficinas.ts` |
+| Agentes (contratar, editar, despedir) | `backend/src/agentes.ts`, UI en `oficina/ui/contratar.js` y `oficina/ui/agente.js` |
+| El Creador (armar una oficina con tarjetas) | `backend/src/creador.ts`, `backend/src/rutas-creador.ts`, `oficina/ui/creador.js` |
+| Flujos | `backend/src/flujos.ts`, `backend/src/motor-flujos.ts`, `oficina/ui/flujos.js` |
+| Biblioteca | `backend/src/biblioteca.ts`, `oficina/ui/biblioteca.js` |
+| Reuniones | `backend/src/reuniones.ts`, `oficina/ui/reunion.js` |
+| Tareas programadas | `backend/src/programador.ts`, `backend/src/tareas.ts`, `oficina/ui/tareas.js` |
+| Navegación y rutas `#/…` de la UI | `oficina/ui/nav.js` |
+
 Hasta la 0.7 la app de Mac era nativa en Swift, con su propio backend; se retiró al pasar las dos plataformas a
 Electron (queda en el historial de git, antes de borrar `app/`).
 

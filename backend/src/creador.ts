@@ -15,7 +15,8 @@ import {
   LecturaAPI, ValidarFlujos, ValidarReglas, flujoDesde, flujoJSON, reglaDesde, type PasoFlujo,
 } from './modelo-flujos.js'
 import { OficinaStore, ValidarAgenteExtra, type ConectorAsignado, type Oficina } from './oficina.js'
-import { Oficinas, type OficinaActiva } from './oficinas.js'
+import type { OficinaActiva } from './oficinas.js'
+import { armarDepartamento, borrarDepartamento, crearDepartamento, editarDepartamento } from './departamentos.js'
 import { esCoordinador, type ServidorConector } from './permisos.js'
 import type { Servicios } from './servicios.js'
 import { num, txt, type Fila, type SQLValor } from './sqlite.js'
@@ -354,7 +355,7 @@ export const Creador = {
       case 'departamento': {
         if (crear && vacio('nombre')) falta('nombre', '¿Cómo se llama el departamento?')
         const usados = crear ? new Set(o.departamentos.map((x) => x.id)) : new Set<string>()
-        Oficinas.armarDepartamento(
+        armarDepartamento(
           { id: texto(d.id), nombre: texto(d.nombre) ?? 'x', color: texto(d.color), mision: typeof d.mision === 'string' ? d.mision : undefined }, 0, usados)
         break
       }
@@ -682,16 +683,16 @@ export const Creador = {
       case 'departamento:crear': {
         const nombre = texto(d.nombre)
         if (nombre === undefined) throw new ErrorAPI(400, 'Falta el nombre del departamento.')
-        const [dep] = of.crearDepartamento({ id: texto(d.id), nombre, color: texto(d.color), mision: texto(d.mision) })
+        const [dep] = crearDepartamento(of, { id: texto(d.id), nombre, color: texto(d.color), mision: texto(d.mision) })
         return dep.id
       }
       case 'departamento:modificar':
         if (obj === '') throw faltaObj()
-        of.editarDepartamento(obj, { nombre: texto(d.nombre), color: texto(d.color), mision: typeof d.mision === 'string' ? d.mision : undefined })
+        editarDepartamento(of, obj, { nombre: texto(d.nombre), color: texto(d.color), mision: typeof d.mision === 'string' ? d.mision : undefined })
         return obj
       case 'departamento:quitar':
         if (obj === '') throw faltaObj()
-        of.borrarDepartamento(obj, texto(d.moverA))
+        borrarDepartamento(of, obj, texto(d.moverA))
         return obj
 
       case 'agente:crear': {

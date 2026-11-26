@@ -266,7 +266,7 @@
       '-',
       { texto: 'Contratar un agente…', icono: 'personas', accion: function () { App.Nav.ir('#/equipo/contratar'); } },
       { texto: 'Armar con el Creador…', icono: 'chispa', accion: function () { App.Nav.ir('#/equipo/creador'); } },
-      { texto: 'Nuevo departamento…', icono: 'capas', accion: function () { App.Deptos.agregar(); } },
+      { texto: 'Nuevo departamento…', icono: 'capas', accion: function () { App.Departamentos.agregar(); } },
     ]);
   }
 

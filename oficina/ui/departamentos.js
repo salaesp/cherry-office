@@ -1,9 +1,12 @@
-/* Departamentos: cada uno es una sala del edificio. Crear, renombrar, cambiar color y borrar (moviendo a su gente). */
+/* Departamentos: cada uno es una sala del edificio. Crear, renombrar, cambiar color y borrar (moviendo a su gente).
+   Se abre desde nav.js (modo «departamentos», ruta #/equipo/departamentos), la paleta de comandos y el menú de la app.
+   Llama a /api/departamentos (POST, PATCH, DELETE): rutas en backend/src/rutas-departamentos.ts, reglas en
+   backend/src/departamentos.ts, contrato en backend/API.md#departamentos. */
 (function () {
   'use strict';
   var h = App.h, api = App.api;
 
-  App.Deptos = {
+  App.Departamentos = {
     /* `crear` (opcional) reemplaza a App.hoja: la ventana de Ajustes lo usa para dibujar la sección adentro */
     abrir: function (crear) {
       var hj = (crear || App.hoja)({ titulo: 'Departamentos', ancho: 520 });
@@ -132,7 +135,7 @@
       { texto: 'Cambiar color…', icono: 'chispa', accion: function () { App.elegirColor(ancla, d.color, function (c) { guardar(d.id, { color: c }, null, { color: d.color }); }); } },
       { texto: 'Misión y más…', icono: 'capas', accion: function () { App.Nav.ir('#/equipo/departamentos'); } },
       '-',
-      { texto: 'Borrar departamento…', icono: 'papelera', accion: function () { App.Deptos.borrar(d); } }
+      { texto: 'Borrar departamento…', icono: 'papelera', accion: function () { App.Departamentos.borrar(d); } }
     ]);
   }
 })();

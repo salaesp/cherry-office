@@ -18,7 +18,7 @@ App.Nav = (function () {
   var SECCIONES = [
     { id: 'bandeja', texto: 'Bandeja', icono: 'bandeja', ruta: '#/bandeja', movil: true },
     { id: 'oficina', texto: 'Oficina', icono: 'edificio', ruta: '#/oficina' },
-    { id: 'equipo', texto: 'Chats', icono: 'charla', ruta: '#/equipo', movil: true },
+    { id: 'equipo', texto: 'Equipo', icono: 'personas', ruta: '#/equipo', movil: true },
     { id: 'archivos', texto: 'Archivos', icono: 'carpeta', ruta: '#/archivos', movil: true },
     { id: 'trabajo', texto: 'Trabajo', icono: 'reloj', ruta: '#/trabajo' }
   ];
@@ -26,7 +26,7 @@ App.Nav = (function () {
   var LUGAR = {
     reunion: ['equipo', 'reuniones'],
     entregables: ['bandeja', 'revisar'], permisos: ['bandeja', 'permisos'], parte: ['bandeja', 'hoy'],
-    deptos: ['equipo', 'departamentos'], contratar: ['equipo', 'contratar'], creador: ['equipo', 'creador'],
+    departamentos: ['equipo', 'departamentos'], contratar: ['equipo', 'contratar'], creador: ['equipo', 'creador'],
     'reunion-nueva': ['equipo', 'reuniones'], 'flujos-editor': ['trabajo', 'flujos'],
     biblioteca: ['archivos', 'biblioteca'], conocimiento: ['archivos', 'conocimiento'], carpeta: ['archivos', 'carpeta'],
     tareas: ['trabajo', 'tareas'], flujos: ['trabajo', 'flujos']
@@ -192,7 +192,7 @@ App.Nav = (function () {
         else vacio();
       } else if (r.sec === 'equipo') {
         ponerSeccion('equipo', ['departamentos', 'contratar', 'creador', 'reuniones', 'nueva-reunion'].indexOf(r.a) >= 0 ? (r.a === 'nueva-reunion' ? 'reuniones' : r.a) : null);
-        if (r.a === 'departamentos') { if (m !== 'deptos') abrirDeptos(); }
+        if (r.a === 'departamentos') { if (m !== 'departamentos') abrirDepartamentos(); }
         else if (r.a === 'contratar') { if (m !== 'contratar') App.Contratar.abrir(); }
         else if (r.a === 'creador') { if (m !== 'creador') App.Creador.abrir(); }
         else if (r.a === 'nueva-reunion') { if (m !== 'reunion-nueva') App.Reunion.nueva(); }
@@ -245,7 +245,7 @@ App.Nav = (function () {
     if (modo === 'entregables') { var e = App.Entregables.abierta(); return '#/bandeja/revisar' + (e ? '/' + e : ''); }
     if (modo === 'permisos') return '#/bandeja/permisos';
     if (modo === 'parte') return '#/bandeja/hoy';
-    if (modo === 'deptos') return '#/equipo/departamentos';
+    if (modo === 'departamentos') return '#/equipo/departamentos';
     if (modo === 'contratar') return '#/equipo/contratar';
     if (modo === 'creador') return '#/equipo/creador';
     if (modo === 'reunion-nueva') return '#/equipo/nueva-reunion';
@@ -402,7 +402,10 @@ App.Nav = (function () {
       var q = buscarEq.trim().toLowerCase();
       App.vaciar(cuerpo);
       if (eqTab === 'reuniones') { cuerpo.appendChild(listaReuniones(q)); return; }
-      App.add(cuerpo, App.dom.equipo, h('div.lista-grupo', 'La oficina'),
+      var nDeps = (App.E.oficina.departamentos || []).length;
+      var grupoOficina = h('div.lista-grupo', 'La oficina', h('span.cuenta', nDeps + ' ' + (nDeps === 1 ? 'departamento' : 'departamentos')),
+        h('button.btn.icono.chico', { title: 'Nuevo departamento', 'aria-label': 'Nuevo departamento', onclick: function () { App.Departamentos.agregar(); } }, App.icono('mas')));
+      App.add(cuerpo, App.dom.equipo, grupoOficina,
         filtroFila('capas', 'Departamentos', sub === 'departamentos', function () { ir('#/equipo/departamentos'); }));
       /* filtrar a la gente sin rearmar la lista (las filas las pinta app.js) */
       App.dom.equipo.querySelectorAll('.persona[data-id]').forEach(function (el) {
@@ -428,12 +431,12 @@ App.Nav = (function () {
     if (App.marcarEstados) App.marcarEstados();
   }
   /* Departamentos como pantalla (la misma sección de Ajustes): al guardar se vuelve a pintar */
-  function abrirDeptos() {
-    App.Deptos.abrir(function (op) {
-      var hj = App.hojaEnPanel({ titulo: op.titulo || 'Departamentos', icono: 'capas' }, 'deptos');
+  function abrirDepartamentos() {
+    App.Departamentos.abrir(function (op) {
+      var hj = App.hojaEnPanel({ titulo: op.titulo || 'Departamentos', icono: 'capas' }, 'departamentos');
       hj.enVentana = true;
       var barra = h('div.acciones'); hj.pie.appendChild(barra); hj.pie = barra;   // los botones van en la barra, no estirados
-      hj.cerrar = function () { if (App.modoDerecho() === 'deptos') abrirDeptos(); };
+      hj.cerrar = function () { if (App.modoDerecho() === 'departamentos') abrirDepartamentos(); };
       return hj;
     });
   }

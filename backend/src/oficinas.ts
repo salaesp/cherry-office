@@ -14,7 +14,10 @@ import {
 } from './oficina.js'
 import { migrarMemoria } from './memoria-estructura.js'
 import { actualizarMemoria, completarEstructura, crearEstructura } from './plantillas.js'
-import { Slug, Validar, largo } from './validar.js'
+import { Validar, largo } from './validar.js'
+import { armarDepartamento, departamentosSugeridos, maxDepartamentos, type DepartamentoNuevo } from './departamentos.js'
+
+export type { DepartamentoNuevo } from './departamentos.js'
 
 /** Oficina abierta: carpeta absoluta + contenido de oficina.json (leído en el momento). */
 export class OficinaActiva {
@@ -61,15 +64,10 @@ function perfilDesde(o: unknown): Perfil {
   return { nombre: largo(n) <= 80 ? n : '', avatar }
 }
 
-export type DepartamentoNuevo = { id?: string; nombre: string; color?: string; mision?: string }
-
 /** Ruta del usuario: absoluta o con `~`. */
 const esRutaAbsoluta = (c: string) => path.isAbsolute(c) || c === '~' || c.startsWith('~/') || c.startsWith('~\\')
 
 export class Oficinas {
-  static readonly paleta = ['#ee6da6', '#a88bd6', '#f0a35b', '#e6c22e', '#4aa0dc', '#5fbf8a', '#d9684f', '#7f8fa6']
-  static readonly departamentosSugeridos = ['Dirección', 'Comunicación', 'Operaciones']
-  static readonly maxDepartamentos = 12
   static readonly maxAgentes = 60
 
   readonly estadoPath: string
@@ -181,10 +179,10 @@ export class Oficinas {
     if (largo(d) > 80) throw new ErrorAPI(400, 'El nombre del dueño es demasiado largo.')
 
     const pedidos = departamentos && departamentos.length > 0 ? departamentos
-      : vacia ? [] : Oficinas.departamentosSugeridos.map((x) => ({ nombre: x }))
-    if (pedidos.length > Oficinas.maxDepartamentos) throw new ErrorAPI(400, `Máximo ${Oficinas.maxDepartamentos} departamentos.`)
+      : vacia ? [] : departamentosSugeridos.map((x) => ({ nombre: x }))
+    if (pedidos.length > maxDepartamentos) throw new ErrorAPI(400, `Máximo ${maxDepartamentos} departamentos.`)
     const deps: Departamento[] = []
-    pedidos.forEach((p, i) => deps.push(Oficinas.armarDepartamento(p, i, new Set(deps.map((x) => x.id)))))
+    pedidos.forEach((p, i) => deps.push(armarDepartamento(p, i, new Set(deps.map((x) => x.id)))))
 
     let dir: string
     const c = carpeta?.trim()
@@ -369,26 +367,6 @@ export class Oficinas {
     return cand
   }
 
-  static armarDepartamento(p: DepartamentoNuevo, indice: number, usados: Set<string>): Departamento {
-    const n = p.nombre.trim()
-    if (n === '' || largo(n) > 60) throw new ErrorAPI(400, 'El nombre del departamento es obligatorio (hasta 60 caracteres).')
-    const color = p.color ?? Oficinas.paleta[indice % Oficinas.paleta.length]!
-    if (!Validar.colorHex(color)) throw new ErrorAPI(400, 'El color tiene que ser tipo #a88bdc.')
-    let id: string
-    if (p.id !== undefined) {
-      if (!Slug.valido(p.id)) throw new ErrorAPI(400, 'Id de departamento inválido (usá minúsculas, números y guiones).')
-      if (usados.has(p.id)) throw new ErrorAPI(409, 'Ya hay un departamento con ese id.')
-      id = p.id
-    } else {
-      id = Slug.unico(n, usados, 'depto')
-    }
-    const mision = p.mision?.trim()
-    ValidarAgenteExtra.mision(mision)
-    const d: Departamento = { id, nombre: n, color: color.toLowerCase() }
-    if (mision) d.mision = mision
-    return d
-  }
-
   // MARK: oficina y departamentos
 
   /** Lee la oficina activa, aplica `cambio` y la escribe (validada, atómica). */
@@ -424,55 +402,6 @@ export class Oficinas {
     return this.modificar((o) => {
       if (n !== undefined) o.nombre = n
       if (d !== undefined) o.duenio = d
-    })[1]
-  }
-
-  crearDepartamento(p: DepartamentoNuevo): [Departamento, OficinaActiva] {
-    return this.modificar((o) => {
-      if (o.departamentos.length >= Oficinas.maxDepartamentos) throw new ErrorAPI(400, `Máximo ${Oficinas.maxDepartamentos} departamentos.`)
-      const d = Oficinas.armarDepartamento(p, o.departamentos.length, new Set(o.departamentos.map((x) => x.id)))
-      o.departamentos.push(d)
-      return d
-    })
-  }
-
-  editarDepartamento(id: string, cambios: { nombre?: string; color?: string; mision?: string }): [Departamento, OficinaActiva] {
-    return this.modificar((o) => {
-      const d = o.departamentos.find((x) => x.id === id)
-      if (!d) throw new ErrorAPI(404, 'No existe ese departamento.')
-      if (cambios.nombre !== undefined) {
-        const n = cambios.nombre.trim()
-        if (n === '' || largo(n) > 60) throw new ErrorAPI(400, 'El nombre del departamento es obligatorio (hasta 60 caracteres).')
-        d.nombre = n
-      }
-      if (cambios.color !== undefined) {
-        if (!Validar.colorHex(cambios.color)) throw new ErrorAPI(400, 'El color tiene que ser tipo #a88bdc.')
-        d.color = cambios.color.toLowerCase()
-      }
-      if (cambios.mision !== undefined) {
-        const m = cambios.mision.trim()
-        ValidarAgenteExtra.mision(m)
-        if (m === '') delete d.mision
-        else d.mision = m
-      }
-      return { ...d }
-    })
-  }
-
-  /** Borra el departamento. Con agentes adentro exige `moverA` (otro departamento existente). */
-  borrarDepartamento(id: string, moverA?: string): OficinaActiva {
-    return this.modificar((o) => {
-      if (!o.departamentos.some((x) => x.id === id)) throw new ErrorAPI(404, 'No existe ese departamento.')
-      if (o.departamentos.length <= 1) throw new ErrorAPI(409, 'La oficina necesita al menos un departamento.')
-      const adentro = o.agentes.filter((a) => a.departamento === id)
-      if (adentro.length > 0) {
-        if (!moverA) throw new ErrorAPI(409, `El departamento tiene ${adentro.length} agente(s). Elegí a qué departamento moverlos (moverA).`)
-        if (moverA === id || !o.departamentos.some((x) => x.id === moverA)) {
-          throw new ErrorAPI(400, 'El departamento de destino (moverA) no existe o es el mismo.')
-        }
-        for (const a of adentro) a.departamento = moverA
-      }
-      o.departamentos = o.departamentos.filter((x) => x.id !== id)
     })[1]
   }
 }

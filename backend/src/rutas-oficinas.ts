@@ -1,10 +1,11 @@
-// Rutas del núcleo para oficinas (Router.despachar de Swift): estado, oficinas, oficina, perfil, departamentos y la
-// lista de agentes. Contratar/editar/despedir agentes, chat e historial se suman al portar sus módulos.
+// Rutas del núcleo para oficinas (Router.despachar de Swift): estado, oficinas, oficina, perfil y la lista de agentes
+// (los departamentos viven en rutas-departamentos.ts). Contratar/editar/despedir agentes, chat e historial se suman al portar sus módulos.
 import { clavesModelo, esConectoresAgentes, esEstiloOficina, esMemoriaIA, esModoPermisos, modelosValidos, type ClaveModelo, type Config, type PreferenciasIA } from './config.js'
 import { ErrorAPI } from './errores.js'
 import { esObjeto, objeto, objetoOpcional, type Obj } from './json.js'
 import { ValidarAgenteExtra, agenteJSON, departamentoJSON, oficinaJSON } from './oficina.js'
-import { avatarValido, perfilJSON, type DepartamentoNuevo, type OficinaActiva, type Oficinas } from './oficinas.js'
+import { avatarValido, perfilJSON, type OficinaActiva, type Oficinas } from './oficinas.js'
+import type { DepartamentoNuevo } from './departamentos.js'
 import { no404, no405, type Resp, type RutaNucleo } from './router.js'
 import { Slug, Validar } from './validar.js'
 import { modoSkillsDe } from './skills.js'
@@ -19,15 +20,6 @@ export interface InfoClaude {
 }
 
 export const sobreOficina = (a: OficinaActiva): Obj => ({ carpeta: a.carpeta, oficina: oficinaJSON(a.oficina) })
-
-/** `mision` en un PATCH: clave ausente = undefined (no se toca); null o texto vacío la borran (""). */
-export function misionPatch(d: Obj): string | undefined {
-  if (!('mision' in d)) return undefined
-  const v = d.mision
-  if (v === null) return ''
-  if (typeof v !== 'string') throw new ErrorAPI(400, '«mision» tiene que ser texto.')
-  return Validar.texto(v, 'mision', ValidarAgenteExtra.maxMision, false) ?? ''
-}
 
 /** `modelos` de PUT /api/preferencias: `{creador?, internos?}` con sonnet, opus, haiku o inherit. */
 function modelosPedidos(v: unknown): Partial<Record<ClaveModelo, string>> {
@@ -186,33 +178,6 @@ export function rutasOficinas({ config, oficinas, claude, alAbrir = [], ocupada 
         else o.ia = ia
       })
       return [200, sobreOficina(a)]
-    }
-    if (seccion === 'departamentos' && n === 2) {
-      if (method !== 'POST') return no405
-      const d = objeto(body)
-      const [dep, a] = oficinas.crearDepartamento({
-        id: Validar.texto(d.id, 'id', 41, false), nombre: Validar.texto(d.nombre, 'nombre', 60)!,
-        color: Validar.texto(d.color, 'color', 7, false), mision: Validar.texto(d.mision, 'mision', ValidarAgenteExtra.maxMision, false),
-      })
-      return [200, { departamento: departamentoJSON(dep), oficina: oficinaJSON(a.oficina) }]
-    }
-    if (seccion === 'departamentos' && n === 3) {
-      const id = a2!
-      if (!Slug.valido(id)) return no404
-      if (method === 'PATCH') {
-        const d = objeto(body)
-        const [dep, a] = oficinas.editarDepartamento(id, {
-          nombre: Validar.texto(d.nombre, 'nombre', 60, false), color: Validar.texto(d.color, 'color', 7, false), mision: misionPatch(d),
-        })
-        return [200, { departamento: departamentoJSON(dep), oficina: oficinaJSON(a.oficina) }]
-      }
-      if (method === 'DELETE') {
-        const d = objetoOpcional(body)
-        const mover = typeof d.moverA === 'string' ? d.moverA : query.moverA
-        const a = oficinas.borrarDepartamento(id, mover)
-        return [200, { ok: true, oficina: oficinaJSON(a.oficina) }]
-      }
-      return no405
     }
     if (seccion === 'agentes' && n === 2) {
       if (method === 'GET') return [200, { agentes: oficinas.requerirActiva().oficina.agentes.map(agenteJSON) }]
