@@ -27,7 +27,16 @@ npm start
    dispositivo.
 2. Dejalo correr unos minutos: se arma `datos/chats.json` con la lista de chats y grupos (solo nombre, número y último
    mensaje; nunca texto).
-3. Cortalo con Ctrl+C y completá `datos/config.json` con los chats a leer:
+3. Cortalo con Ctrl+C y mirá la lista como la mostraría la app (sin repetidos, primero los que tienen actividad, con
+   un resumen al final):
+   ```bash
+   npm run lista
+   ```
+   Elegí por el número de la lista; a los que no tienen nombre ponéselo con `=`:
+   ```bash
+   npm run elegir -- 1 4=Mamá
+   ```
+   También podés editar `datos/config.json` a mano, por ejemplo para agregar a alguien por número:
    ```json
    {
      "chats": [

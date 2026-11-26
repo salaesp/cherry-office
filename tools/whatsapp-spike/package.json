@@ -9,7 +9,9 @@
   "scripts": {
     "start": "node --max-old-space-size=256 spike.mjs",
     "test": "node --test mapeo.test.mjs",
-    "bundle": "node bundle.mjs"
+    "bundle": "node bundle.mjs",
+    "lista": "node lista.mjs",
+    "elegir": "node lista.mjs"
   },
   "dependencies": {
     "baileys": "7.0.0-rc14",
