@@ -251,11 +251,14 @@ planeado:
 - **Al exportar** la oficina, la secretaría viaja sin los chats (números de teléfono).
 - **Sin novedades:** la entrega queda silenciosa y ya revisada (no se descarta: sirve de registro).
 
-### S3: fuentes de conector
-- `FuenteConector` genérica, parametrizada por servidor de claude.ai: `novedades` devuelve `undefined`; `material` es
-  la instrucción con la fecha del cursor y la indicación de la persona; `herramientas` son las de leer de ese conector.
-- Primeras: **Gmail** (lo nuevo desde el cursor) y **Calendar** (lo que viene en las próximas 24 o 48 h).
-- Si el conector deja de estar conectado (`CatalogoConectores`), la fuente lo informa en `estado()`.
+### S3: fuentes de conector (hecho)
+Gmail y Calendario, como se describe en la sección «Secretaría» de [backend/API.md](../backend/API.md). Cambios respecto
+de lo planeado:
+- Dos fuentes con id fijo (`gmail`, `calendario`) sobre una `fuenteConector` genérica que reconoce el servidor del
+  catálogo por el nombre (`/gmail/i`, `/calendar|calendario/i`).
+- **El agente tiene que tener el conector asignado para leer** (o el modo «todos»): la revisión corre con sus permisos
+  normales. Si no, la fuente muestra el problema y no se revisa (no se gasta en una revisión que no puede leer).
+- Se configuran en la misma sección de la ficha (prender, cada cuánto, indicación).
 
 ### S4: audios e imágenes de WhatsApp
 - Audios: transcribirlos en la compu (Whisper local) antes de guardarlos como texto. Hay que decidir el modelo, el peso

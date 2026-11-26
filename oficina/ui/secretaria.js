@@ -119,6 +119,11 @@
           return cargar();
         }).catch(function (e) { err.textContent = e.message; ahora.disabled = false; });
       } }, datos.corriendo ? 'Revisando…' : 'Revisar ahora');
+      function textoNovedades() {
+        var conectores = (datos.fuentes || []).filter(function (f) { return f.tipo === 'conector' && f.activa && !f.problema; }).map(function (f) { return f.nombre; });
+        var wa = estadoWa.activa ? (estadoWa.novedades ? 'Hay mensajes de WhatsApp sin revisar.' : 'Nada nuevo en WhatsApp.') : '';
+        return (wa + (conectores.length ? ' ' + conectores.join(' y ') + (conectores.length > 1 ? ' se miran' : ' se mira') + ' siempre.' : '')).trim();
+      }
       var revs = (datos.revisiones || []).slice(0, 5).map(function (r) {
         var txt = (ESTADO_REV[r.estado] || r.estado) + (r.estado === 'ok' ? (r.vacia ? ' · sin novedades' : ' · con reporte') : '') + (r.manual ? ' · a pedido' : '');
         var ver = r.entrega ? h('button.btn.chico.fantasma', { onclick: function () { if (App.Entregables && App.Entregables.abrir) App.Entregables.abrir(r.entrega); } }, 'Ver') : null;
@@ -127,7 +132,7 @@
       });
       caja.appendChild(h('div.ajuste', { style: { display: 'block' } },
         h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, ahora,
-          h('span.ajuste-ayuda', { style: { flex: 1 } }, estadoWa.novedades ? 'Hay mensajes nuevos sin revisar.' : 'No hay nada nuevo desde la última revisión.')),
+          h('span.ajuste-ayuda', { style: { flex: 1 } }, textoNovedades())),
         err,
         revs.length ? h('div', { style: { marginTop: '8px' } }, h('div.ajuste-tit', { style: { fontSize: '12px' } }, 'Últimas revisiones'), revs) : null,
         h('div', { style: { marginTop: '10px' } }, h('button.btn.chico.fantasma', { onclick: function () {

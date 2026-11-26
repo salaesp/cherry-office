@@ -234,3 +234,64 @@ describe('secretaría', () => {
     expect(JSON.stringify(of)).not.toContain('5491155551234')
   })
 })
+
+describe('fuentes de conector (S3)', () => {
+  const leerMail = 'mcp__claude_ai_Gmail__search_threads'
+  const leerCal = 'mcp__claude_ai_Google_Calendar__list_events'
+  const catalogo = [
+    { nombre: 'Gmail', prefijo: 'mcp__claude_ai_Gmail', estado: 'connected', herramientas: [leerMail, 'mcp__claude_ai_Gmail__send_message'] },
+    { nombre: 'Google Calendar', prefijo: 'mcp__claude_ai_Google_Calendar', estado: 'connected', herramientas: [leerCal, 'mcp__claude_ai_Google_Calendar__create_event'] },
+  ]
+
+  test('sin catálogo, sin conector o sin asignar: no se revisa y se explica por qué', async () => {
+    const { b, sec } = await preparar()
+    await configurar(b, { fuentes: [{ id: 'gmail', cada: { valor: 1, unidad: 'horas' } }] })
+    let g = (await llamar(b, 'GET', '/api/secretaria')).obj.fuentes.find((f: any) => f.id === 'gmail')
+    expect(g).toMatchObject({ tipo: 'conector', disponible: false, activa: true })
+    expect(g.problema).toMatch(/Ajustes › Conectores/)
+    const { catalogoDe } = await import('../../src/conectores.js')
+    catalogoDe(b.servicios)!.fijar(catalogo)
+    g = (await llamar(b, 'GET', '/api/secretaria')).obj.fuentes.find((f: any) => f.id === 'gmail')
+    expect(g).toMatchObject({ disponible: true, novedades: null })
+    expect(g.problema).toMatch(/no tiene Gmail asignado/)
+    expect(await sec.revisar()).toBeUndefined()
+  })
+
+  test('Gmail y WhatsApp en la misma revisión; el cursor de Gmail avanza al terminar bien', async () => {
+    const { b, carpeta, sec, mensaje, ultimaConsigna } = await preparar()
+    const { catalogoDe } = await import('../../src/conectores.js')
+    catalogoDe(b.servicios)!.fijar(catalogo)
+    expect((await llamar(b, 'PATCH', '/api/agentes/sofia', { conectores: [{ servidor: 'Gmail', leer: [leerMail], actuar: [] }, { servidor: 'Google Calendar', leer: [leerCal], actuar: [] }] })).status).toBe(200)
+    await configurar(b, { fuentes: [
+      { id: 'whatsapp', cada: { valor: 1, unidad: 'horas' }, chats: [MAMA] },
+      { id: 'gmail', cada: { valor: 4, unidad: 'horas' }, indicacion: 'solo mails del banco y del colegio' },
+      { id: 'calendario', cada: { valor: 12, unidad: 'horas' } },
+    ] })
+    const g = (await llamar(b, 'GET', '/api/secretaria')).obj.fuentes.find((f: any) => f.id === 'gmail')
+    expect(g).toMatchObject({ disponible: true, problema: null })
+    // sin mensajes de WhatsApp igual revisa Gmail y el calendario (no se puede saber si hay algo sin preguntar)
+    const r = await sec.revisar()
+    expect(r?.fuentes).toEqual(['gmail', 'calendario'])
+    await esperar(() => sec.store.una(r!.id)?.estado !== 'corriendo')
+    const c = ultimaConsigna()
+    expect(c).toContain('--- Fuente: Gmail ---')
+    expect(c).toMatch(/after:\d{10}/)
+    expect(c).toContain('Indicación de Ana para esta fuente: solo mails del banco y del colegio')
+    expect(c).toContain('--- Fuente: Calendario ---')
+    expect(c).toContain('próximas 48 horas')
+    expect(c).not.toContain('--- Fuente: WhatsApp ---')
+    const desde = sec.store.cursor(carpeta, 'gmail').desde!
+    expect(Math.abs(desde - ahora())).toBeLessThan(10)
+
+    // una hora después: le toca a WhatsApp (con un mensaje) pero no a Gmail ni al calendario
+    mensaje('turno el viernes', ahora() - 300)
+    const r2 = await sec.revisar(enSeg(3601))
+    expect(r2?.fuentes).toEqual(['whatsapp'])
+    await esperar(() => !sec.store.corriendo(carpeta))
+    // cuatro horas después: Gmail retoma desde la revisión anterior
+    const r3 = await sec.revisar(enSeg(4 * 3600 + 5))
+    expect(r3?.fuentes).toEqual(['gmail'])
+    await esperar(() => !sec.store.corriendo(carpeta))
+    expect(ultimaConsigna()).toContain(`after:${desde}`)
+  })
+})
