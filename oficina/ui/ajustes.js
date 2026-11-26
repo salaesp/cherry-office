@@ -259,6 +259,7 @@ App.Ajustes = (function () {
   var SECCIONES = [
     { id: 'general', grupo: 'oficina', texto: 'General', icono: 'edificio', pintar: function (c) { App.editarOficina(c); } },
     { id: 'reglas', grupo: 'oficina', texto: 'Reglas', icono: 'regla', pintar: function (c) { reglas(c); } },
+    { id: 'secretaria', grupo: 'oficina', texto: 'Secretaría', icono: 'bandeja', visible: function () { return !!App.Secretaria; }, pintar: function (c) { App.Secretaria.pintar(c); } },
     { id: 'conectores', grupo: 'oficina', texto: 'Conectores', icono: 'enchufe', pintar: function (c) { conectores(c); } },
     { id: 'habilitados', grupo: 'oficina', texto: 'Skills y MCP', icono: 'chispa', pintar: habilitados },
     { id: 'trabajo', grupo: 'oficina', texto: 'Carpetas de trabajo', icono: 'carpeta', pintar: carpetasTrabajo,

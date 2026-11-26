@@ -324,3 +324,56 @@ describe('notas de voz (S4)', () => {
     expect(ultimaConsigna()).toContain('[nota de voz, 5 s] (transcribiendo…)')
   })
 })
+
+describe('contratar en un paso', () => {
+  const leerMail = 'mcp__claude_ai_Gmail__search_threads'
+  const leerCal = 'mcp__claude_ai_Google_Calendar__list_events'
+  const crearCal = 'mcp__claude_ai_Google_Calendar__create_event'
+  const catalogo = [
+    { nombre: 'Gmail', prefijo: 'mcp__claude_ai_Gmail', estado: 'connected', herramientas: [leerMail, 'mcp__claude_ai_Gmail__send_message'] },
+    { nombre: 'Google Calendar', prefijo: 'mcp__claude_ai_Google_Calendar', estado: 'connected', herramientas: [leerCal, crearCal] },
+  ]
+
+  test('queda en la recepción, con los chats elegidos, Gmail y el calendario asignados; no se contrata dos veces', async () => {
+    const { b } = await preparar()
+    const { catalogoDe } = await import('../../src/conectores.js')
+    catalogoDe(b.servicios)!.fijar(catalogo)
+    const r = await llamar(b, 'POST', '/api/secretaria/contratar', { nombre: 'Rosa' })
+    expect(r.status).toBe(200)
+    expect(r.obj.agente).toEqual({ id: 'rosa', nombre: 'Rosa' })
+    expect(r.obj.config.fuentes.map((f: any) => f.id)).toEqual(['whatsapp', 'gmail', 'calendario'])
+    expect(r.obj.config.fuentes[0].chats.sort()).toEqual([GRUPO, MAMA].sort())
+    const o = b.servicios.oficinas.activa()!.oficina
+    const rosa = o.agentes.find((a) => a.id === 'rosa')!
+    expect(rosa).toMatchObject({ rol: 'Secretaría', departamento: 'recepcion' })
+    expect(rosa.conectores).toEqual([
+      { servidor: 'Gmail', leer: [leerMail], actuar: [] },
+      { servidor: 'Google Calendar', leer: [leerCal], actuar: [crearCal] },
+    ])
+    expect(r.obj.fuentes.find((f: any) => f.id === 'gmail').problema).toBeNull()
+    expect((await llamar(b, 'POST', '/api/secretaria/contratar', { nombre: 'Otra' })).status).toBe(409)
+    // la recepción vale como departamento (se puede mover y volver)
+    expect((await llamar(b, 'PATCH', '/api/agentes/rosa', { departamento: 'direccion' })).status).toBe(200)
+    expect((await llamar(b, 'PATCH', '/api/agentes/rosa', { departamento: 'recepcion' })).status).toBe(200)
+    expect((await llamar(b, 'PATCH', '/api/agentes/rosa', { departamento: 'nada' })).status).toBe(400)
+  })
+
+  test('elegir un chat desde la secretaría lo elige en WhatsApp; prender Gmail le asigna el conector', async () => {
+    const { b, wa } = await preparar()
+    const otro = '5491188888888@s.whatsapp.net'
+    ;(wa as any).proceso.emit('message', { tipo: 'chats', chats: [{ jid: otro, grupo: false, agenda: 'Papá' }] })
+    const r = await llamar(b, 'POST', '/api/secretaria/contratar', {})
+    expect(r.obj.agente.nombre).toBe('Secretaría')
+    expect(r.obj.config.fuentes.map((f: any) => f.id)).toEqual(['whatsapp'])
+    expect(r.obj.chatsWhatsApp.find((c: any) => c.jid === otro)).toMatchObject({ nombre: 'Papá', elegido: false })
+    const id = r.obj.agente.id
+    const p = await llamar(b, 'PUT', '/api/secretaria', { fuentes: [{ id: 'whatsapp', cada: { valor: 1, unidad: 'horas' }, chats: [MAMA, otro] }] })
+    expect(p.status).toBe(200)
+    expect(wa.store.chat(otro)).toMatchObject({ elegido: true, nombre: 'Papá' })
+    const { catalogoDe } = await import('../../src/conectores.js')
+    catalogoDe(b.servicios)!.fijar(catalogo)
+    await llamar(b, 'PUT', '/api/secretaria', { fuentes: [...p.obj.config.fuentes, { id: 'gmail', cada: { valor: 4, unidad: 'horas' } }] })
+    const ag = b.servicios.oficinas.activa()!.oficina.agentes.find((a) => a.id === id)!
+    expect(ag.conectores).toEqual([{ servidor: 'Gmail', leer: [leerMail], actuar: [] }])
+  })
+})

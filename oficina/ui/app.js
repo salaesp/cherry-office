@@ -371,7 +371,9 @@
       .catch(function (e) { dom.carga.textContent = 'No pude armar la oficina en 3D: ' + e.message; console.error(e); });
   }
 
-  App.depto = function (id) { return (E.oficina.departamentos || []).filter(function (d) { return d.id === id; })[0] || null; };
+  /* la recepción no es un departamento de la oficina: ahí se sienta quien atiende la secretaría (en el mostrador) */
+  App.RECEPCION = { id: 'recepcion', nombre: 'Recepción', color: '#b9a27a' };
+  App.depto = function (id) { return (E.oficina.departamentos || []).filter(function (d) { return d.id === id; })[0] || (id === 'recepcion' ? App.RECEPCION : null); };
   App.agente = function (id) { return (E.oficina.agentes || []).filter(function (a) { return a.id === id; })[0] || null; };
 
   function pintarEquipo() {
@@ -381,6 +383,7 @@
       c.appendChild(h('div.vacio', h('p', 'Todavía no hay nadie en la oficina.'), h('button.btn.primario', { style: { marginTop: '12px' }, onclick: function () { App.Contratar.abrir(); } }, App.icono('mas'), 'Contratar al primero')));
     }
     var deps = o.departamentos.slice();
+    if (!deps.some(function (d) { return d.id === 'recepcion'; }) && o.agentes.some(function (a) { return a.departamento === 'recepcion'; })) deps.unshift(App.RECEPCION);
     var sueltos = o.agentes.filter(function (a) { return !App.depto(a.departamento); });
     if (sueltos.length) deps.push({ id: '__sin', nombre: 'Sin departamento', color: '#9a9a9a' });
     deps.forEach(function (d) {

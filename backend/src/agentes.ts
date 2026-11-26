@@ -7,7 +7,7 @@ import path from 'node:path'
 import { ErrorAPI } from './errores.js'
 import { esObjeto, objeto, type Obj } from './json.js'
 import {
-  OficinaStore, ValidarAgenteExtra, agenteJSON, oficinaJSON,
+  OficinaStore, ValidarAgenteExtra, agenteJSON, existeDepto, oficinaJSON,
   type AgenteDef, type Avatar, type ConectorAsignado, type LimitesAgente, type Oficina,
 } from './oficina.js'
 import { Oficinas, OficinaActiva, avatarValido } from './oficinas.js'
@@ -350,7 +350,7 @@ export function contratar(oficinas: Oficinas, n: NuevoAgente, log?: { info(m: st
   const a = oficinas.requerirActiva()
   const o = a.oficina
   if (o.agentes.length >= Oficinas.maxAgentes) throw new ErrorAPI(400, `Máximo ${Oficinas.maxAgentes} agentes por oficina.`)
-  if (!o.departamentos.some((d) => d.id === n.departamento)) throw new ErrorAPI(400, 'El departamento no existe.')
+  if (!existeDepto(o, n.departamento)) throw new ErrorAPI(400, 'El departamento no existe.')
   const usados = new Set(o.agentes.map((x) => x.id))
   let id: string
   if (n.id !== undefined) {
@@ -401,7 +401,7 @@ export function editarAgente(oficinas: Oficinas, id: string, c: CambiosAgente): 
     const ag = o.agentes.find((x) => x.id === id)
     if (!ag) throw new ErrorAPI(404, 'No existe ese agente.')
     if (c.departamento !== undefined) {
-      if (!o.departamentos.some((d) => d.id === c.departamento)) throw new ErrorAPI(400, 'El departamento no existe.')
+      if (!existeDepto(o, c.departamento)) throw new ErrorAPI(400, 'El departamento no existe.')
       ag.departamento = c.departamento
     }
     if (c.nombre !== undefined) ag.nombre = c.nombre

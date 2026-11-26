@@ -275,6 +275,15 @@ Como se describe en la sección «WhatsApp» de [backend/API.md](../backend/API.
 - **Sin probar todavía:** el transcriptor dentro de la app de Mac y Windows empaquetada (el armado de recursos se probó en
   Linux), y la calidad en español con notas de voz reales.
 
+### Secretaría en un paso (después de S4)
+A pedido de la persona: armarla era rebuscado (contratar a alguien en un departamento, decirle que atienda, darle
+permisos de WhatsApp, elegir chats en dos lugares, asignar conectores). Ahora:
+- **Ajustes › Secretaría › Contratar**: con un nombre queda armada (chats elegidos, Gmail y Calendario si están
+  conectados, con los conectores asignados).
+- **Se sienta en la recepción** (departamento reservado `recepcion`), al costado del mostrador, y no sale a pasear.
+- **Todo en una pantalla**: los chats se eligen desde la lista completa (elegir uno ahí lo elige en WhatsApp) y prender
+  Gmail o Calendario asigna el conector. En la ficha del agente queda un resumen con «Configurar».
+
 ## Pruebas
 - Unitarias (vitest):
   - WhatsApp: filtro por chat con `@lid` y por grupo, descartando estados y canales; mapeo de mensajes de Baileys con

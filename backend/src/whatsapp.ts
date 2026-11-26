@@ -355,6 +355,7 @@ export class ServicioWhatsApp {
   private deteniendo = false
   private desvinculando?: () => void
   private purga?: NodeJS.Timeout
+  private retomarTr?: NodeJS.Timeout
   static readonly esperas = [5, 30, 120, 600]
   static readonly maxFallas = 5
   static readonly retencionDias = 90
@@ -374,7 +375,8 @@ export class ServicioWhatsApp {
     else if (this.activo) this.iniciar()
     this.purgar()
     // audios que quedaron sin transcribir de antes
-    setTimeout(() => this.transcribirPendientes(), 10_000).unref?.()
+    this.retomarTr = setTimeout(() => { try { this.transcribirPendientes() } catch {} }, 10_000)
+    this.retomarTr.unref?.()
     this.purga = setInterval(() => this.purgar(), 6 * 3600_000)
     this.purga.unref?.()
   }
@@ -621,6 +623,7 @@ export class ServicioWhatsApp {
   async detener() {
     clearTimeout(this.reintento)
     clearInterval(this.purga)
+    clearTimeout(this.retomarTr)
     this.detenerTranscriptor()
     const p = this.proceso
     if (!p) return

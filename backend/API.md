@@ -319,13 +319,18 @@ Vincular un WhatsApp por QR, elegir qué chats se leen y dejar que los agentes c
 
 ## Secretaría
 
-Un agente de la oficina atiende la secretaría: revisa sus fuentes (por ahora, chats de WhatsApp) cada cierto tiempo o a pedido y deja un reporte en la bandeja, con sugerencias por `proponer_accion` que la persona aprueba (fase S2 de [docs/plan-secretaria.md](../docs/plan-secretaria.md)). Código: `backend/src/secretaria.ts`; pantalla en la ficha del agente (`oficina/ui/secretaria.js`) y «Revisar ahora» en el ícono de la bandeja del sistema (`desktop/src/main.ts`).
+Un agente de la oficina atiende la secretaría: revisa sus fuentes (por ahora, chats de WhatsApp) cada cierto tiempo o a pedido y deja un reporte en la bandeja, con sugerencias por `proponer_accion` que la persona aprueba (fase S2 de [docs/plan-secretaria.md](../docs/plan-secretaria.md)). Código: `backend/src/secretaria.ts`; pantalla en Ajustes › Secretaría (`oficina/ui/secretaria.js`, con un resumen y «Configurar» en la ficha de quien la atiende) y «Revisar ahora» en el ícono de la bandeja del sistema (`desktop/src/main.ts`).
 
 | Método | Ruta | Cuerpo | Respuesta |
 |---|---|---|---|
 | GET | `/api/secretaria` | | `{config: SecretariaCfg\|null, agente: {id, nombre}\|null, corriendo, fuentes:[{id, nombre, tipo: "local"\|"conector", disponible, activa, problema?, ultima?, proxima?, novedades?}], chatsWhatsApp:[{jid, nombre, grupo}], revisiones:[Revision] (las últimas 20)}` |
 | PUT | `/api/secretaria` | `{agente?, activa?, franja?: {desde, hasta}\|null, reporteVacio?, fuentes?}` | Como el GET. Cambia lo que viene (lo demás queda). `agente: null` cierra la secretaría. La primera vez, sin `fuentes`, arranca con WhatsApp cada 1 hora y sin chats. 400 si el agente no existe, una fuente es desconocida o repetida, el intervalo queda fuera de 5 minutos a 24 horas o la franja no es HH:MM |
+| POST | `/api/secretaria/contratar` | `{nombre?, avatar?}` | Como el GET. Contrata en un paso a quien atiende la secretaría (por defecto «Secretaría»): agente con rol «Secretaría» en la recepción (`departamento: "recepcion"`), con su consigna; revisa los chats ya elegidos de WhatsApp cada 1 hora y, si están conectados en claude.ai, Gmail (cada 4 horas) y el calendario (cada 12 horas), con esos conectores asignados (Gmail para leer; el calendario para leer y proponer eventos). 409 si ya hay secretaría |
 | POST | `/api/secretaria/revisar` | `{fuentes?: [id]}` | `{revision: Revision\|null, motivo: texto\|null}`. «Revisar ahora»: no espera el intervalo, la franja ni la calma; si no hay nada nuevo no lanza nada y lo dice en `motivo`. 409 sin secretaría o con una revisión en curso |
+
+Al guardar con `PUT`: los chats de la fuente WhatsApp que todavía no estaban elegidos en Ajustes › WhatsApp quedan elegidos (con el nombre de la agenda, la pista o el número) y se leen desde ese momento; prender Gmail o Calendario le asigna su conector a quien atiende (`conectoresParaFuentes`). `GET` trae en `chatsWhatsApp` todos los chats (con `elegido`, `numero?`, `ultimo?`) y en `whatsapp` el estado de la conexión.
+
+**Recepción:** `recepcion` es un departamento reservado (`deptoRecepcion`, `existeDepto` en `oficina.ts`): vale para un agente aunque no esté en `departamentos` (si la oficina tiene uno con ese id, manda el suyo). En la oficina pixel, quien está ahí se sienta al costado del mostrador y no sale a pasear; la interfaz lo muestra como «Recepción» (`App.depto`).
 
 `SecretariaCfg` (en `oficina.json` → `secretaria`): `{agente, activa, franja?: {desde: "HH:MM", hasta: "HH:MM"}, reporteVacio, fuentes:[{id: "whatsapp"|"gmail"|"calendario", cada: {valor, unidad: "minutos"|"horas"}, chats?: [jid] (solo WhatsApp), indicacion?}]}`. La franja puede cruzar la medianoche. Una configuración que quedó inválida (por ejemplo, despidieron a quien la atendía) no traba la oficina: simplemente no corre. Al exportar la oficina viaja sin `chats` (son números de teléfono).
 
