@@ -18,4 +18,5 @@ import './migracion.js' // [migracion]
 import './uso-claude.js' // [uso-claude]
 import './chat-tareas.js' // [chat-tareas]
 import './whatsapp.js' // [whatsapp]
+import './secretaria.js' // [secretaria]
 export {}

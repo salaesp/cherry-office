@@ -225,6 +225,7 @@ export class Programador implements ProgramadorEntregas {
   static readonly prefijoParte = 'parte:'
   static readonly prefijoPedido = 'pedido:'
   static readonly prefijoEspera = 'espera:'
+  static readonly prefijoSecretaria = 'secretaria:'
 
   readonly ejecuciones: Ejecuciones
   /** Pedidos de permiso de las corridas que esperan a la persona (permisos-tareas.ts). */
@@ -235,6 +236,8 @@ export class Programador implements ProgramadorEntregas {
   private readonly automatico: boolean
   private readonly ganchosTerminar: GanchoTerminar[] = []
   private readonly ganchosEntregar: GanchoEntregar[] = []
+  /** Deciden si la entrega de una corrida va sin notificación (p. ej. una revisión de la secretaría sin novedades). */
+  private readonly silenciadores: ((tarea: string, texto: string) => boolean)[] = []
   private preparado = false
   private cerrado = false
   private revisando = false
@@ -261,6 +264,9 @@ export class Programador implements ProgramadorEntregas {
 
   /** Hook para cuando se crea una entrega: con la ejecución que la produjo (`correr`) o con undefined (cambios). */
   alEntregar(f: GanchoEntregar) { this.ganchosEntregar.push(f) }
+
+  /** La entrega de una corrida va sin notificación si algún silenciador lo dice. */
+  silenciar(f: (tarea: string, texto: string) => boolean) { this.silenciadores.push(f) }
 
   /** Reloj inyectable (tests). */
   fijarReloj(r: () => Date) { this.reloj = r }
@@ -516,6 +522,7 @@ export class Programador implements ProgramadorEntregas {
     if (id.startsWith(Programador.prefijoParte)) return 'parte'
     if (id.startsWith(Programador.prefijoPedido)) return 'pedido'
     if (id.startsWith(Programador.prefijoEspera)) return 'espera'
+    if (id.startsWith(Programador.prefijoSecretaria)) return 'secretaria'
     return 'tarea'
   }
 
@@ -647,6 +654,7 @@ export class Programador implements ProgramadorEntregas {
       const entrega = entregas.registrar({
         oficina: carpeta, agente, nombre: def.nombre, origen, ref: ej.tarea, titulo: nombre, texto: r.texto, sid,
         archivos: ArchivosEntrega.relativos(archivos, carpeta), costo,
+        silenciosa: this.silenciadores.some((f) => { try { return f(ej.tarea, r.texto) } catch { return false } }),
       })
       this.marcarHecha(carpeta, t)
       const fin = this.ejecuciones.una(ej.id)
@@ -763,6 +771,7 @@ export function nombreCorrida(id: string): string {
   if (id.startsWith(Programador.prefijoParte)) return 'Parte del día'
   if (id.startsWith(Programador.prefijoPedido)) return 'Pedido de un colega'
   if (id.startsWith(Programador.prefijoEspera)) return 'Versión completa'
+  if (id.startsWith(Programador.prefijoSecretaria)) return 'Revisión de la secretaría'
   return id
 }
 

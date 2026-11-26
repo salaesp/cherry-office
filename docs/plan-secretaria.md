@@ -236,18 +236,20 @@ planeado:
 - **Sin probar todavía:** la app de escritorio empaquetada (la captura lanzada con `fork` desde Electron y fuera
   del asar) y una vinculación real desde la app. En modo desarrollo, la captura real llega hasta el QR.
 
-### S2: la secretaría, con WhatsApp como primera fuente
-- `backend/src/secretaria.ts` (módulo `secretaria`, orden 78): interfaz `Fuente`, registro de fuentes, cálculo de la
-  próxima revisión por fuente (intervalo, franja, espera a que el chat quede quieto), disparo dentro del ciclo del
-  programador, `sec_revisiones` y `sec_cursores(oficina, fuente, clave, valor)` (`clave` = chat para WhatsApp).
-- `FuenteWhatsApp` en `whatsapp.ts` implementa la interfaz.
-- Revisión: encargo del agente (`Programador.encargarLibre`, id `secretaria:<n>`) con el material de cada fuente, las
-  acciones recientes (decisión 7) y qué se espera: un reporte por fuente, sugerencias con `proponer_accion` (evento en el
-  calendario, tarea para otro agente) y `anotar` para lo que valga recordar.
-- Cursor confirmado (decisión 6) con `programador.alTerminar`.
-- «Revisar ahora» en la ficha y en el ícono de la bandeja del sistema.
-- Plantilla «Secretaría» en `plantillas.ts`: Google Calendar asignado (leer y crear evento) e instrucciones para
-  turnos, cumpleaños, pagos y pedidos.
+### S2: la secretaría, con WhatsApp como primera fuente (hecho)
+Implementada como se describe en la sección «Secretaría» de [backend/API.md](../backend/API.md). Cambios respecto de lo
+planeado:
+- **Cursor de WhatsApp por orden de llegada** (rowid), no por hora: con la hora en segundos se perdían mensajes del
+  mismo segundo, y así también entran los atrasados que llegan al reconectar.
+- **Sin plantilla «Secretaría»:** `plantillas.ts` arma carpetas y archivos de una oficina, no es un catálogo de agentes.
+  La secretaría se activa en la ficha de cualquier agente («Que atienda la secretaría») y las instrucciones van en la
+  consigna de cada revisión.
+- **Quién lee WhatsApp:** quien atiende la secretaría recibe las herramientas de WhatsApp acotadas a los chats de su
+  fuente, sin necesitar el permiso general de S1.
+- **Sin validación en `oficina.json`:** una secretaría que quedó inválida (por ejemplo, despidieron a quien la atendía) no
+  traba la oficina; no corre hasta que se arregla en la ficha. El `PUT` sí valida.
+- **Al exportar** la oficina, la secretaría viaja sin los chats (números de teléfono).
+- **Sin novedades:** la entrega queda silenciosa y ya revisada (no se descarta: sirve de registro).
 
 ### S3: fuentes de conector
 - `FuenteConector` genérica, parametrizada por servidor de claude.ai: `novedades` devuelve `undefined`; `material` es

@@ -366,6 +366,10 @@ export class PaqueteRouter implements SubRouter {
       delete of.vinculos
       // las carpetas de trabajo son rutas de esta compu (un repo, por ejemplo): tampoco viajan
       delete of.carpetasTrabajo
+      // la secretaría nombra chats de WhatsApp de esta persona (números de teléfono): viaja sin ellos
+      if (of.secretaria && Array.isArray(of.secretaria.fuentes)) {
+        of.secretaria = { ...of.secretaria, fuentes: (of.secretaria.fuentes as unknown[]).map((f) => (typeof f === 'object' && f !== null ? { ...(f as Record<string, unknown>), chats: undefined } : f)) }
+      }
       OficinaStore.escribir(of, raiz)
       escribirTexto(catalogoMD(subidos, of), path.join(raiz, 'conocimiento', 'archivos.md'))
 

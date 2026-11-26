@@ -428,6 +428,17 @@ async function menuBandeja(): Promise<Menu> {
       ejecutarEnPagina('window.App && App.Entregables && App.Entregables.abrir()')
     } })
   }
+  const sec = await api('/api/secretaria')
+  if (sec.config && sec.agente) {
+    items.push({ label: sec.corriendo ? `${sec.agente.nombre} está revisando…` : `Revisar ahora (${sec.agente.nombre})`, enabled: !sec.corriendo, click: () => {
+      void backend.router.handle('POST', '/api/secretaria/revisar', {}, Buffer.from('{}')).then((r) => {
+        let motivo = ''
+        try { const o = JSON.parse(r.json.toString('utf8')); motivo = o.motivo ?? o.error ?? '' } catch {}
+        if (motivo && Notification.isSupported()) new Notification({ title: 'Secretaría', body: motivo }).show()
+        void refrescarBandeja?.()
+      })
+    } })
+  }
   items.push({ type: 'separator' }, {
     label: 'Próximas tareas',
     submenu: proximas.length

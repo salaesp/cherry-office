@@ -93,6 +93,9 @@ export type Oficina = {
   /** Skills, MCP de Claude Code y conectores de claude.ai habilitados para los agentes de esta oficina (habilitados.ts). */
   ia?: IAOficina
   memoria?: MemoriaOficina
+  /** Secretaría de la oficina (secretaria.ts): quién la atiende, qué fuentes revisa y cada cuánto. Se guarda tal cual y
+   *  la valida su módulo. */
+  secretaria?: Obj
 }
 
 // MARK: - decodificación (como Codable)
@@ -180,6 +183,7 @@ function decodificarOficina(v: unknown): Oficina {
         consolidar: optStr(m.consolidar) as ConsolidarMemoria | undefined, topeTokens: optInt(m.topeTokens),
       })
     }),
+    secretaria: opt(o.secretaria, obj),
   })
 }
 

@@ -101,6 +101,8 @@ async function main() {
   if (m.includes('SALE3')) { process.stderr.write('boom\n'); fin(); return 3 }
   if (m.includes('ISERR')) { salida('{"type":"result","result":"fallo raro","is_error":true}'); fin(); return 0 }
   if (m.includes('VACIO')) { salida('{"type":"result","result":"","is_error":false}'); fin(); return 0 }
+  // la secretaría sin nada para contar (secretaria.test.ts)
+  if (m.includes('FAKE_SIN_NOVEDADES')) { salida('{"type":"result","result":"Sin novedades.","is_error":false}'); fin(); return 0 }
 
   // PERMISO: también en los turnos de reunión (va en el tema): se atiende abajo, como en el chat
   if (kind !== '' && !(kind === 'turno' && m.includes('PERMISO:'))) {

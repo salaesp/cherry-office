@@ -12,7 +12,7 @@ App.Entregables = (function () {
   var abierta = null;          // id de la entrega que muestra el panel (null = lista)
   var ORIGEN = { tarea: 'Tarea programada', encargo: 'Pendiente de reunión', reunion: 'Acta de reunión', chat: 'Chat', cambios: 'Con cambios',
     flujo: 'Paso de un flujo', persona: 'Hecho por vos', propuesta: 'Propuesta', accion: 'Acción aprobada', parte: 'Parte del día',
-    pedido: 'Pedido de un colega', espera: 'Versión completa' };
+    pedido: 'Pedido de un colega', espera: 'Versión completa', secretaria: 'Reporte de la secretaría' };
   var ESTADO = { sin_revisar: 'Sin revisar', revisada: 'Revisada', cambios: 'Reemplazada' };
 
   /* quién la hizo: en una entrega tuya (paso de persona) no hay agente */

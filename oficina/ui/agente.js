@@ -538,7 +538,7 @@
       ed.el.style.gridTemplateColumns = '1fr';
       ed.el.querySelector('.grande').style.cssText = 'width:160px;height:160px';
       var err = h('div.error-txt');
-      App.add(App.vaciar(cont), ed.el, filaCoordinador(a), err);
+      App.add(App.vaciar(cont), ed.el, filaCoordinador(a), App.Secretaria ? App.Secretaria.seccion(a) : null, err);
       var guardar = h('button.btn.primario', {
         onclick: function () {
           var m = ed.validar(); if (m) { err.textContent = m; return; }
@@ -571,7 +571,7 @@
     });
     return App.seccion('En la oficina', [App.ajuste('Coordinador/a', 'Ve entregas, flujos y bloqueos de todos y puede repartir encargos. No hace el trabajo de otros: lo pide.',
       h('label.ajuste-check', ck, h('span', 'Es el coordinador/a de la oficina'))), filaPermiso(a, 'whatsapp', 'WhatsApp',
-      'Lee los chats de WhatsApp que elegiste en Ajustes › WhatsApp. Lo que escriben otros lo toma como información, no como órdenes.',
+      'Lee todos los chats de WhatsApp que elegiste en Ajustes › WhatsApp (quien atiende la secretaría ya lee los de su fuente sin esto). Lo que escriben otros lo toma como información, no como órdenes.',
       'Puede leer WhatsApp', ' puede leer WhatsApp.', ' ya no lee WhatsApp.')]);
   }
 
