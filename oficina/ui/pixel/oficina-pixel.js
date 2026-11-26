@@ -640,33 +640,50 @@ App.OficinaPixel = (function () {
   function margen(px) {
     px = Math.max(0, Math.round(px || 0)); if (px === margenIzq) return;
     margenIzq = px;
-    if (elegido && figs[elegido]) enfocarAgente(elegido); else if (cam.k <= kLejos) irCamara(encuadreGeneral());
+    if (elegido && figs[elegido]) enfocarAgente(elegido); else if (enGeneral()) irCamara(encuadreGeneral());
   }
 
   /* ---------- cámara ---------- */
-  var cam = { cx: 0, cy: 0, k: 1, kv: 1, dx: 0, dy: 0 }, kLejos = 1, kCerca = 3, tween = null, cw = 1, ch = 1;
+  /* cam.k es el zoom; puede quedar fraccionario mientras se pellizca, y al soltar se acomoda al entero más cercano
+     (el pixel art se ve nítido en múltiplos enteros). kMin es el encuadre general: si el mundo no entra ni a 1×,
+     es la escala que lo hace entrar entero */
+  var cam = { cx: 0, cy: 0, k: 1, kv: 1, dx: 0, dy: 0 }, kLejos = 1, kMin = 1, kCerca = 3, tween = null, inercia = null, camSucia = false, cw = 1, ch = 1;
   /* px (CSS) tapados por un panel a la izquierda: la cámara centra en el hueco que queda a la derecha */
   var margenIzq = 0;
   function corrimiento(k) { return margenIzq / 2 * (window.devicePixelRatio || 1) / (k || 1); }
-  function encuadreGeneral() { return { cx: W / 2 - corrimiento(kLejos), cy: H / 2 - 10, k: kLejos }; }
+  function encuadreGeneral() { return { cx: W / 2 - corrimiento(kMin), cy: H / 2 - 10, k: kMin }; }
+  function enGeneral() { return cam.k <= kMin + 1e-3; }
+  function kMax() { return kCerca + 3; }
+  function acotarK(k) { return Math.max(kMin, Math.min(kMax(), k)); }
   function ajustar() {
     if (!vista) return;
-    var dpr = window.devicePixelRatio || 1, cssW = cont.clientWidth || 800, cssH = cont.clientHeight || 600;
+    var dpr = window.devicePixelRatio || 1, cssW = cont.clientWidth || 800, cssH = cont.clientHeight || 600, era = enGeneral();
     cw = vista.width = Math.max(1, R(cssW * dpr)); ch = vista.height = Math.max(1, R(cssH * dpr));
+    var fit = Math.min(cw / W, ch / H);
     kLejos = Math.max(1, Math.min(Math.floor(cw / W), Math.floor(ch / H)));
+    kMin = fit < 1 ? fit : kLejos;
     kCerca = Math.max(kLejos + 1, Math.floor(cw / 420));
-    presentar(); if (items.length) pedir(); else sucio = true;   // antes de construir no hay mundo que dibujar
+    if (era || cam.k < kMin) cam.k = kMin; else if (cam.k > kMax()) cam.k = kMax();
+    limitar(); presentar(); if (items.length) pedir(); else sucio = true;   // antes de construir no hay mundo que dibujar
   }
+  function calcular() { var k = cam.k; cam.kv = k; cam.dx = R(cw / 2 - cam.cx * k); cam.dy = R(ch / 2 - cam.cy * k); }
   function presentar() {
     if (!vc) return;
-    var fit = Math.min(cw / W, ch / H), k = cam.k <= kLejos && fit < 1 ? fit : cam.k;
-    cam.kv = k; cam.dx = R(cw / 2 - cam.cx * k); cam.dy = R(ch / 2 - cam.cy * k);
+    calcular(); camSucia = false;
+    var k = cam.kv;
     vc.setTransform(1, 0, 0, 1, 0, 0); vc.clearRect(0, 0, cw, ch);
     vc.imageSmoothingEnabled = k < 1; vc.drawImage(mundo, cam.dx, cam.dy, W * k, H * k);
     moverEtiquetas();
   }
-  function limitar() { var k = cam.kv || cam.k, hw = cw / 2 / k, hh = ch / 2 / k; cam.cx = Math.max(Math.min(hw, W / 2), Math.min(Math.max(W - hw, W / 2), cam.cx)); cam.cy = Math.max(Math.min(hh, H / 2), Math.min(Math.max(H - hh, H / 2), cam.cy)); }
-  function irCamara(to) { if (reducido) { Object.assign(cam, to); tween = null; } else tween = { from: { cx: cam.cx, cy: cam.cy, k: cam.k }, to: to, t0: performance.now() }; pedir(); }
+  /* la cámara cambió por un gesto: se recalcula ya (para que el próximo evento convierta bien las coordenadas) pero se
+     dibuja una sola vez por cuadro, no en cada evento del dedo */
+  function moverCam() { calcular(); camSucia = true; if (!pausado) despertar(); }
+  function limitado(c) { var k = c.k, hw = cw / 2 / k, hh = ch / 2 / k;
+    return { cx: Math.max(Math.min(hw, W / 2), Math.min(Math.max(W - hw, W / 2), c.cx)), cy: Math.max(Math.min(hh, H / 2), Math.min(Math.max(H - hh, H / 2), c.cy)), k: k }; }
+  function limitar() { var c = limitado(cam); cam.cx = c.cx; cam.cy = c.cy; }
+  /* encuadre con zoom k que deja el punto del mundo (wx, wy) bajo el punto de pantalla (px0, py0) */
+  function anclar(k, px0, py0, wx, wy) { return limitado({ cx: wx - (px0 - cw / 2) / k, cy: wy - (py0 - ch / 2) / k, k: k }); }
+  function irCamara(to, dur) { inercia = null; if (reducido) { Object.assign(cam, to); tween = null; } else tween = { from: { cx: cam.cx, cy: cam.cy, k: cam.k }, to: to, t0: performance.now(), dur: dur || 650 }; pedir(); }
   function encuadrar() { irCamara(encuadreGeneral()); }
   function enfocar(x, y) { var p = iso(x, y); irCamara({ cx: p[0] - corrimiento(kCerca), cy: p[1] - 24, k: kCerca }); return true; }
   function enfocarAgente(id) { var f = figs[id]; if (!f) return false; return enfocar(f.x, f.y); }
@@ -692,37 +709,85 @@ App.OficinaPixel = (function () {
     if (s && s.tipo !== 'depto' && s.tipo !== 'recepcion') return { tipo: s.tipo, sala: s };
     return null;
   }
-  var ptrs = new Map(), arr = null, movido = false, pinch = null, acum = 0;
+  var ptrs = new Map(), arr = null, movido = false, pinch = null, acum = 0, centroGesto = null, finPellizco = 0;
+  function aPantalla(x, y) { var r = vista.getBoundingClientRect(), dpr = window.devicePixelRatio || 1; return [(x - r.left) * dpr, (y - r.top) * dpr]; }
+  function empezarArrastre(x, y, t) { arr = { x: x, y: y, cx: cam.cx, cy: cam.cy, t: t, vx: 0, vy: 0, px: x, py: y }; }
+  function empezarPinch() {
+    var v = Array.from(ptrs.values()), m = aPantalla((v[0][0] + v[1][0]) / 2, (v[0][1] + v[1][1]) / 2);
+    tween = null; inercia = null; arr = null; movido = true;   // un toque con dos dedos no es un clic
+    pinch = { d: Math.max(1, Math.hypot(v[0][0] - v[1][0], v[0][1] - v[1][1])), k: cam.k, wx: (m[0] - cam.dx) / cam.kv, wy: (m[1] - cam.dy) / cam.kv };
+    centroGesto = m;
+  }
+  /* al soltar todo: si el zoom quedó entre dos enteros se acomoda al más cercano, alrededor de donde estaban los dedos */
+  function acomodarZoom() {
+    var k = cam.k, nk = k < 1 ? k : Math.round(k);
+    nk = acotarK(nk); if (Math.abs(nk - k) < 1e-3) return false;
+    if (nk <= kMin + 1e-3) { irCamara(encuadreGeneral(), 220); return true; }
+    var c = centroGesto || [cw / 2, ch / 2];
+    irCamara(anclar(nk, c[0], c[1], (c[0] - cam.dx) / cam.kv, (c[1] - cam.dy) / cam.kv), 180); return true;
+  }
   function conectar() {
     vista.addEventListener('wheel', function (e) {
       e.preventDefault();
+      var dpr = window.devicePixelRatio || 1;
       if (!e.ctrlKey && e.deltaY % 1 !== 0 && Math.abs(e.deltaX) + Math.abs(e.deltaY) < 60 && !e.deltaMode) {   // trackpad con dos dedos: mover
-        tween = null; cam.cx += e.deltaX * (window.devicePixelRatio || 1) / cam.kv; cam.cy += e.deltaY * (window.devicePixelRatio || 1) / cam.kv; limitar(); presentar(); return; }
-      acum += e.deltaY; if (Math.abs(acum) < (e.ctrlKey ? 8 : 40)) return;
-      var r = vista.getBoundingClientRect(), dpr = window.devicePixelRatio || 1; zoom(cam.k + (acum < 0 ? 1 : -1), (e.clientX - r.left) * dpr, (e.clientY - r.top) * dpr); acum = 0;
+        tween = null; inercia = null; cam.cx += e.deltaX * dpr / cam.kv; cam.cy += e.deltaY * dpr / cam.kv; limitar(); moverCam(); return; }
+      var p = aPantalla(e.clientX, e.clientY);
+      if (e.ctrlKey) {   // pellizco del trackpad: zoom continuo, y se acomoda al entero cuando se deja de pellizcar
+        tween = null; inercia = null;
+        var k = acotarK(cam.k * Math.exp(-e.deltaY * .01));
+        Object.assign(cam, anclar(k, p[0], p[1], (p[0] - cam.dx) / cam.kv, (p[1] - cam.dy) / cam.kv)); moverCam();
+        centroGesto = p; clearTimeout(finPellizco); finPellizco = setTimeout(function () { finPellizco = 0; acomodarZoom(); }, 160); return; }
+      acum += e.deltaY; if (Math.abs(acum) < 40) return;
+      zoom(paso(cam.k, acum < 0 ? 1 : -1), p[0], p[1]); acum = 0;
     }, { passive: false });
-    vista.addEventListener('pointerdown', function (e) { vista.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]); movido = false;
-      if (ptrs.size === 1) arr = { x: e.clientX, y: e.clientY, cx: cam.cx, cy: cam.cy };
-      if (ptrs.size === 2) { var v = Array.from(ptrs.values()); pinch = { d: Math.hypot(v[0][0] - v[1][0], v[0][1] - v[1][1]), k: cam.k }; arr = null; } });
+    vista.addEventListener('pointerdown', function (e) { vista.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+      if (ptrs.size === 1) { movido = false; tween = null; inercia = null; empezarArrastre(e.clientX, e.clientY, e.timeStamp); }
+      if (ptrs.size === 2) empezarPinch(); });
     vista.addEventListener('pointermove', function (e) {
-      if (!ptrs.has(e.pointerId)) { var h = golpe(e); if (JSON.stringify(h && { t: h.tipo, i: h.id }) !== JSON.stringify(hover && { t: hover.tipo, i: hover.id })) { hover = h; vista.style.cursor = h ? 'pointer' : 'default'; pintarEtiquetas(); pedir(); if (cbPasar) cbPasar(h ? { tipo: h.tipo, id: h.id, texto: h.texto } : null); } return; }
+      if (!ptrs.has(e.pointerId)) { if (e.pointerType === 'touch') return; var h = golpe(e); if (JSON.stringify(h && { t: h.tipo, i: h.id }) !== JSON.stringify(hover && { t: hover.tipo, i: hover.id })) { hover = h; vista.style.cursor = h ? 'pointer' : 'default'; pintarEtiquetas(); pedir(); if (cbPasar) cbPasar(h ? { tipo: h.tipo, id: h.id, texto: h.texto } : null); } return; }
       ptrs.set(e.pointerId, [e.clientX, e.clientY]);
-      if (pinch && ptrs.size === 2) { var v = Array.from(ptrs.values()), d = Math.hypot(v[0][0] - v[1][0], v[0][1] - v[1][1]), r = vista.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
-        zoom(R(pinch.k * d / pinch.d), ((v[0][0] + v[1][0]) / 2 - r.left) * dpr, ((v[0][1] + v[1][1]) / 2 - r.top) * dpr); movido = true; return; }
-      if (arr) { var dx = e.clientX - arr.x, dy = e.clientY - arr.y; if (Math.abs(dx) + Math.abs(dy) > 4) movido = true;
-        if (movido) { tween = null; var dp = window.devicePixelRatio || 1; cam.cx = arr.cx - dx * dp / cam.kv; cam.cy = arr.cy - dy * dp / cam.kv; limitar(); presentar(); vista.style.cursor = 'grabbing'; } }
+      if (pinch && ptrs.size >= 2) {   // pellizco: zoom continuo + mover con el punto medio de los dedos
+        var v = Array.from(ptrs.values()), d = Math.hypot(v[0][0] - v[1][0], v[0][1] - v[1][1]), m = aPantalla((v[0][0] + v[1][0]) / 2, (v[0][1] + v[1][1]) / 2);
+        Object.assign(cam, anclar(acotarK(pinch.k * d / pinch.d), m[0], m[1], pinch.wx, pinch.wy)); centroGesto = m; moverCam(); return; }
+      if (arr) { var dx = e.clientX - arr.x, dy = e.clientY - arr.y; if (Math.abs(dx) + Math.abs(dy) > 6) movido = true;
+        if (movido) { tween = null; var dp = window.devicePixelRatio || 1; cam.cx = arr.cx - dx * dp / cam.kv; cam.cy = arr.cy - dy * dp / cam.kv; limitar(); moverCam(); vista.style.cursor = 'grabbing';
+          var dtm = e.timeStamp - arr.t; if (dtm > 0) { var a = Math.min(1, dtm / 50); arr.vx += ((e.clientX - arr.px) / dtm - arr.vx) * a; arr.vy += ((e.clientY - arr.py) / dtm - arr.vy) * a; }
+          arr.t = e.timeStamp; arr.px = e.clientX; arr.py = e.clientY; } }
     });
-    function soltar(e) { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; if (!ptrs.size) { arr = null; vista.style.cursor = hover ? 'pointer' : 'default'; } }
+    function soltar(e, cancelado) {
+      if (!ptrs.has(e.pointerId)) return;
+      ptrs.delete(e.pointerId);
+      if (ptrs.size === 1) {   // de dos dedos a uno: sigue arrastrando con el que quedó, sin saltos
+        pinch = null; var q = Array.from(ptrs.values())[0]; empezarArrastre(q[0], q[1], e.timeStamp); return; }
+      if (ptrs.size) return;
+      var a = arr; arr = null; pinch = null; vista.style.cursor = hover ? 'pointer' : 'default';
+      if (acomodarZoom()) return;
+      /* inercia: si se soltó en movimiento, la vista sigue deslizándose y frena sola */
+      if (!cancelado && !reducido && a && movido && e.timeStamp - a.t < 80 && Math.hypot(a.vx, a.vy) > .25) {
+        var dp = window.devicePixelRatio || 1; inercia = { vx: -a.vx * dp / cam.kv, vy: -a.vy * dp / cam.kv, t: performance.now() }; pedir(); }
+    }
     vista.addEventListener('pointerup', function (e) { var era = !movido && ptrs.size === 1; soltar(e); if (!era) return; var h = golpe(e); if (!h) return;
       if (h.tipo === 'agente') cbAgente(h.id); else cbLugar(h.tipo); });
-    vista.addEventListener('pointercancel', soltar);
+    vista.addEventListener('pointercancel', function (e) { soltar(e, true); });
     vista.addEventListener('pointerleave', function () { if (hover) { hover = null; pintarEtiquetas(); pedir(); if (cbPasar) cbPasar(null); } });
   }
+  /* un paso de la ruedita: al entero siguiente (o al encuadre general por abajo) */
+  function paso(k, dir) {
+    if (dir > 0) return k < 1 ? 1 : Math.floor(k + 1e-3) + 1;
+    var n = Math.ceil(k - 1e-3) - 1; return n < 1 ? kMin : Math.max(n, kMin);
+  }
   function zoom(nk, px0, py0) {
-    nk = Math.max(kLejos, Math.min(kCerca + 3, nk)); if (nk === cam.k) return; tween = null;
-    var wx = (px0 - cam.dx) / cam.kv, wy = (py0 - cam.dy) / cam.kv; cam.k = nk; cam.cx = wx - (px0 - cw / 2) / nk; cam.cy = wy - (py0 - ch / 2) / nk;
-    if (nk === kLejos) Object.assign(cam, encuadreGeneral());
-    presentar(); limitar(); presentar();
+    nk = acotarK(nk); if (Math.abs(nk - cam.k) < 1e-3) return;
+    if (nk <= kMin + 1e-3) { irCamara(encuadreGeneral(), 200); return; }
+    irCamara(anclar(nk, px0, py0, (px0 - cam.dx) / cam.kv, (py0 - cam.dy) / cam.kv), 160);
+  }
+  function avanzarInercia(now) {
+    var dt = Math.min(50, now - inercia.t); inercia.t = now;
+    var ax = cam.cx, ay = cam.cy; cam.cx += inercia.vx * dt; cam.cy += inercia.vy * dt; limitar();
+    if (cam.cx === ax) inercia.vx = 0; if (cam.cy === ay) inercia.vy = 0;   // chocó con el borde
+    var fr = Math.pow(.996, dt); inercia.vx *= fr; inercia.vy *= fr;
+    if (Math.hypot(inercia.vx, inercia.vy) * cam.kv < .03) inercia = null;
   }
 
   /* ---------- ciclo ---------- */
@@ -730,9 +795,10 @@ App.OficinaPixel = (function () {
   function despertar() { if (dormido) { clearTimeout(dormido); dormido = 0; } if (!raf) raf = requestAnimationFrame(cuadro); }
   function cuadro(now) {
     raf = 0; if (pausado) return;
-    var mover = !!tween;
-    if (tween) { var p = Math.min(1, (now - tween.t0) / 650), e = 1 - Math.pow(1 - p, 3), f = tween.from, to = tween.to;
-      cam.cx = f.cx + (to.cx - f.cx) * e; cam.cy = f.cy + (to.cy - f.cy) * e; cam.k = p < 1 ? Math.max(kLejos, R(f.k + (to.k - f.k) * e)) : to.k; if (p >= 1) tween = null; }
+    var mover = !!tween || !!inercia || camSucia;
+    if (tween) { var p = Math.min(1, (now - tween.t0) / (tween.dur || 650)), e = 1 - Math.pow(1 - p, 3), f = tween.from, to = tween.to;
+      cam.cx = f.cx + (to.cx - f.cx) * e; cam.cy = f.cy + (to.cy - f.cy) * e; cam.k = p < 1 ? f.k + (to.k - f.k) * e : to.k; if (p >= 1) tween = null; }
+    if (inercia) avanzarInercia(now);
     var dt = ultimo ? Math.min(.1, (now - ultimo) / 1000) : 0; ultimo = now;
     Object.keys(figs).forEach(function (id) { avanzar(figs[id], dt); });
     if (now - ultimoRevisar > 1000) { ultimoRevisar = now; revisar(now); }
@@ -745,7 +811,7 @@ App.OficinaPixel = (function () {
     /* con la cámara quieta, nadie caminando y nada pendiente, no hace falta despertarse en cada refresco de pantalla
        (120 por segundo): se duerme hasta el próximo cuadro de la animación, o un segundo si no hay animación.
        pedir() lo despierta antes si cambia algo */
-    var ocupado = tween || sucio || Object.keys(figs).some(function (id) { return figs[id].ruta; });
+    var ocupado = tween || inercia || sucio || Object.keys(figs).some(function (id) { return figs[id].ruta; });
     if (ocupado) { raf = requestAnimationFrame(cuadro); return; }
     ultimo = 0;
     var ahora = performance.now(), espera = reducido ? 1000 : 125 - (ahora % 125) + 1;
