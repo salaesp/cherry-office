@@ -8,12 +8,18 @@ import path from 'node:path'
 import { safeStorage } from 'electron'
 import type { HostWhatsApp } from '../../backend/src/whatsapp.js'
 
-export function hostWhatsApp(datosDir: string, dist: string): HostWhatsApp {
+export function hostWhatsApp(datosDir: string, dist: string, empaquetada: boolean, recursos: string): HostWhatsApp {
   // electron-builder desempaca la captura (asarUnpack): se lanza desde app.asar.unpacked
   const captura = path.join(dist, 'whatsapp-captura.mjs').replace(/([\\/])app\.asar([\\/])/, '$1app.asar.unpacked$2')
   let clave: string | undefined
+  // el transcriptor (S4): en la app instalada, en los recursos con su motor nativo; sin empaquetar, el que build.mjs deja
+  // en backend/dist (encuentra el motor en backend/node_modules)
+  const transcriptor = empaquetada
+    ? { script: path.join(recursos, 'transcriptor', 'whatsapp-transcriptor.mjs') }
+    : { script: path.resolve(dist, '../../backend/dist/transcriptor-desktop.mjs') }
   return {
     captura,
+    transcriptor,
     clave: () => {
       if (clave) return clave
       try {

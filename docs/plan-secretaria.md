@@ -260,11 +260,20 @@ de lo planeado:
   normales. Si no, la fuente muestra el problema y no se revisa (no se gasta en una revisión que no puede leer).
 - Se configuran en la misma sección de la ficha (prender, cada cuánto, indicación).
 
-### S4: audios e imágenes de WhatsApp
-- Audios: transcribirlos en la compu (Whisper local) antes de guardarlos como texto. Hay que decidir el modelo, el peso
-  de la descarga y el consumo.
-- Imágenes (por ejemplo, una orden médica): pasarlas por la extracción de la biblioteca (`extraccion.ts`) o como
-  adjunto de la revisión.
+### S4: audios e imágenes de WhatsApp (hecho)
+Como se describe en la sección «WhatsApp» de [backend/API.md](../backend/API.md). Lo que se decidió y probó:
+- **Whisper local con Transformers.js y onnxruntime-node** (modelo base, q8, ~80 MB). Probado con una nota de voz real en
+  OGG/Opus: unos 2 segundos para 11 segundos de audio con el modelo ya bajado, ~700 MB de memoria mientras trabaja. El
+  transcriptor es un proceso aparte que se apaga solo.
+- **Se descartó WebAssembly:** Transformers.js en Node fuerza el motor nativo, y whisper.cpp en WebAssembly es solo para
+  navegador. A cambio, el motor nativo se copia recortado a cada plataforma: ~45 MB en Mac (solo
+  `libonnxruntime.1.dylib`, que es lo que pide el binding) y ~66 MB en Windows (con DirectML, que onnxruntime.dll nombra y
+  no se pudo confirmar desde Linux que sea opcional). `sharp` (imágenes) se reemplaza por un módulo vacío.
+- **Imágenes:** no se procesan; el agente las mira con `whatsapp_imagen`, que devuelve contenido `image` de MCP (el
+  servidor MCP propio ahora puede devolver imágenes).
+- **Medios cifrados** con la misma clave de la sesión.
+- **Sin probar todavía:** el transcriptor dentro de la app de Mac y Windows empaquetada (el armado de recursos se probó en
+  Linux), y la calidad en español con notas de voz reales.
 
 ## Pruebas
 - Unitarias (vitest):

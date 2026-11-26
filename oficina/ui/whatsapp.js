@@ -29,7 +29,8 @@
         dibujar();
         clearTimeout(reloj);
         // mientras vincula o sincroniza, se vuelve a preguntar seguido
-        var espera = r.estado === 'esperando_qr' || r.estado === 'conectando' ? 2500 : r.sincronizando ? 4000 : 0;
+        var tr = r.transcriptor && r.transcriptor.estado;
+        var espera = r.estado === 'esperando_qr' || r.estado === 'conectando' ? 2500 : r.sincronizando || tr === 'cargando' || tr === 'trabajando' ? 4000 : 0;
         if (espera) reloj = setTimeout(function () { if (vivo) cargar(); }, espera);
       }).catch(function (e) { if (vivo) err.textContent = e.message; });
     }
@@ -109,6 +110,7 @@
         datos.cifrado ? null : h('div.ayuda', { style: { color: 'var(--peligro)' } }, 'Ojo: en esta compu la sesión se guarda sin cifrar.'),
         App.seccion('Chats que se leen', elegidos.length ? elegidos.map(filaElegido) : h('div.ajuste-ayuda', 'Todavía no elegiste ninguno. Elegilos de la lista de abajo o agregá uno por número.'),
           { cuenta: elegidos.length ? String(elegidos.length) : '', ayuda: 'Para que un agente los lea, activá «Puede leer WhatsApp» en su ficha.' }),
+        App.seccion('Notas de voz e imágenes', notasDeVoz()),
         App.seccion('Agregar por número', formNumero()),
         App.seccion('Elegir de tus chats', listaChats()),
         pieDesvincular());
@@ -122,6 +124,29 @@
           h('button.btn.chico', { onclick: function () { editar(c); } }, App.icono('lapiz'), 'Editar'),
           h('button.btn.chico.fantasma', { title: 'Dejar de leer', onclick: function () { quitar(c); } }, App.icono('papelera'))),
         c.nota ? h('div.ajuste-ayuda', { style: { marginTop: '4px', fontStyle: 'italic' } }, 'Nota: ' + c.nota) : null);
+    }
+
+    /* transcribir las notas de voz en esta compu (Whisper, sin mandar el audio a ningún lado) */
+    function notasDeVoz() {
+      var t = datos.transcriptor || { estado: 'apagado' };
+      var ck = h('input', { type: 'checkbox', checked: datos.transcribir });
+      ck.addEventListener('change', function () {
+        api().put('/api/whatsapp/ajustes', { transcribir: ck.checked }).then(function (r) {
+          datos = r; dibujar();
+          App.guardado(ck.checked ? 'Las notas de voz nuevas se van a transcribir.' : 'Ya no se transcriben las notas de voz.');
+        }).catch(function (e) { err.textContent = e.message; ck.checked = !ck.checked; });
+      });
+      var estado = !datos.transcribir ? null
+        : t.estado === 'cargando' ? (t.progreso != null && t.progreso < 100 ? 'Bajando el modelo de transcripción (' + t.progreso + ' %)…' : 'Preparando la transcripción…')
+        : t.estado === 'trabajando' ? 'Transcribiendo…'
+        : t.estado === 'listo' ? 'Lista para transcribir.'
+        : t.estado === 'sin_motor' ? 'La transcripción no está disponible en esta instalación' + (t.error ? ' (' + t.error + ')' : '') + '.'
+        : 'Se prende sola cuando llega una nota de voz.';
+      return h('div',
+        App.ajuste('Transcribir las notas de voz', 'En tu compu, sin mandar el audio a ningún lado. La primera vez baja un modelo de unos 80 MB; mientras transcribe usa bastante memoria y después se apaga sola. Así los agentes entienden lo que dicen los audios.',
+          h('label.ajuste-check', ck, h('span', 'Transcribir'))),
+        estado ? h('div.ajuste-ayuda', { style: { margin: '-4px 0 8px', color: t.estado === 'sin_motor' ? 'var(--peligro)' : '' } }, estado) : null,
+        h('div.ajuste-ayuda', 'Las imágenes de los chats elegidos se guardan cifradas y los agentes las pueden mirar (por ejemplo, la foto de una orden médica).'));
     }
 
     function formNumero() {

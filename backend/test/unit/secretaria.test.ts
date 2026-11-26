@@ -295,3 +295,32 @@ describe('fuentes de conector (S3)', () => {
     expect(ultimaConsigna()).toContain(`after:${desde}`)
   })
 })
+
+describe('notas de voz (S4)', () => {
+  test('espera a que termine la transcripción (hasta el tope) y la manda en el material', async () => {
+    const { b, carpeta, sec, wa, ultimaConsigna } = await preparar()
+    const pedidos: any[] = []
+    const tr = new EventEmitter() as any
+    tr.send = (m: any) => { if (m.tipo === 'transcribir') pedidos.push(m); return true }
+    tr.kill = () => true
+    ;(b.servicios.huecos.whatsappHost as any).lanzarTranscriptor = () => tr
+    await llamar(b, 'PUT', '/api/whatsapp/ajustes', { transcribir: true })
+    await configurar(b)
+    const c = (wa as any).proceso as EventEmitter
+    c.emit('message', { tipo: 'mensaje', m: { id: 'v1', chat: MAMA, de: MAMA, propio: false, ts: ahora() - 600, tipo: 'nota_de_voz', segundos: 9, media: { archivo: 'a'.repeat(32) + '.bin', mime: 'audio/ogg', bytes: 10 } } })
+    expect(pedidos.length).toBe(1)
+    expect(await sec.revisar()).toBeUndefined()   // se está transcribiendo
+    tr.emit('message', { tipo: 'texto', chat: MAMA, id: 'v1', texto: 'tengo turno el jueves a las diez' })
+    const r = await sec.revisar()
+    expect(r).toBeDefined()
+    await esperar(() => !sec.store.corriendo(carpeta))
+    expect(ultimaConsigna()).toContain('[nota de voz, 9 s] dice: «tengo turno el jueves a las diez»')
+
+    // si la transcripción no llega, revisa igual pasado el tope
+    c.emit('message', { tipo: 'mensaje', m: { id: 'v2', chat: MAMA, de: MAMA, propio: false, ts: ahora() - 600, tipo: 'nota_de_voz', segundos: 5, media: { archivo: 'b'.repeat(32) + '.bin', mime: 'audio/ogg', bytes: 10 } } })
+    expect(await sec.revisar(enSeg(3601))).toBeUndefined()
+    expect(await sec.revisar(enSeg(3601 + ServicioSecretaria.esperaMaxima))).toBeDefined()
+    await esperar(() => !sec.store.corriendo(carpeta))
+    expect(ultimaConsigna()).toContain('[nota de voz, 5 s] (transcribiendo…)')
+  })
+})

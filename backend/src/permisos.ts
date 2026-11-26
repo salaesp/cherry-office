@@ -174,7 +174,7 @@ export const TodosConectores = {
 /** Leer los chats de WhatsApp elegidos (whatsapp.ts): solo los agentes con el permiso «whatsapp». */
 export const WhatsAppAgente = {
   permiso: 'whatsapp',
-  nombresMCP: ['whatsapp_chats', 'whatsapp_leer', 'whatsapp_buscar'],
+  nombresMCP: ['whatsapp_chats', 'whatsapp_leer', 'whatsapp_imagen', 'whatsapp_buscar'],
   /** Permiso general: lee todos los chats elegidos. */
   puede: (a: AgenteDef) => a.permisos?.includes('whatsapp') ?? false,
   /** Chats de la fuente WhatsApp de la secretaría, si este agente la atiende (secretaria.ts); undefined si no. */

@@ -4,9 +4,11 @@ import { randomBytes } from 'node:crypto'
 import { esObjeto, type Obj } from './json.js'
 
 /** Resultado de una herramienta MCP: texto y si es un error de la herramienta (`isError`). */
-export type MCPResultado = { texto: string; esError: boolean }
+export type MCPResultado = { texto: string; esError: boolean; imagenes?: { datos: string; mime: string }[] }
 export const MCPResultados = {
   ok: (texto: string): MCPResultado => ({ texto, esError: false }),
+  /** Texto más imágenes (base64), que el agente ve como tales (contenido `image` de MCP). */
+  conImagenes: (texto: string, imagenes: { datos: string; mime: string }[]): MCPResultado => ({ texto, esError: false, imagenes }),
   error: (texto: string): MCPResultado => ({ texto, esError: true }),
 }
 
@@ -79,7 +81,7 @@ export async function procesarMCP(cuerpo: Buffer | string, herramientas: MCPHerr
       const args: Obj = esObjeto(params.arguments) ? params.arguments : {}
       const r = await herramientas.llamar(params.name, args)
       if (r === undefined) return errorRPC(id, -32602, `Herramienta desconocida: ${params.name}`)
-      const res: Obj = { content: [{ type: 'text', text: r.texto }] }
+      const res: Obj = { content: [{ type: 'text', text: r.texto }, ...(r.imagenes ?? []).map((i) => ({ type: 'image', data: i.datos, mimeType: i.mime }))] }
       if (r.esError) res.isError = true
       return resultado(id, res)
     }

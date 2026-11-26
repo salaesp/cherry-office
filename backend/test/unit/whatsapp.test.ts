@@ -7,8 +7,9 @@ import { describe, expect, test } from 'vitest'
 import { mcpDe } from '../../src/consultas.js'
 import type { AgenteDef, Oficina } from '../../src/oficina.js'
 import { HerramientasMCPAgente, WhatsAppAgente } from '../../src/permisos.js'
-import { WhatsAppStore, whatsappDe, type ProcesoCaptura } from '../../src/whatsapp.js'
-import { FiltroElegidos, cifrarSesion, descifrarSesion, contenido, jidDeNumero, mapearMensaje, metaChat, normalizarJid, seIgnora, type ACaptura, type DeCaptura } from '../../src/whatsapp-mapeo.js'
+import { ServicioWhatsApp, WhatsAppStore, whatsappDe, type ProcesoCaptura } from '../../src/whatsapp.js'
+import { procesarMCP } from '../../src/mcp-protocolo.js'
+import { FiltroElegidos, cifrarBytes, cifrarSesion, descifrarBytes, descifrarSesion, nombreMedia, contenido, jidDeNumero, mapearMensaje, metaChat, normalizarJid, seIgnora, type ACaptura, type DeCaptura } from '../../src/whatsapp-mapeo.js'
 import { SQLiteDB } from '../../src/sqlite.js'
 import { Sandbox, U, esperar } from '../support/sandbox.js'
 import { arrancar, llamar, oficina } from '../support/en-proceso.js'
@@ -129,7 +130,7 @@ describe('store', () => {
     const ahora = Date.now() / 1000
     st.guardar({ id: 'v', chat: MAMA, de: MAMA, propio: false, ts: ahora - 100 * 86400, tipo: 'texto', texto: 'viejo' })
     st.guardar({ id: 'n', chat: MAMA, de: MAMA, propio: false, ts: ahora, tipo: 'texto', texto: 'nuevo' })
-    expect(st.purgar(90)).toBe(1)
+    expect(st.purgar(90).n).toBe(1)
     expect(st.mensajes(MAMA, { limite: 10 }).map((x) => x.id)).toEqual(['n'])
   })
 })
@@ -326,5 +327,120 @@ describe('agentes', () => {
     expect(b2).toContain('[Mamá] Mamá: El jueves')
     expect((await t.llamar('whatsapp_buscar', { texto: 'nada que ver' }))!.texto).toBe('No encontré mensajes con esas palabras.')
     expect((await t.llamar('whatsapp_leer', { chat: 'Nadie' }))!.esError).toBe(true)
+  })
+})
+
+describe('audios e imágenes (S4)', () => {
+  test('archivos cifrados: ida y vuelta, y no se abren con otra clave', () => {
+    const clave = Buffer.alloc(32, 3)
+    const datos = Buffer.from('OggS falso con datos de audio')
+    const c = cifrarBytes(datos, clave)
+    expect(c.subarray(0, 4).toString()).toBe('WAM1')
+    expect(c.includes(Buffer.from('audio'))).toBe(false)
+    expect(descifrarBytes(c, clave).equals(datos)).toBe(true)
+    expect(() => descifrarBytes(c, Buffer.alloc(32, 4))).toThrow()
+    expect(() => descifrarBytes(datos, clave)).toThrow()
+    expect(descifrarBytes(datos, undefined).equals(datos)).toBe(true)
+    expect(nombreMedia(MAMA, 'A1')).toMatch(/^[0-9a-f]{32}\.bin$/)
+  })
+
+  /** Transcriptor doble: guarda los pedidos y deja responder a mano. */
+  class TranscriptorDoble extends EventEmitter implements ProcesoCaptura {
+    pedidos: any[] = []
+    env: NodeJS.ProcessEnv = {}
+    send(m: any) { if (m.tipo === 'transcribir') this.pedidos.push(m); if (m.tipo === 'salir') setTimeout(() => this.emit('exit', 0), 5); return true }
+    kill() { this.emit('exit', 1); return true }
+    responder(m: any) { this.emit('message', m) }
+  }
+
+  async function conMedia() {
+    const clave = 'cd'.repeat(32)
+    const sb = new Sandbox()
+    const b = arrancar(sb)
+    const carpeta = await oficina(b, [{ id: 'sofia', permisos: ['whatsapp'] }])
+    const capturas: CapturaDoble[] = []
+    const transcriptores: TranscriptorDoble[] = []
+    b.servicios.huecos.whatsappHost = {
+      clave: () => clave,
+      lanzar: () => { const c = new CapturaDoble(); capturas.push(c); return c },
+      lanzarTranscriptor: (_r: string, env: NodeJS.ProcessEnv) => { const t = new TranscriptorDoble(); t.env = env; transcriptores.push(t); return t },
+    }
+    const wa = whatsappDe(b.servicios)!
+    await llamar(b, 'POST', '/api/whatsapp/vincular', { aceptoRiesgo: true })
+    const c = capturas[0]!
+    c.emitir({ tipo: 'chats', chats: [{ jid: MAMA, grupo: false, agenda: 'Mamá' }] })
+    await llamar(b, 'PUT', '/api/whatsapp/chats/' + encodeURIComponent(MAMA), { elegido: true })
+    const guardarArchivo = (id: string, datos: Buffer) => {
+      fs.mkdirSync(wa.dirMedia, { recursive: true })
+      const archivo = nombreMedia(MAMA, id)
+      fs.writeFileSync(path.join(wa.dirMedia, archivo), cifrarBytes(datos, Buffer.from(clave, 'hex')))
+      return archivo
+    }
+    const mcp = mcpDe(b.servicios)!
+    const id = { oficina: carpeta, agente: 'sofia', sid: U.a, perfil: 'agente' }
+    const tools = mcp.consultas.herramientas(mcp.tokens.emitir(id), id)
+    return { b, sb, wa, c, transcriptores, guardarArchivo, tools, clave }
+  }
+
+  test('notas de voz: se transcriben si está activado, la transcripción se lee y se busca', async () => {
+    const { b, wa, c, transcriptores, guardarArchivo, tools, clave } = await conMedia()
+    // sin activar: queda «sin transcribir» y no se lanza nada
+    c.emitir({ tipo: 'mensaje', m: { id: 'v0', chat: MAMA, de: MAMA, propio: false, ts: 1000, tipo: 'nota_de_voz', segundos: 4, media: { archivo: guardarArchivo('v0', Buffer.from('ogg')), mime: 'audio/ogg', bytes: 3 } } })
+    expect(transcriptores.length).toBe(0)
+    expect(wa.store.mensaje(MAMA, 'v0')?.mediaEstado).toBe('sin_transcribir')
+
+    expect((await llamar(b, 'PUT', '/api/whatsapp/ajustes', { transcribir: 'si' })).status).toBe(400)
+    expect((await llamar(b, 'PUT', '/api/whatsapp/ajustes', { transcribir: true })).obj).toMatchObject({ transcribir: true, transcriptor: { estado: 'apagado' } })
+    c.emitir({ tipo: 'mensaje', m: { id: 'v1', chat: MAMA, de: MAMA, propio: false, ts: 1001, tipo: 'nota_de_voz', segundos: 12, media: { archivo: guardarArchivo('v1', Buffer.from('ogg')), mime: 'audio/ogg', bytes: 3 } } })
+    const t = transcriptores[0]!
+    expect(t.env.HQ_WA_CLAVE).toBe(clave)
+    expect(t.env.HQ_WA_MODELOS).toContain('modelos')
+    expect(t.pedidos.map((p) => p.id)).toEqual(['v1'])
+    expect(t.pedidos[0].archivo).toContain(path.join('whatsapp', 'media'))
+    expect((await tools.llamar('whatsapp_leer', { chat: 'Mamá' }))!.texto).toContain('[nota de voz, 12 s] (transcribiendo…)')
+    t.responder({ tipo: 'listo' })
+    t.responder({ tipo: 'texto', chat: MAMA, id: 'v1', texto: 'Tengo turno con el cardiólogo el jueves' })
+    expect(wa.store.mensaje(MAMA, 'v1')).toMatchObject({ transcripcion: 'Tengo turno con el cardiólogo el jueves', mediaEstado: 'lista' })
+    const leer = (await tools.llamar('whatsapp_leer', { chat: 'Mamá' }))!.texto
+    expect(leer).toContain('[nota de voz, 12 s] dice: «Tengo turno con el cardiólogo el jueves»')
+    expect(leer).toContain('[nota de voz, 4 s] (sin transcribir)')
+    expect((await tools.llamar('whatsapp_buscar', { texto: 'cardiologo' }))!.texto).toContain('dice: «Tengo turno')
+    expect(wa.transcriptor.estado).toBe('listo')
+
+    // un fallo y un motor que no está
+    c.emitir({ tipo: 'mensaje', m: { id: 'v2', chat: MAMA, de: MAMA, propio: false, ts: 1002, tipo: 'nota_de_voz', media: { archivo: guardarArchivo('v2', Buffer.from('ogg')), mime: 'audio/ogg', bytes: 3 } } })
+    t.responder({ tipo: 'fallo', chat: MAMA, id: 'v2', error: 'audio roto' })
+    expect(wa.store.mensaje(MAMA, 'v2')?.mediaEstado).toBe('error')
+    c.emitir({ tipo: 'mensaje', m: { id: 'v3', chat: MAMA, de: MAMA, propio: false, ts: 1003, tipo: 'nota_de_voz', media: { archivo: guardarArchivo('v3', Buffer.from('ogg')), mime: 'audio/ogg', bytes: 3 } } })
+    t.responder({ tipo: 'sin_motor', error: 'Cannot find module onnxruntime-node' })
+    expect(wa.store.mensaje(MAMA, 'v3')?.mediaEstado).toBe('sin_motor')
+    expect((await llamar(b, 'GET', '/api/whatsapp')).obj.transcriptor).toMatchObject({ estado: 'sin_motor' })
+  })
+
+  test('imágenes: el agente las ve con whatsapp_imagen (contenido image de MCP); quitar el chat borra los archivos', async () => {
+    const { b, wa, c, guardarArchivo, tools } = await conMedia()
+    const png = Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex')
+    const archivo = guardarArchivo('i1', png)
+    c.emitir({ tipo: 'mensaje', m: { id: 'i1', chat: MAMA, de: MAMA, propio: false, ts: 1000, tipo: 'imagen', texto: 'la orden', media: { archivo, mime: 'image/png', bytes: png.length } } })
+    c.emitir({ tipo: 'mensaje', m: { id: 'i2', chat: MAMA, de: MAMA, propio: false, ts: 1001, tipo: 'imagen' } })
+    const leer = (await tools.llamar('whatsapp_leer', { chat: 'Mamá' }))!.texto
+    expect(leer).toContain('[imagen i1] la orden')
+    expect(leer).toMatch(/Mamá: \[imagen\]$/m)
+    const r = (await tools.llamar('whatsapp_imagen', { chat: 'Mamá', id: 'i1' }))!
+    expect(r.esError).toBe(false)
+    expect(r.texto).toContain('con el texto: «la orden»')
+    expect(r.imagenes).toEqual([{ datos: png.toString('base64'), mime: 'image/png' }])
+    expect((await tools.llamar('whatsapp_imagen', { chat: 'Mamá', id: 'i2' }))!.esError).toBe(true)
+    expect((await tools.llamar('whatsapp_imagen', { chat: 'Mamá', id: 'nada' }))!.esError).toBe(true)
+    // por el protocolo, como lo ve claude
+    const rpc = await procesarMCP(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'whatsapp_imagen', arguments: { chat: 'Mamá', id: 'i1' } } }), tools)
+    const contenido = JSON.parse(rpc!).result.content
+    expect(contenido.map((x: any) => x.type)).toEqual(['text', 'image'])
+    expect(contenido[1]).toEqual({ type: 'image', data: png.toString('base64'), mimeType: 'image/png' })
+
+    const ruta = path.join(wa.dirMedia, archivo)
+    expect(fs.existsSync(ruta)).toBe(true)
+    await llamar(b, 'PUT', '/api/whatsapp/chats/' + encodeURIComponent(MAMA), { elegido: false })
+    expect(fs.existsSync(ruta)).toBe(false)
   })
 })

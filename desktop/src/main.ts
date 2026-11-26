@@ -48,7 +48,7 @@ async function arrancar() {
   const env = process.env
   const config = Config.load(os.homedir(), env)
   config.version = app.getVersion()
-  backend = createBackend({ config, env, whatsapp: hostWhatsApp(config.datosDir, __dirname) })
+  backend = createBackend({ config, env, whatsapp: hostWhatsApp(config.datosDir, __dirname, app.isPackaged, process.resourcesPath) })
   const r = raices(app.isPackaged, process.resourcesPath, path.resolve(__dirname, '../..'))
 
   protocol.handle('hq', async (req) => {

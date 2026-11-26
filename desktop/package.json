@@ -42,6 +42,10 @@
       {
         "from": "build/icon.png",
         "to": "icono.png"
+      },
+      {
+        "from": "build/recursos/transcriptor",
+        "to": "transcriptor"
       }
     ],
     "asar": true,

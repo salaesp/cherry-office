@@ -10,12 +10,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import makeWASocket, {
-  Browsers, BufferJSON, DisconnectReason, initAuthCreds, makeCacheableSignalKeyStore, proto,
+  Browsers, BufferJSON, DisconnectReason, downloadMediaMessage, initAuthCreds, makeCacheableSignalKeyStore, proto,
   type AuthenticationCreds, type AuthenticationState, type SignalDataTypeMap, type WASocket,
 } from 'baileys'
 import {
-  FiltroElegidos, cifrarSesion, descifrarSesion, esGrupo, mapearMensaje, metaChat, normalizarJid, seIgnora, segundos,
-  type ACaptura, type DeCaptura, type MetaChatWA,
+  FiltroElegidos, cifrarBytes, cifrarSesion, descifrarSesion, esGrupo, maxBytesMedia, mediaQueSeBaja, nombreMedia, mapearMensaje, metaChat, normalizarJid, seIgnora, segundos,
+  type ACaptura, type DeCaptura, type MensajeWA, type MetaChatWA,
 } from './whatsapp-mapeo.js'
 
 const DIR = process.env.HQ_WA_DIR ?? ''
@@ -26,6 +26,7 @@ if (!DIR || !process.send) {
 }
 const AUTH = path.join(DIR, 'auth')
 fs.mkdirSync(AUTH, { recursive: true, mode: 0o700 })
+const MEDIA = path.join(DIR, 'media')
 
 const enviar = (m: DeCaptura) => { try { process.send?.(m) } catch {} }
 
@@ -218,9 +219,31 @@ async function conectar() {
         if (o.endsWith('@lid')) alias(m.chat, o)
       }
       anotarChat(m.chat, { ultimo: ts })
-      enviar({ tipo: 'mensaje', m })
+      if (mediaQueSeBaja(m.tipo)) void bajarMedia(s, wa, m).finally(() => enviar({ tipo: 'mensaje', m }))
+      else enviar({ tipo: 'mensaje', m })
     }
   })
+}
+
+/** Baja el audio o la imagen de un mensaje de un chat elegido y lo guarda cifrado. Si no se puede, el mensaje va igual
+ *  (sin `media`). */
+async function bajarMedia(s: WASocket, wa: Parameters<typeof downloadMediaMessage>[0], m: MensajeWA) {
+  try {
+    const cont = wa.message?.audioMessage ?? wa.message?.imageMessage
+      ?? wa.message?.ephemeralMessage?.message?.audioMessage ?? wa.message?.ephemeralMessage?.message?.imageMessage
+      ?? wa.message?.viewOnceMessageV2?.message?.imageMessage ?? wa.message?.viewOnceMessage?.message?.imageMessage
+    const tope = m.tipo === 'imagen' ? maxBytesMedia.imagen : maxBytesMedia.audio
+    const largo = Number(cont?.fileLength ?? 0)
+    if (largo > tope) return
+    const datos = await downloadMediaMessage(wa, 'buffer', {}, { logger: logger as any, reuploadRequest: s.updateMediaMessage })
+    if (datos.length > tope) return
+    fs.mkdirSync(MEDIA, { recursive: true, mode: 0o700 })
+    const archivo = nombreMedia(m.chat, m.id)
+    fs.writeFileSync(path.join(MEDIA, archivo), cifrarBytes(datos, CLAVE), { mode: 0o600 })
+    m.media = { archivo, mime: String(cont?.mimetype ?? (m.tipo === 'imagen' ? 'image/jpeg' : 'audio/ogg')).split(';')[0]!.trim(), bytes: datos.length }
+  } catch (e) {
+    logger.warn(String(e), 'media')
+  }
 }
 
 async function alAbrir(s: WASocket) {

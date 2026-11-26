@@ -1,7 +1,7 @@
 // WhatsApp, lógica pura (docs/plan-secretaria.md, «Fuente WhatsApp»): ids, filtros y mapeo de los mensajes de Baileys
 // al formato de la oficina. Sin red ni Baileys: lo usan la captura (proceso hijo) y el módulo `whatsapp.ts`.
 // Viene del spike (`tools/whatsapp-spike/mapeo.mjs`), probado con un WhatsApp real.
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto'
 
 /** Un mensaje guardado de un chat elegido. `de` = JID de quien lo mandó (en un chat individual, el del chat). */
 export type MensajeWA = {
@@ -18,7 +18,17 @@ export type MensajeWA = {
   editado?: string
   /** Borrado para todos: id del borrado. */
   borrado?: string
+  /** Audio o imagen bajado por la captura (cifrado en `<carpeta de WhatsApp>/media/<archivo>`). */
+  media?: MediaWA
 }
+
+export type MediaWA = { archivo: string; mime: string; bytes: number }
+
+/** Lo que la captura baja: notas de voz, audios e imágenes de los chats elegidos, hasta estos tamaños. */
+export const mediaQueSeBaja = (tipo: string) => tipo === 'nota_de_voz' || tipo === 'audio' || tipo === 'imagen'
+export const maxBytesMedia = { audio: 16 * 1024 * 1024, imagen: 10 * 1024 * 1024 }
+/** Nombre del archivo de un medio: sin datos del chat ni del mensaje a la vista. */
+export const nombreMedia = (chat: string, id: string) => createHash('sha256').update(chat + '\u0000' + id).digest('hex').slice(0, 32) + '.bin'
 
 /** Metadatos de un chat para la lista (nunca texto). */
 export type MetaChatWA = {
@@ -232,3 +242,33 @@ export function descifrarSesion(contenido: string, clave: Buffer | undefined): s
   d.setAuthTag(b.subarray(12, 28))
   return Buffer.concat([d.update(b.subarray(28)), d.final()]).toString('utf8')
 }
+
+/** Lo mismo para archivos (audios, imágenes): con clave, «WAM1» + iv 12 | tag 16 | datos; sin clave, los bytes tal cual. */
+const marcaBytes = Buffer.from('WAM1')
+export function cifrarBytes(datos: Buffer, clave: Buffer | undefined): Buffer {
+  if (!clave) return datos
+  const iv = randomBytes(12)
+  const c = createCipheriv('aes-256-gcm', clave, iv)
+  const cuerpo = Buffer.concat([c.update(datos), c.final()])
+  return Buffer.concat([marcaBytes, iv, c.getAuthTag(), cuerpo])
+}
+export function descifrarBytes(b: Buffer, clave: Buffer | undefined): Buffer {
+  const cifrado = b.subarray(0, 4).equals(marcaBytes)
+  if (!cifrado) {
+    if (clave) throw new Error('archivo sin cifrar con clave configurada')
+    return b
+  }
+  if (!clave) throw new Error('archivo cifrado sin clave')
+  const d = createDecipheriv('aes-256-gcm', clave, b.subarray(4, 16))
+  d.setAuthTag(b.subarray(16, 32))
+  return Buffer.concat([d.update(b.subarray(32)), d.final()])
+}
+
+/** Mensajes entre el transcriptor (proceso hijo) y el backend. */
+export type ATranscriptor = { tipo: 'transcribir'; chat: string; id: string; archivo: string; mime: string } | { tipo: 'salir' }
+export type DeTranscriptor =
+  | { tipo: 'listo' }
+  | { tipo: 'sin_motor'; error: string }
+  | { tipo: 'cargando'; progreso: number | null }
+  | { tipo: 'texto'; chat: string; id: string; texto: string }
+  | { tipo: 'fallo'; chat: string; id: string; error: string }
