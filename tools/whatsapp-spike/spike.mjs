@@ -161,7 +161,9 @@ async function conectar() {
       anotarChat(m.chat, { ultimo: ts })
       anexar('mensajes.jsonl', { upsert: type, ...m })
       contadores.mensajesGuardados++
-      const quien = m.propio ? 'yo' : elegidos.porId.get(m.chat)?.nombre
+      // en un grupo, quien escribió: el nombre de tu agenda o, si no, su número (nunca el pushName)
+      const quien = m.propio ? 'yo' : m.de === m.chat ? elegidos.porId.get(m.chat)?.nombre
+        : lista.get(m.de)?.nombre ?? (m.de?.endsWith('@s.whatsapp.net') ? '+' + m.de.split('@')[0] : m.de)
       console.log(`  ${elegidos.porId.get(m.chat)?.nombre} · ${quien}: ${m.texto ?? '[' + m.tipo + ']'}${m.via === 'alternativo' ? '  (por id alternativo)' : ''}`)
     }
   })
