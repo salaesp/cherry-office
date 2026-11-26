@@ -16,6 +16,7 @@ import { Oficinas } from './oficinas.js'
 import { Router, type APIHandler } from './router.js'
 import { infoClaude, rutasChat } from './rutas-chat.js'
 import { rutasOficinas } from './rutas-oficinas.js'
+import { rutasDepartamentos } from './rutas-departamentos.js'
 import { modulosRegistrados, type Servicios } from './servicios.js'
 import { Store } from './store.js'
 import type { HostWhatsApp } from './whatsapp.js'
@@ -66,6 +67,7 @@ export function createBackend({ config, claudePath, env = process.env, whatsapp 
   router.explorador = new ExploradorRouter(config, oficinas, log)
   router.registrarExtra(new TrabajoRouter(oficinas, log))
   router.nucleo.push(rutasOficinas({ config, oficinas, claude: infoClaude(runner), alAbrir: s.alAbrir, ocupada: (c) => runner.actividad.vista(c).size > 0 }))
+  router.nucleo.push(rutasDepartamentos({ oficinas }))
   router.nucleo.push(rutasChat({
     config, store, runner, oficinas, avisos, entregas, log,
     mcp: () => s.mcp?.(), permisosTareas: () => s.permisosTareas?.(), catalogo: () => s.catalogo?.(),

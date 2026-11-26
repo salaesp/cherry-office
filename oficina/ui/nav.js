@@ -26,7 +26,7 @@ App.Nav = (function () {
   var LUGAR = {
     reunion: ['equipo', 'reuniones'],
     entregables: ['bandeja', 'revisar'], permisos: ['bandeja', 'permisos'], parte: ['bandeja', 'hoy'],
-    deptos: ['equipo', 'departamentos'], contratar: ['equipo', 'contratar'], creador: ['equipo', 'creador'],
+    departamentos: ['equipo', 'departamentos'], contratar: ['equipo', 'contratar'], creador: ['equipo', 'creador'],
     'reunion-nueva': ['equipo', 'reuniones'], 'flujos-editor': ['trabajo', 'flujos'],
     biblioteca: ['archivos', 'biblioteca'], conocimiento: ['archivos', 'conocimiento'], carpeta: ['archivos', 'carpeta'],
     tareas: ['trabajo', 'tareas'], flujos: ['trabajo', 'flujos']
@@ -192,7 +192,7 @@ App.Nav = (function () {
         else vacio();
       } else if (r.sec === 'equipo') {
         ponerSeccion('equipo', ['departamentos', 'contratar', 'creador', 'reuniones', 'nueva-reunion'].indexOf(r.a) >= 0 ? (r.a === 'nueva-reunion' ? 'reuniones' : r.a) : null);
-        if (r.a === 'departamentos') { if (m !== 'deptos') abrirDeptos(); }
+        if (r.a === 'departamentos') { if (m !== 'departamentos') abrirDepartamentos(); }
         else if (r.a === 'contratar') { if (m !== 'contratar') App.Contratar.abrir(); }
         else if (r.a === 'creador') { if (m !== 'creador') App.Creador.abrir(); }
         else if (r.a === 'nueva-reunion') { if (m !== 'reunion-nueva') App.Reunion.nueva(); }
@@ -245,7 +245,7 @@ App.Nav = (function () {
     if (modo === 'entregables') { var e = App.Entregables.abierta(); return '#/bandeja/revisar' + (e ? '/' + e : ''); }
     if (modo === 'permisos') return '#/bandeja/permisos';
     if (modo === 'parte') return '#/bandeja/hoy';
-    if (modo === 'deptos') return '#/equipo/departamentos';
+    if (modo === 'departamentos') return '#/equipo/departamentos';
     if (modo === 'contratar') return '#/equipo/contratar';
     if (modo === 'creador') return '#/equipo/creador';
     if (modo === 'reunion-nueva') return '#/equipo/nueva-reunion';
@@ -428,12 +428,12 @@ App.Nav = (function () {
     if (App.marcarEstados) App.marcarEstados();
   }
   /* Departamentos como pantalla (la misma sección de Ajustes): al guardar se vuelve a pintar */
-  function abrirDeptos() {
-    App.Deptos.abrir(function (op) {
-      var hj = App.hojaEnPanel({ titulo: op.titulo || 'Departamentos', icono: 'capas' }, 'deptos');
+  function abrirDepartamentos() {
+    App.Departamentos.abrir(function (op) {
+      var hj = App.hojaEnPanel({ titulo: op.titulo || 'Departamentos', icono: 'capas' }, 'departamentos');
       hj.enVentana = true;
       var barra = h('div.acciones'); hj.pie.appendChild(barra); hj.pie = barra;   // los botones van en la barra, no estirados
-      hj.cerrar = function () { if (App.modoDerecho() === 'deptos') abrirDeptos(); };
+      hj.cerrar = function () { if (App.modoDerecho() === 'departamentos') abrirDepartamentos(); };
       return hj;
     });
   }

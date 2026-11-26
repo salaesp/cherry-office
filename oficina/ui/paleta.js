@@ -60,7 +60,7 @@ App.Paleta = (function () {
      ['Armar con el Creador', 'chispa', 'Armá la oficina charlando', 'creador armar oficina', function () { App.Nav.ir('#/equipo/creador'); }],
      ['Contratar un agente', 'mas', '', 'contratar agente nuevo', function () { App.Nav.ir('#/equipo/contratar'); }],
      ['Llamar a reunión', 'reunion', '', 'llamar reunion', function () { App.Reunion.nueva(); }],
-     ['Nuevo departamento', 'capas', '', 'nuevo departamento', function () { App.Deptos.agregar(); }],
+     ['Nuevo departamento', 'capas', '', 'nuevo departamento', function () { App.Departamentos.agregar(); }],
      ['Ajustes', 'ajustes', '', 'ajustes configuracion', function () { App.Ajustes.abrir(); }],
      ['Nombre de la oficina y quién dirige', 'edificio', '', 'nombre oficina dirige general', function () { App.Ajustes.abrir('general'); }],
      ['Reglas de la oficina', 'regla', '', 'reglas oficina', function () { App.Ajustes.abrir('reglas'); }],
