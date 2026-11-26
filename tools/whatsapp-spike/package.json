@@ -11,7 +11,8 @@
     "test": "node --test mapeo.test.mjs",
     "bundle": "node bundle.mjs",
     "lista": "node lista.mjs",
-    "elegir": "node lista.mjs"
+    "elegir": "node lista.mjs",
+    "borrar": "node borrar.mjs"
   },
   "dependencies": {
     "baileys": "7.0.0-rc14",

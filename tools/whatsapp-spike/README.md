@@ -49,7 +49,20 @@ npm start
 4. Volvé a correr `npm start`. Ya no pide QR: se reconecta con la sesión guardada. Los mensajes de los elegidos se ven en
    la terminal y quedan en `datos/mensajes.jsonl`.
 
-Para desvincular: WhatsApp › Dispositivos vinculados › tocar el dispositivo › Cerrar sesión. Después borrá `datos/`.
+## Al terminar: borrar todo
+Cortá el spike (Ctrl+C) y corré:
+
+```bash
+npm run borrar
+```
+
+1. Escribe `informe-resumen.json` con cantidades y consumo (horas corriendo, RAM y CPU, desconexiones, mensajes por
+   tipo y por vía). Sin textos, números, nombres ni ids: sirve para completar el informe de abajo.
+2. Desvincula el dispositivo de WhatsApp (lo mismo que «Cerrar sesión» en Dispositivos vinculados).
+3. Borra `datos/` entero: sesión, mensajes, lista de chats, selección y logs.
+
+Después fijate en el teléfono que el dispositivo ya no aparezca. Si no se pudo desvincular, cerralo a mano desde ahí.
+`npm run borrar -- --resumen` solo escribe el resumen, sin borrar nada.
 
 ## Qué deja en `datos/`
 | Archivo | Qué tiene |
