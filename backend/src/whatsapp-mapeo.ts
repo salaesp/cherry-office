@@ -99,8 +99,12 @@ export class FiltroElegidos {
   private readonly alias = new Map<string, string>()
   /** grupo -> ids (números y @lid) de las personas que se leen; sin entrada, se lee a todos */
   private readonly solo = new Map<string, Set<string>>()
+  /** Modo «leer todos los chats individuales»: los ids (número o @lid) de los chats que la persona sacó igual. */
+  private readonly ignorados: Set<string> | undefined
 
-  constructor(lista: ElegidoCaptura[] = []) {
+  /** `todos`: además de los elegidos, se lee cualquier chat individual (no grupos) que escriba, salvo los de `ignorar`. */
+  constructor(lista: ElegidoCaptura[] = [], todos?: { ignorar?: string[] }) {
+    this.ignorados = todos ? new Set((todos.ignorar ?? []).map(normalizarJid).filter((j): j is string => !!j)) : undefined
     for (const c of lista) {
       const id = normalizarJid(c.jid)
       if (!id || seIgnora(id)) continue
@@ -142,6 +146,20 @@ export class FiltroElegidos {
     if (!o || !this.tiene(canonico) || this.alias.get(o) === canonico) return false
     this.alias.set(o, canonico)
     return true
+  }
+
+  get leeTodos() { return !!this.ignorados }
+
+  /** En el modo «todos», un chat individual que todavía no está elegido: su id canónico (el número si se sabe; si no, el
+   *  @lid), y queda anotado para reconocer los mensajes que siguen (también los propios). Un mensaje propio no abre un chat
+   *  nuevo: se lee desde que la otra persona escribe. undefined si no corresponde. */
+  individualNuevo(remoteJid: unknown, alt: unknown, propio: boolean): string | undefined {
+    if (!this.ignorados || propio || esGrupo(remoteJid)) return undefined
+    const ids = [remoteJid, alt].map(normalizarJid).filter((j): j is string => !!j && !seIgnora(j) && !esGrupo(j))
+    if (!ids.length || ids.some((j) => this.ignorados!.has(j))) return undefined
+    const id = ids.find(esNumero) ?? ids[0]!
+    for (const j of ids) this.alias.set(j, id)
+    return id
   }
 
   /** El id canónico del elegido que corresponde a alguno de estos jids. */
@@ -223,10 +241,11 @@ export function mapearMensaje(wa: unknown, elegidos: FiltroElegidos): MensajeWA 
   const w = wa as Cualquiera | undefined
   const k = w?.key as Cualquiera | undefined
   if (!k?.remoteJid || !k.id || seIgnora(k.remoteJid)) return undefined
-  const chat = elegidos.resolver(k.remoteJid, k.remoteJidAlt)
-  if (!chat) return undefined
   const c = contenido(w!.message)
   if (c.tipo === 'vacio' || c.tipo === 'protocolo' || c.tipo === 'reaccion') return undefined
+  const chat = elegidos.resolver(k.remoteJid, k.remoteJidAlt)
+    ?? (c.tipo === 'edicion' || c.tipo === 'borrado' ? undefined : elegidos.individualNuevo(k.remoteJid, k.remoteJidAlt, !!k.fromMe))
+  if (!chat) return undefined
   const grupo = esGrupo(chat)
   // el filtro de personas de un grupo se aplica acá, antes de que nada salga del proceso
   if (grupo && !k.fromMe && !elegidos.leeA(chat, k.participantAlt, k.participant)) return undefined
@@ -268,7 +287,8 @@ export type DeCaptura =
   | { tipo: 'error'; texto: string }
 
 export type ACaptura =
-  | { tipo: 'elegidos'; chats: (ElegidoCaptura & { lids: string[] })[] }
+  /** `todos`: leer también cualquier chat individual que escriba, salvo los de `ignorar` (con sus @lid). */
+  | { tipo: 'elegidos'; chats: (ElegidoCaptura & { lids: string[] })[]; todos?: { ignorar: string[] } }
   | { tipo: 'cerrar_sesion' }
   | { tipo: 'salir' }
 

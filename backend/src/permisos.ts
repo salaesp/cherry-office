@@ -178,12 +178,14 @@ export const WhatsAppAgente = {
   nombresMCP: ['whatsapp_chats', 'whatsapp_leer', 'whatsapp_imagen', 'whatsapp_buscar'],
   /** Permiso general: lee todos los chats elegidos. */
   puede: (a: AgenteDef) => a.permisos?.includes('whatsapp') ?? false,
-  /** Chats de la fuente WhatsApp de la secretaría, si este agente la atiende (secretaria.ts); undefined si no. */
-  chatsSecretaria(o: Oficina, a: AgenteDef): string[] | undefined {
+  /** Chats de la fuente WhatsApp de la secretaría, si este agente la atiende (secretaria.ts); 'todos' si revisa todos los que
+   *  se leen; undefined si no la atiende. */
+  chatsSecretaria(o: Oficina, a: AgenteDef): string[] | 'todos' | undefined {
     const sec = o.secretaria
     if (!sec || sec.agente !== a.id || sec.activa === false || !Array.isArray(sec.fuentes)) return undefined
-    const f = (sec.fuentes as unknown[]).find((x) => typeof x === 'object' && x !== null && (x as { id?: unknown }).id === 'whatsapp') as { chats?: unknown } | undefined
+    const f = (sec.fuentes as unknown[]).find((x) => typeof x === 'object' && x !== null && (x as { id?: unknown }).id === 'whatsapp') as { chats?: unknown; todos?: unknown } | undefined
     if (!f) return undefined
+    if (f.todos === true) return 'todos'
     return Array.isArray(f.chats) ? f.chats.filter((c): c is string => typeof c === 'string') : []
   },
   herramientasMCP: (o: Oficina, a: AgenteDef) =>

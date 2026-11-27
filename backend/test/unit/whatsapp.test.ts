@@ -340,6 +340,76 @@ describe('rutas', () => {
   })
 })
 
+describe('leer todos los chats individuales', () => {
+  const CLIENTE = '5491166666666@s.whatsapp.net', CLIENTE_LID = '666000111222@lid', DESCONOCIDO_LID = '555000111222@lid'
+  const ruta = (jid: string) => '/api/whatsapp/chats/' + encodeURIComponent(jid)
+
+  test('captura: con «todos» pasa cualquier chat individual desde que escriben (no grupos, no los ignorados)', () => {
+    const f = new FiltroElegidos([], { ignorar: [TIO] })
+    expect(f.leeTodos).toBe(true)
+    // un mensaje propio no abre el chat
+    expect(mapearMensaje({ key: { remoteJid: CLIENTE, fromMe: true, id: 'p0' }, message: { conversation: 'hola, ¿cómo va?' } }, f)).toBeUndefined()
+    // llega por @lid con el número al lado: queda el número, y lo que sigue (también lo propio) se reconoce
+    expect(mapearMensaje({ key: { remoteJid: CLIENTE_LID, remoteJidAlt: CLIENTE, id: 'c1' }, message: { conversation: '¿tienen turno el lunes?' } }, f)).toMatchObject({ chat: CLIENTE, de: CLIENTE })
+    expect(mapearMensaje({ key: { remoteJid: CLIENTE_LID, fromMe: true, id: 'c2' }, message: { conversation: 'sí, a las 10' } }, f)).toMatchObject({ chat: CLIENTE, de: 'yo' })
+    // sin número conocido, el @lid
+    expect(mapearMensaje({ key: { remoteJid: DESCONOCIDO_LID, id: 'd1' }, message: { conversation: 'precio?' } }, f)?.chat).toBe(DESCONOCIDO_LID)
+    // grupos no elegidos e ignorados, no
+    expect(mapearMensaje({ key: { remoteJid: GRUPO, participant: CLIENTE, id: 'g1' }, message: { conversation: 'asado' } }, f)).toBeUndefined()
+    expect(mapearMensaje({ key: { remoteJid: TIO, id: 't1' }, message: { conversation: 'privado' } }, f)).toBeUndefined()
+    // sin «todos», nada de esto
+    expect(mapearMensaje({ key: { remoteJid: CLIENTE, id: 'c3' }, message: { conversation: 'hola' } }, new FiltroElegidos([]))).toBeUndefined()
+  })
+
+  test('rutas: prender, se eligen solos, editar lo vuelve propio, sacar no vuelve, apagar borra los automáticos', async () => {
+    const { b, capturas, wa } = await preparar()
+    await llamar(b, 'POST', '/api/whatsapp/vincular', { aceptoRiesgo: true })
+    const c = capturas[0]!
+    c.emitir({ tipo: 'estado', estado: 'conectado' })
+    expect((await llamar(b, 'GET', '/api/whatsapp')).obj.leerTodos).toBe(false)
+    expect((await llamar(b, 'PUT', '/api/whatsapp/ajustes', { leerTodos: 'si' })).status).toBe(400)
+    const r = await llamar(b, 'PUT', '/api/whatsapp/ajustes', { leerTodos: true })
+    expect(r.obj.leerTodos).toBe(true)
+    expect(c.ultimosElegidos()?.todos).toEqual({ ignorar: [] })
+
+    // primer mensaje de un cliente (y uno de un grupo, que no entra)
+    c.emitir({ tipo: 'chats', chats: [{ jid: CLIENTE, grupo: false, pista: 'Laura' }] })
+    c.emitir({ tipo: 'mensaje', m: { id: 'm1', chat: CLIENTE, de: CLIENTE, propio: false, ts: 1000, tipo: 'texto', texto: '¿hacen envíos?' } })
+    c.emitir({ tipo: 'mensaje', m: { id: 'm2', chat: CLIENTE, de: 'yo', propio: true, ts: 1001, tipo: 'texto', texto: 'sí' } })
+    c.emitir({ tipo: 'mensaje', m: { id: 'g1', chat: GRUPO, de: TIO, propio: false, ts: 1002, tipo: 'texto', texto: 'asado' } })
+    // un @lid cuyo número ya se conoce se guarda en el número
+    c.emitir({ tipo: 'alias', pn: MAMA, lid: MAMA_LID })
+    c.emitir({ tipo: 'mensaje', m: { id: 'm3', chat: MAMA_LID, de: MAMA_LID, propio: false, ts: 1003, tipo: 'texto', texto: 'hola nene' } })
+    expect(wa.store.mensajes(CLIENTE, { limite: 5 }).map((m) => m.texto)).toEqual(['¿hacen envíos?', 'sí'])
+    expect(wa.store.mensajes(GRUPO, { limite: 5 })).toEqual([])
+    expect(wa.store.mensajes(MAMA, { limite: 5 }).map((m) => m.de)).toEqual([MAMA])
+    let g = (await llamar(b, 'GET', '/api/whatsapp')).obj
+    expect(g.chats.filter((x: any) => x.auto).map((x: any) => x.jid).sort()).toEqual([CLIENTE, MAMA].sort())
+    expect(c.ultimosElegidos()?.chats.map((x) => x.jid).sort()).toEqual([CLIENTE, MAMA].sort())
+
+    // editar lo vuelve propio; sacar uno con «todos» prendido lo deja ignorado
+    expect((await llamar(b, 'PUT', ruta(CLIENTE), { nombre: 'Laura (clienta)' })).obj.chat.auto).toBeUndefined()
+    await llamar(b, 'PUT', ruta(MAMA), { elegido: false })
+    expect(c.ultimosElegidos()?.todos?.ignorar.sort()).toEqual([MAMA, MAMA_LID].sort())
+    c.emitir({ tipo: 'mensaje', m: { id: 'm4', chat: MAMA, de: MAMA, propio: false, ts: 1004, tipo: 'texto', texto: 'otra vez' } })
+    expect(wa.store.chat(MAMA)?.elegido).toBe(false)
+
+    // otro cliente entra solo; al apagar se borra él (no Laura, que se editó) y se olvidan los ignorados
+    c.emitir({ tipo: 'mensaje', m: { id: 'm5', chat: TIO, de: TIO, propio: false, ts: 1005, tipo: 'texto', texto: 'precio?' } })
+    expect(wa.store.chat(TIO)?.auto).toBe(true)
+    g = (await llamar(b, 'PUT', '/api/whatsapp/ajustes', { leerTodos: false })).obj
+    expect(g.leerTodos).toBe(false)
+    expect(wa.store.chat(TIO)?.elegido).toBe(false)
+    expect(wa.store.mensajes(TIO, { limite: 5 })).toEqual([])
+    expect(wa.store.chat(CLIENTE)).toMatchObject({ elegido: true, nombre: 'Laura (clienta)' })
+    expect(wa.store.chat(MAMA)?.ignorado).toBeUndefined()
+    expect(c.ultimosElegidos()?.todos).toBeUndefined()
+    // apagado, un número nuevo no entra
+    c.emitir({ tipo: 'mensaje', m: { id: 'm6', chat: TIO, de: TIO, propio: false, ts: 1006, tipo: 'texto', texto: 'hola?' } })
+    expect(wa.store.chat(TIO)?.elegido).toBe(false)
+  })
+})
+
 describe('teléfono, grupos con filtro y transcripción (mejoras de S4)', () => {
   const OTRO = '5491199999999@s.whatsapp.net', OTRO_LID = '888000111222@lid', TIO_LID = '777000111222@lid'
   const ruta = (jid: string) => '/api/whatsapp/chats/' + encodeURIComponent(jid)

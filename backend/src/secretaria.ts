@@ -28,7 +28,9 @@ import { numeroVisible } from './whatsapp-mapeo.js'
 // MARK: - configuración
 
 export type CadaFuente = { valor: number; unidad: 'minutos' | 'horas' }
-export type FuenteCfg = { id: string; cada: CadaFuente; chats?: string[]; indicacion?: string }
+/** `todos` (solo WhatsApp): revisa todos los chats que se leen en Ajustes › WhatsApp, también los que entran solos con «leer
+ *  todos los chats individuales», además de `chats`. */
+export type FuenteCfg = { id: string; cada: CadaFuente; chats?: string[]; todos?: boolean; indicacion?: string }
 export type Franja = { desde: string; hasta: string }
 export type SecretariaCfg = { agente: string; activa: boolean; franja?: Franja; reporteVacio: boolean; fuentes: FuenteCfg[] }
 
@@ -64,6 +66,7 @@ export function decodificarSecretaria(v: unknown, o: Oficina, ids: string[]): Se
       if (!Array.isArray(x.chats) || !x.chats.every((j) => typeof j === 'string' && j.length <= 80) || x.chats.length > 50) throw new ErrorAPI(400, 'Los chats de la fuente tienen un formato inválido.')
       f.chats = [...new Set(x.chats as string[])]
     }
+    if (x.todos === true) f.todos = true
     if (x.indicacion !== undefined && x.indicacion !== null && x.indicacion !== '') {
       if (typeof x.indicacion !== 'string' || largo(x.indicacion) > 500) throw new ErrorAPI(400, 'La indicación de una fuente puede tener hasta 500 caracteres.')
       f.indicacion = sanear(x.indicacion).trim()
@@ -162,15 +165,17 @@ export const fuenteWhatsApp: Fuente = {
     if (wa.estado === 'revocado') return 'WhatsApp cerró la sesión: volvé a vincularlo en Ajustes › WhatsApp.'
     if (wa.estado === 'caido') return 'La conexión con WhatsApp se cayó.'
     const elegidos = new Set(wa.store.elegidos().map((c) => c.jid))
+    if (cfg.todos) return elegidos.size || wa.leerTodos ? undefined : 'No hay chats para revisar: elegilos en Ajustes › WhatsApp o prendé «Leer todos los chats individuales».'
     if (!(cfg.chats ?? []).some((j) => elegidos.has(j))) return 'No hay chats para revisar: elegilos acá (y en Ajustes › WhatsApp).'
     return undefined
   },
 }
 
-/** Los chats de la fuente que siguen elegidos en Ajustes › WhatsApp. */
+/** Los chats de la fuente que siguen elegidos en Ajustes › WhatsApp (con `todos`, todos los que se leen). */
 function chatsDe(c: ContextoFuente): ChatWA[] {
   const wa = whatsappDe(c.s)
   if (!wa) return []
+  if (c.cfg.todos) return wa.store.elegidos()
   const quiero = new Set(c.cfg.chats ?? [])
   return wa.store.elegidos().filter((ch) => quiero.has(ch.jid))
 }
@@ -663,6 +668,7 @@ export class ServicioSecretaria {
       // todos los chats (para elegir desde acá); los elegidos primero
       chatsWhatsApp: wa ? wa.store.chats().filter((c) => !c.jid.endsWith('@lid')).map((c) => ({ jid: c.jid, nombre: nombreVisible(c), grupo: c.grupo, elegido: c.elegido, ...(c.ultimo ? { ultimo: c.ultimo } : {}), ...(numeroVisible(c.jid) ? { numero: numeroVisible(c.jid) } : {}) })) : [],
       whatsapp: wa ? wa.estado : 'apagado',
+      whatsappLeerTodos: wa?.leerTodos ?? false,
       revisiones: this.store.lista(act.carpeta).map(revisionJSON),
     }
   }

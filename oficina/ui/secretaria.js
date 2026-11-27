@@ -133,6 +133,18 @@
           if (q && !otros.length) lista.appendChild(h('div.ajuste-ayuda', 'Nada con «' + filtro + '».'));
         }
         llenar();
+        /* revisar todos los chats que se leen (para un negocio: con «leer todos los chats individuales», también los que entran solos) */
+        var todosWa = !!(fWa && fWa.todos);
+        var ckTodos = h('input', { type: 'checkbox', checked: todosWa });
+        ckTodos.addEventListener('change', function () {
+          guardarWa({ todos: ckTodos.checked }, ckTodos.checked ? 'Revisa todos los chats que se leen.' : 'Revisa solo los chats que marques.');
+        });
+        var lineaTodos = h('div', { style: { margin: '2px 0 8px' } },
+          h('label.ajuste-check', { style: { display: 'flex' } }, ckTodos, h('span', 'Revisar todos los chats que se leen')),
+          h('div.ajuste-ayuda', datos.whatsappLeerTodos
+            ? 'Incluye los que entran solos porque en Ajustes › WhatsApp está prendido «Leer todos los chats individuales» (por ejemplo, clientes que no tenés agendados).'
+            : 'Todos los elegidos en Ajustes › WhatsApp. Si te escriben números que no tenés agendados (por ejemplo, clientes de un negocio), prendé «Leer todos los chats individuales» allá.'));
+        if (todosWa) { buscar.style.display = 'none'; lista.style.display = 'none'; }
         var cada = (fWa && fWa.cada) || { valor: 1, unidad: 'horas' };
         var valor = h('input.campo', { type: 'number', min: 1, value: cada.valor, style: { width: '70px' } });
         var unidad = h('select.campo', { style: { width: 'auto' } }, h('option', { value: 'minutos', selected: cada.unidad === 'minutos' }, 'minutos'), h('option', { value: 'horas', selected: cada.unidad === 'horas' }, 'horas'));
@@ -144,10 +156,10 @@
         valor.addEventListener('change', cambiarCada); unidad.addEventListener('change', cambiarCada);
         App.add(bloqueWa,
           h('div.ajuste-ayuda', { style: { marginBottom: '6px' } }, 'Qué chats revisa. Se leen desde que los marcás; nunca manda mensajes.'),
-          buscar, lista,
+          lineaTodos, buscar, lista,
           h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', flexWrap: 'wrap' } }, h('span', 'Revisar cada'), valor, unidad,
             h('span.ajuste-ayuda', '(si no llegó nada nuevo, no gasta)')),
-          estadoWa.problema && marcados.length ? h('div.ajuste-ayuda', { style: { color: 'var(--peligro)', marginTop: '6px' } }, estadoWa.problema) : null);
+          estadoWa.problema && (marcados.length || todosWa) ? h('div.ajuste-ayuda', { style: { color: 'var(--peligro)', marginTop: '6px' } }, estadoWa.problema) : null);
       }
       caja.appendChild(bloqueWa);
 
