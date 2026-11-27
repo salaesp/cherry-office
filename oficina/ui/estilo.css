@@ -245,6 +245,8 @@ select.campo { padding-right: 26px; }
 @keyframes rebote { 0%, 80%, 100% { opacity: .3; transform: none; } 40% { opacity: 1; transform: translateY(-2px); } }
 .sugerencias { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 12px; }
 .sugerencias .chip { white-space: normal; height: auto; min-height: 26px; padding: 4px 10px; text-align: left; line-height: 1.35; }
+.sugerencias .sug-tareas { display: inline-flex; align-items: center; gap: 6px; }
+.sugerencias .sug-tareas svg { width: 14px; height: 14px; flex: none; }
 /* mensajes en cola: burbujas pendientes debajo de la charla, para cuando el agente termine */
 .cola { align-self: flex-end; max-width: 85%; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 .cola-cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; font-size: 12px; color: var(--suave); }
@@ -1286,7 +1288,6 @@ button.adjunto:hover { background: var(--panel-2); }
 .agente-herr .btn[aria-pressed="true"] { background: var(--panel-2); color: var(--texto); box-shadow: inset 0 0 0 1px var(--linea-fuerte); }
 .charla-barra { display: flex; align-items: center; gap: 8px; padding: 6px 16px 8px; border-bottom: 1px solid var(--linea); min-height: 38px; }
 .charla-tit { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.charla-barra .sacar-tareas { flex: none; }
 
 /* columna de detalles */
 .lat-cab { display: flex; align-items: center; gap: 6px; padding: 14px 10px 8px 14px; min-height: 52px; flex: none; }
