@@ -51,7 +51,11 @@ describe('configuración', () => {
   const base = { agente: 'sofia', fuentes: [{ id: 'whatsapp', cada: { valor: 30, unidad: 'minutos' }, chats: [MAMA] }] }
 
   test('valida agente, fuentes, intervalo y franja', () => {
-    expect(decodificarSecretaria(base, o, ['whatsapp'])).toEqual({ agente: 'sofia', activa: true, reporteVacio: false, fuentes: [{ id: 'whatsapp', cada: { valor: 30, unidad: 'minutos' }, chats: [MAMA] }] })
+    expect(decodificarSecretaria(base, o, ['whatsapp'])).toEqual({ agente: 'sofia', activa: true, reporteVacio: false, reporte: { horas: ['09:00', '19:00'] }, fuentes: [{ id: 'whatsapp', cada: { valor: 30, unidad: 'minutos' }, chats: [MAMA] }] })
+    expect(decodificarSecretaria({ ...base, reporte: { horas: ['20:30', '08:00', '08:00'] } }, o, ['whatsapp']).reporte).toEqual({ horas: ['08:00', '20:30'] })
+    for (const reporte of [{ horas: [] }, { horas: ['8'] }, { horas: Array.from({ length: 9 }, (_, i) => `1${i}:00`) }, 'x']) {
+      expect(() => decodificarSecretaria({ ...base, reporte }, o, ['whatsapp'])).toThrow(/horas del reporte/)
+    }
     expect(() => decodificarSecretaria({ ...base, agente: 'nadie' }, o, ['whatsapp'])).toThrow(/agente/)
     expect(() => decodificarSecretaria({ ...base, fuentes: [{ id: 'fax', cada: { valor: 1, unidad: 'horas' } }] }, o, ['whatsapp'])).toThrow(/desconocida/)
     expect(() => decodificarSecretaria({ ...base, fuentes: [base.fuentes[0], base.fuentes[0]] }, o, ['whatsapp'])).toThrow(/repetida/)
@@ -141,8 +145,11 @@ describe('secretaría', () => {
     expect(c1).not.toContain('asado')
     expect(c1).not.toContain('Ya revisado (solo como contexto')
     expect(sec.store.cursor(carpeta, 'whatsapp')[MAMA]).toBeGreaterThan(0)
-    const e = b.servicios.entregas.una(carpeta, sec.store.una(r!.id)!.entrega!)
-    expect(e).toMatchObject({ origen: 'secretaria', estado: 'sin_revisar' })
+    expect(c1).toContain('son tus notas para el próximo reporte')
+    // la revisión no deja entrega: sus notas quedan para el reporte
+    expect(sec.store.una(r!.id)).toMatchObject({ notas: 'hola sofia', urgente: false })
+    expect(sec.store.una(r!.id)!.entrega).toBeUndefined()
+    expect(b.servicios.entregas.lista(carpeta, { origen: 'secretaria' })).toHaveLength(0)
 
     // enseguida no le toca; una hora después sin nada nuevo, tampoco
     mensaje('¿Me acompañás?', ahora() - 200)
@@ -181,23 +188,87 @@ describe('secretaría', () => {
     await esperar(() => !sec.store.corriendo(carpeta))
   })
 
-  test('sin novedades: entrega silenciosa y ya revisada (salvo que se pida verla)', async () => {
+  test('sin novedades: la revisión no deja notas ni entrega', async () => {
     const { b, carpeta, sec, mensaje } = await preparar()
     await configurar(b)
     mensaje('jaja FAKE_SIN_NOVEDADES', ahora() - 300)
     const r = await sec.revisar()
     await esperar(() => sec.store.una(r!.id)?.estado !== 'corriendo')
+    expect(sec.store.una(r!.id)).toMatchObject({ estado: 'ok', vacia: true })
+    expect(sec.store.una(r!.id)!.notas).toBeUndefined()
+    expect(sec.store.sinReportar(carpeta)).toHaveLength(0)
+    expect(b.servicios.entregas.lista(carpeta, { origen: 'secretaria' })).toHaveLength(0)
+  })
+
+  test('el reporte junta las notas a la hora elegida; sin nada nuevo no gasta', async () => {
+    const { sb, b, carpeta, sec, mensaje, ultimaConsigna } = await preparar()
+    await configurar(b, { reporte: { horas: ['09:00', '19:00'] } })
+    expect(await sec.reportar()).toBeUndefined()   // la primera vuelta marca desde cuándo junta
+    mensaje('El jueves a las 10 tengo turno', ahora() - 300)
+    const r1 = await sec.revisar()
+    await esperar(() => !sec.store.corriendo(carpeta))
+    mensaje('Y el viernes el dentista', ahora() - 300)
+    const r2 = await sec.revisar(enSeg(3601))
+    await esperar(() => !sec.store.corriendo(carpeta))
+    expect(sec.store.sinReportar(carpeta).map((x) => x.id)).toEqual([r1!.id, r2!.id])
+    const llamadas = sb.llamadas.length
+    const rep = await sec.reportar(enSeg(86400))
+    expect(rep).toMatchObject({ estado: 'corriendo', revisiones: [r1!.id, r2!.id] })
+    await esperar(() => sec.store.reporte(rep!.id)?.entrega !== undefined)
+    expect(sb.llamadas.length).toBe(llamadas + 1)
+    const c = ultimaConsigna()
+    expect(c).toContain('es la hora del reporte')
+    expect(c).toContain('Juntá en UN solo reporte')
+    expect(c).toContain('<notas_revisiones>')
+    expect(c.match(/hola sofia/g)).toHaveLength(2)
+    const r = sec.store.reporte(rep!.id)!
+    expect(r.estado).toBe('ok')
+    const e = b.servicios.entregas.una(carpeta, r.entrega!)!
+    expect(e).toMatchObject({ origen: 'secretaria', estado: 'sin_revisar', titulo: 'Reporte de la secretaría' })
+    expect(sec.store.sinReportar(carpeta)).toHaveLength(0)
+    const api = await llamar(b, 'GET', '/api/secretaria/reportes/' + e.id)
+    expect(api.obj).toMatchObject({ reporte: { id: rep!.id, revisiones: 2 }, acciones: [] })
+    expect((await llamar(b, 'GET', '/api/secretaria/reportes/999')).status).toBe(404)
+    // el siguiente horario sin nada nuevo: no se lanza
+    const antes = sb.llamadas.length
+    const nada = await sec.reportar(enSeg(2 * 86400))
+    expect(nada).toMatchObject({ estado: 'salteado' })
+    expect(sb.llamadas.length).toBe(antes)
+    expect((await llamar(b, 'GET', '/api/secretaria')).obj.reportes[0]).toMatchObject({ estado: 'salteado' })
+  })
+
+  test('lo urgente se avisa en el momento; un reporte que falla deja las notas para el próximo', async () => {
+    const { b, carpeta, sec, mensaje } = await preparar()
+    await configurar(b)
+    await sec.reportar()
+    mensaje('mañana a las 8 turno FAKE_URGENTE', ahora() - 300)
+    const r = await sec.revisar()
     await esperar(() => sec.store.una(r!.id)?.entrega !== undefined)
     const rev = sec.store.una(r!.id)!
-    expect(rev).toMatchObject({ estado: 'ok', vacia: true })
-    await esperar(() => b.servicios.entregas.una(carpeta, rev.entrega!)?.estado === 'revisada')
-    expect(b.servicios.entregas.una(carpeta, rev.entrega!)?.estado).toBe('revisada')
+    expect(rev.urgente).toBe(true)
+    const e = b.servicios.entregas.una(carpeta, rev.entrega!)!
+    expect(e).toMatchObject({ origen: 'secretaria', titulo: 'Urgente: Mamá tiene turno mañana a las 8.' })
+    expect(e.texto).toContain('## Para saber')
+    // el reporte sabe que ya se avisó; si falla, las notas vuelven a quedar libres
+    const id = sec.store.sinReportar(carpeta)[0]!.id
+    b.servicios.store.db.run("UPDATE sec_revisiones SET notas=notas || ' REPORTE_FALLA' WHERE id=?", [id])
+    const rep = await sec.reportar(enSeg(86400))
+    await esperar(() => sec.store.reporte(rep!.id)?.estado !== 'corriendo')
+    expect(sec.store.reporte(rep!.id)?.estado).toBe('fallida')
+    expect(sec.store.sinReportar(carpeta).map((x) => x.id)).toEqual([id])
+  })
 
-    await configurar(b, { reporteVacio: true })
-    mensaje('otra vez FAKE_SIN_NOVEDADES', ahora() - 300)
-    const r2 = await sec.revisar(enSeg(3601))
-    await esperar(() => sec.store.una(r2!.id)?.entrega !== undefined)
-    expect(b.servicios.entregas.una(carpeta, sec.store.una(r2!.id)!.entrega!)?.estado).toBe('sin_revisar')
+  test('«Revisar ahora» arma el reporte enseguida después de revisar', async () => {
+    const { b, carpeta, sec, mensaje, ultimaConsigna } = await preparar()
+    await configurar(b)
+    mensaje('turno el martes', ahora() - 300)
+    const r = await llamar(b, 'POST', '/api/secretaria/revisar')
+    expect(r.obj.revision).toMatchObject({ manual: true })
+    await esperar(() => sec.store.reportes(carpeta)[0]?.entrega !== undefined)
+    expect(sec.store.reportes(carpeta)[0]).toMatchObject({ manual: true, estado: 'ok' })
+    expect(ultimaConsigna()).toContain('es la hora del reporte')
+    // «Armar el reporte» sin nada nuevo
+    expect((await llamar(b, 'POST', '/api/secretaria/reportar')).obj).toMatchObject({ reporte: { estado: 'salteado' }, motivo: 'No hay nada nuevo para el reporte.' })
   })
 
   test('«Revisar ahora», franja horaria, pausa y revisiones que quedaron a medias', async () => {

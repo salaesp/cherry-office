@@ -132,7 +132,7 @@ App.Entregables = (function () {
   /* el título en palabras para la lista: sin «Propuesta:» y con el día del reporte o la carpeta importada */
   function tituloLista(e) {
     if (e.origen === 'propuesta') return String(e.titulo || '').replace(/^Propuesta:\s*/, '');
-    if (e.origen === 'secretaria') return App.Propuestas.tituloReporte(e.creada);
+    if (e.origen === 'secretaria' && !/^Urgente:/.test(e.titulo || '')) return App.Propuestas.tituloReporte(e.creada);
     var imp = e.origen === 'importacion' && /las notas de «(.+?)» a mi memoria/.exec(e.texto || e.resumen || '');
     return imp ? 'Importé tus notas de «' + imp[1] + '»' : e.titulo;
   }
@@ -187,6 +187,8 @@ App.Entregables = (function () {
     if (e.origen === 'propuesta') {
       titulo = String(e.titulo || '').replace(/^Propuesta:\s*/, '');
       sub = nombreDe(e) + ' te lo propone · ' + hace(e.creada) + costo;
+    } else if (e.origen === 'secretaria' && /^Urgente:/.test(e.titulo || '')) {
+      sub = nombreDe(e) + ' te avisa ya, sin esperar al reporte · ' + hace(e.creada) + costo;
     } else if (e.origen === 'secretaria') {
       titulo = App.Propuestas.tituloReporte(e.creada);
       sub = nombreDe(e) + ' · revisó ' + hace(e.creada) + costo;
@@ -271,7 +273,7 @@ App.Entregables = (function () {
       api().get('/api/flujos/corridas', { entrega: e.id, estado: 'todas' }).then(function (r) { return (r.corridas || [])[0] || null; }).catch(function () { return null; }),
       api().get('/api/acciones', { entrega: e.id }).then(function (r) { return r.accion || null; }).catch(function () { return null; }),
       api().get('/api/esperas', { entrega: e.id, estado: 'todas' }).then(function (r) { return r.esperas || []; }).catch(function () { return []; }),
-      e.origen === 'secretaria' && e.sid ? api().get('/api/acciones', { sid: e.sid }).then(function (r) { return r.acciones || []; }).catch(function () { return []; }) : Promise.resolve([])
+      e.origen === 'secretaria' ? accionesDelReporte(e) : Promise.resolve([])
     ]).then(function (r) {
       if (!abiertoPanel() || abierta !== e.id) return;
       extra.corrida = r[0]; extra.accion = r[1];
@@ -354,6 +356,14 @@ App.Entregables = (function () {
   }
 
   /* ---------------- acción hacia afuera (plan §8) ---------------- */
+  /* las propuestas de un reporte de la secretaría: las de su tramo (los reportes nuevos lo guardan) o, en los viejos, las de
+     su misma sesión */
+  function accionesDelReporte(e) {
+    var porSid = function () { return e.sid ? api().get('/api/acciones', { sid: e.sid }).then(function (r) { return r.acciones || []; }).catch(function () { return []; }) : []; };
+    if (/^Urgente:/.test(e.titulo || '')) return Promise.resolve(porSid());   // un aviso urgente sale de una revisión, no de un reporte
+    return api().get('/api/secretaria/reportes/' + e.id).then(function (r) { return r.acciones || []; }).catch(porSid);
+  }
+
   /* un tema o una ficha de la memoria de la secretaría, en su hoja */
   function verMemoria(clase, slug, titulo) {
     if (App.SecretariaMemoria && App.SecretariaMemoria.ver) App.SecretariaMemoria.ver(clase + '/' + slug + '.md', titulo, { compartir: true });

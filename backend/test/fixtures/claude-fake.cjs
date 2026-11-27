@@ -104,6 +104,14 @@ async function main() {
   if (m.includes('VACIO')) { salida('{"type":"result","result":"","is_error":false}'); fin(); return 0 }
   // la secretaría sin nada para contar (secretaria.test.ts)
   if (m.includes('FAKE_SIN_NOVEDADES')) { salida('{"type":"result","result":"Sin novedades.","is_error":false}'); fin(); return 0 }
+  // una revisión con algo urgente (avisa en el momento) o con notas para el reporte
+  if (m.includes('FAKE_URGENTE') && !m.includes('es la hora del reporte')) {
+    salida(JSON.stringify({ type: 'result', result: 'URGENTE: Mamá tiene turno mañana a las 8.\n## Para saber\n- **Mamá** · WhatsApp · 10:00 — Turno mañana a las 8.', is_error: false })); fin(); return 0
+  }
+  if (m.includes('es la hora del reporte') && m.includes('REPORTE_FALLA')) { salida('{"type":"result","result":"fallo raro","is_error":true}'); fin(); return 0 }
+  if (m.includes('es la hora del reporte')) {
+    salida(JSON.stringify({ type: 'result', result: 'Día tranquilo.\n## Para saber\n- **Mamá** · WhatsApp · 10:00 — Pidió turno.', is_error: false })); fin(); return 0
+  }
 
   // PERMISO: también en los turnos de reunión (va en el tema): se atiende abajo, como en el chat
   if (kind !== '' && !(kind === 'turno' && m.includes('PERMISO:'))) {

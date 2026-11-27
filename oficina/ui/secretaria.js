@@ -2,8 +2,9 @@
    configurada con los chats elegidos de WhatsApp y, si están conectados, Gmail y el calendario) y se configura todo acá:
    qué chats revisa (de la lista completa: elegir uno acá lo elige también en Ajustes › WhatsApp), cada cuánto, Gmail y
    Calendario (prenderlos le asigna el conector), la franja horaria y «Revisar ahora». En la ficha del agente queda un
-   resumen con «Configurar». Su memoria privada (bloque «Memoria») está en secretaria-memoria.js. API: GET/PUT
-   /api/secretaria, POST /api/secretaria/contratar y /revisar. */
+   resumen con «Configurar». Revisar y avisar van separados: cada fuente se revisa con su intervalo (sin dejar nada en la
+   bandeja, salvo lo urgente) y el reporte junta todo a las horas que elegís. Su memoria privada (bloque «Memoria») está en
+   secretaria-memoria.js. API: GET/PUT /api/secretaria, POST /api/secretaria/contratar, /revisar y /reportar. */
 (function () {
   var h = App.h;
   var api = function () { return App.api; };
@@ -34,7 +35,7 @@
       App.vaciar(caja);
       if (!datos.config || !datos.agente) dibujarContratar();
       else dibujarConfig(datos.config);
-      if (datos.corriendo) reloj = setTimeout(function () { if (vivo) cargar(); }, 3000);
+      if (datos.corriendo || datos.reporteCorriendo) reloj = setTimeout(function () { if (vivo) cargar(); }, 3000);
     }
     function fuente(id) { return (datos.fuentes || []).filter(function (f) { return f.id === id; })[0]; }
 
@@ -166,7 +167,10 @@
       /* Gmail y Calendario */
       (datos.fuentes || []).filter(function (f) { return f.tipo === 'conector'; }).forEach(function (f) { caja.appendChild(bloqueConector(cfg, f)); });
 
-      /* franja y reporte vacío */
+      /* el reporte: a qué horas junta todo */
+      caja.appendChild(bloqueReporte(cfg));
+
+      /* franja para revisar */
       var conFranja = h('input', { type: 'checkbox', checked: !!cfg.franja });
       var desde = h('input.campo', { type: 'time', value: (cfg.franja && cfg.franja.desde) || '08:00', style: { width: 'auto' }, disabled: !cfg.franja });
       var hasta = h('input.campo', { type: 'time', value: (cfg.franja && cfg.franja.hasta) || '22:00', style: { width: 'auto' }, disabled: !cfg.franja });
@@ -176,12 +180,9 @@
           conFranja.checked ? 'Revisa solo entre las ' + desde.value + ' y las ' + hasta.value + '.' : 'Revisa a cualquier hora.');
       };
       conFranja.addEventListener('change', cambiarFranja); desde.addEventListener('change', cambiarFranja); hasta.addEventListener('change', cambiarFranja);
-      var vacio = h('input', { type: 'checkbox', checked: cfg.reporteVacio });
-      vacio.addEventListener('change', function () { guardar({ reporteVacio: vacio.checked }); });
       caja.appendChild(h('div.ajuste', { style: { display: 'block' } },
-        h('label.ajuste-check', conFranja, h('span', 'Solo entre'), desde, h('span', 'y'), hasta),
-        h('div.ajuste-ayuda', { style: { margin: '2px 0 8px' } }, 'Lo que llegue fuera de ese horario lo revisa en la primera vuelta del día.'),
-        h('label.ajuste-check', vacio, h('span', 'Dejar el reporte en la bandeja aunque no haya novedades'))));
+        h('label.ajuste-check', conFranja, h('span', 'Revisar solo entre'), desde, h('span', 'y'), hasta),
+        h('div.ajuste-ayuda', { style: { margin: '2px 0 0' } }, 'Lo que llegue fuera de ese horario lo revisa en la primera vuelta del día. El reporte sale igual a sus horas.')));
 
       /* revisar ahora, últimas revisiones y cerrar */
       var err = h('div.error-txt');
@@ -192,15 +193,34 @@
           return cargar();
         }).catch(function (e) { err.textContent = e.message; ahora.disabled = false; });
       } }, datos.corriendo ? 'Revisando…' : 'Revisar ahora');
+      ahora.disabled = !!(datos.corriendo || datos.reporteCorriendo);
+      var verEntrega = function (id) { return id ? h('button.btn.chico.fantasma', { onclick: function () { if (App.Entregables && App.Entregables.abrir) App.Entregables.abrir(id); } }, 'Ver') : null; };
       var revs = (datos.revisiones || []).slice(0, 5).map(function (r) {
-        var txt = (ESTADO_REV[r.estado] || r.estado) + (r.estado === 'ok' ? (r.vacia ? ' · sin novedades' : ' · con reporte') : '') + (r.manual ? ' · a pedido' : '');
-        var ver = r.entrega ? h('button.btn.chico.fantasma', { onclick: function () { if (App.Entregables && App.Entregables.abrir) App.Entregables.abrir(r.entrega); } }, 'Ver') : null;
+        var nombres = { whatsapp: 'WhatsApp', gmail: 'Gmail', calendario: 'Calendario' };
+        var que = r.estado !== 'ok' ? '' : r.vacia ? ' · sin novedades' : r.urgente ? ' · avisó algo urgente' : r.reporte ? ' · ya en un reporte' : ' · para el próximo reporte';
+        var txt = (r.fuentes || []).map(function (f) { return nombres[f] || f; }).join(', ') + ' · ' + (ESTADO_REV[r.estado] || r.estado) + que + (r.manual ? ' · a pedido' : '');
         return h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0' } },
-          h('span.ajuste-ayuda', { style: { flex: 1 } }, App.hace(r.creada) + ' · ' + txt + (r.error ? ' (' + r.error + ')' : '')), ver);
+          h('span.ajuste-ayuda', { style: { flex: 1 } }, App.hace(r.creada) + ' · ' + txt + (r.error ? ' (' + r.error + ')' : '')), verEntrega(r.urgente ? r.entrega : null));
       });
+      var ESTADO_REP = { corriendo: 'Armándolo…', ok: 'Listo', fallida: 'Falló', incierta: 'Se cortó', salteado: 'Sin nada nuevo: no te dejó nada' };
+      var reps = (datos.reportes || []).slice(0, 4).map(function (r) {
+        var txt = (ESTADO_REP[r.estado] || r.estado) + (r.estado === 'ok' && r.vacio ? ' · sin novedades' : '') + (r.manual ? ' · a pedido' : '');
+        return h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0' } },
+          h('span.ajuste-ayuda', { style: { flex: 1 } }, App.hace(r.creada) + ' · ' + txt + (r.error ? ' (' + r.error + ')' : '')), verEntrega(r.estado === 'ok' && !r.vacio ? r.entrega : null));
+      });
+      var armar = h('button.btn', { disabled: datos.corriendo || datos.reporteCorriendo, title: 'Arma el reporte con lo que ya revisó, sin esperar al horario', onclick: function () {
+        armar.disabled = true; err.textContent = '';
+        api().post('/api/secretaria/reportar', {}).then(function (r) {
+          App.guardado(r.motivo || ag.nombre + ' está armando el reporte.');
+          return cargar();
+        }).catch(function (e) { err.textContent = e.message; armar.disabled = false; });
+      } }, datos.reporteCorriendo ? 'Armando el reporte…' : 'Armar el reporte ahora');
       caja.appendChild(h('div.ajuste', { style: { display: 'block' } },
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, ahora, h('span.ajuste-ayuda', { style: { flex: 1 } }, textoNovedades(estadoWa))),
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } }, ahora, armar, h('span.ajuste-ayuda', { style: { flex: 1 } }, textoNovedades(estadoWa))),
+        h('div.ajuste-ayuda', { style: { marginTop: '6px' } }, '«Revisar ahora» mira todo y enseguida te deja el reporte. ' +
+          (datos.sinReportar ? (datos.sinReportar === 1 ? 'Hay 1 revisión' : 'Hay ' + datos.sinReportar + ' revisiones') + ' esperando el próximo reporte.' : 'No hay nada esperando el próximo reporte.')),
         err,
+        reps.length ? h('div', { style: { marginTop: '8px' } }, h('div.ajuste-tit', { style: { fontSize: '12px' } }, 'Últimos reportes'), reps) : null,
         revs.length ? h('div', { style: { marginTop: '8px' } }, h('div.ajuste-tit', { style: { fontSize: '12px' } }, 'Últimas revisiones'), revs) : null));
       /* memoria privada de la secretaría (secretaria-memoria.js) */
       if (App.SecretariaMemoria) caja.appendChild(App.SecretariaMemoria.bloque(true));
@@ -215,6 +235,33 @@
       var conectores = (datos.fuentes || []).filter(function (f) { return f.tipo === 'conector' && f.activa && !f.problema; }).map(function (f) { return f.nombre; });
       var wa = estadoWa.activa ? (estadoWa.novedades ? 'Hay mensajes de WhatsApp sin revisar.' : 'Nada nuevo en WhatsApp.') : '';
       return (wa + (conectores.length ? ' ' + conectores.join(' y ') + (conectores.length > 1 ? ' se miran' : ' se mira') + ' siempre.' : '')).trim();
+    }
+
+    /* El reporte: a qué horas junta lo revisado (chips con las horas, agregar y sacar) y si lo deja aunque no haya nada */
+    function bloqueReporte(cfg) {
+      var horas = ((cfg.reporte && cfg.reporte.horas) || ['09:00', '19:00']).slice();
+      var guardarHoras = function (nuevas, texto) { return guardar({ reporte: { horas: nuevas } }, texto); };
+      var chips = horas.map(function (hm) {
+        return h('span.insignia', { style: { height: '28px', fontSize: '13px', gap: '6px', paddingRight: '4px' } }, hm,
+          horas.length > 1 ? h('button.btn.chico.fantasma.icono', { title: 'Sacar las ' + hm, style: { height: '20px', width: '20px', padding: 0 }, onclick: function () {
+            guardarHoras(horas.filter(function (x) { return x !== hm; }), 'Ya no te deja el reporte a las ' + hm + '.');
+          } }, App.icono('cerrar')) : null);
+      });
+      var nueva = h('input.campo', { type: 'time', value: '13:00', style: { width: 'auto' } });
+      var agregar = h('button.btn.chico', { disabled: horas.length >= 8, onclick: function () {
+        if (!nueva.value || horas.indexOf(nueva.value) >= 0) return;
+        guardarHoras(horas.concat([nueva.value]), 'También te deja el reporte a las ' + nueva.value + '.');
+      } }, App.icono('mas'), 'Agregar');
+      var vacio = h('input', { type: 'checkbox', checked: cfg.reporteVacio });
+      vacio.addEventListener('change', function () { guardar({ reporteVacio: vacio.checked }, vacio.checked ? 'Te deja el reporte aunque no haya novedades.' : 'Sin novedades, no te deja reporte.'); });
+      var prox = datos.proximoReporte ? new Date(datos.proximoReporte * 1000) : null;
+      var proxTxt = prox ? (prox.toDateString() === new Date().toDateString() ? 'hoy' : 'mañana') + ' a las ' + prox.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+      return h('div.ajuste', { style: { display: 'block' } },
+        h('div.ajuste-tit', 'Reporte'),
+        h('div.ajuste-ayuda', { style: { margin: '2px 0 8px' } }, 'Cada fuente se revisa con su intervalo, sin dejarte nada en la bandeja. A estas horas te deja un solo reporte con lo que juntó desde el anterior; si no hubo nada nuevo, no te deja nada. Lo urgente y lo que te propone hacer te llega enseguida.'),
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } }, chips, nueva, agregar),
+        proxTxt ? h('div.ajuste-ayuda', { style: { marginTop: '6px' } }, 'Próximo reporte: ' + proxTxt + '.') : null,
+        h('label.ajuste-check', { style: { marginTop: '8px' } }, vacio, h('span', 'Dejar el reporte aunque no haya novedades')));
     }
 
     /* Una fuente de conector: prenderla (le asigna el conector a quien atiende), cada cuánto y una indicación */
@@ -240,8 +287,8 @@
       valor.addEventListener('change', function () { guardarFuente('Revisa ' + f.nombre + ' cada ' + valor.value + ' ' + unidad.value + '.'); });
       unidad.addEventListener('change', function () { guardarFuente('Revisa ' + f.nombre + ' cada ' + valor.value + ' ' + unidad.value + '.'); });
       ind.addEventListener('change', function () { guardarFuente('Indicación guardada.'); });
-      var ayuda = f.id === 'gmail' ? 'Mira los mails que llegaron desde la revisión anterior y te cuenta lo que importa. Cada revisión de Gmail usa Claude aunque no haya mails nuevos: conviene cada varias horas.'
-        : 'Arma la agenda de hoy y las próximas 48 horas, te avisa lo nuevo y puede proponerte eventos.';
+      var ayuda = f.id === 'gmail' ? 'Mira los mails que llegaron desde la revisión anterior y anota lo que importa para el reporte. Cada revisión de Gmail usa Claude aunque no haya mails nuevos: conviene cada varias horas.'
+        : 'Arma la agenda de hoy y las próximas 48 horas para el reporte y puede proponerte eventos.';
       var nota = !f.disponible ? h('div.ajuste-ayuda', { style: { marginTop: '6px' } }, 'Conectá ' + f.nombre + ' en tu cuenta de claude.ai y actualizá la lista en Ajustes › Conectores.')
         : fc && f.problema ? h('div.ajuste-ayuda', { style: { color: 'var(--peligro)', marginTop: '6px' } }, f.problema) : null;
       return h('div.ajuste', { style: { display: 'block' } },

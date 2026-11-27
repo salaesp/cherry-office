@@ -589,7 +589,9 @@ export class MemoriaSecretaria {
 
   /** La sección de memoria de la consigna: temas abiertos, fichas de quienes aparecen en lo nuevo, lo anotado hoy, lo
    *  que hay que consolidar y las instrucciones. `material`: el texto de las fuentes de esta revisión. */
-  seccionConsigna(carpeta: string, material: string, p: { persona: string; puedeActuar: boolean }, hoy = new Date()): string[] {
+  /** La memoria en la consigna de una revisión. `modo` 'revision' (las revisiones silenciosas que dejan notas): el
+   *  seguimiento de los temas trabados no va acá sino en el reporte. Sin modo, como antes (revisión que deja reporte). */
+  seccionConsigna(carpeta: string, material: string, p: { persona: string; puedeActuar: boolean; modo?: 'revision' }, hoy = new Date()): string[] {
     const temas = this.temas(carpeta, { estado: 'abiertos' }, hoy)
     const fichas = this.fichasDe(carpeta, material)
     const x = this.leerDia(carpeta, diaLocal(hoy))
@@ -622,10 +624,12 @@ export class MemoriaSecretaria {
       p.puedeActuar
         ? '- Lo que tenga fecha no lo recordás vos: proponelo como evento del calendario con un recordatorio (proponer_accion), así avisa el calendario. Vos solo dejás el tema con su fecha.'
         : `- Lo que tenga fecha no lo recordás vos: contalo en «## Para hacer» como evento del calendario con recordatorio que ${p.persona} podría agendar, y dejá el tema con su fecha.`,
-      '- Seguimiento: repasá los temas abiertos. Los que quedaron trabados o sin respuesta (marcados abajo, o que lo nuevo muestra sin avance) van en el reporte en la sección «## Seguimiento», con qué se esperaba y desde cuándo. Si hay temas trabados, no respondas «Sin novedades»: dejá el reporte.',
+      p.modo === 'revision'
+        ? '- Si lo nuevo mueve un tema abierto (se resolvió, cambió la fecha, llegó una respuesta), actualizalo con memoria_tema. El seguimiento de los temas trabados no va en estas notas: lo hacés en el reporte. Si lo único que hay son temas trabados, respondé «Sin novedades».'
+        : '- Seguimiento: repasá los temas abiertos. Los que quedaron trabados o sin respuesta (marcados abajo, o que lo nuevo muestra sin avance) van en el reporte en la sección «## Seguimiento», con qué se esperaba y desde cuándo. Si hay temas trabados, no respondas «Sin novedades»: dejá el reporte.',
       '- Si algo de tu memoria le serviría a toda la oficina (no solo a vos), no lo compartas por tu cuenta: sugerilo con memoria_sugerir_compartir y ' + p.persona + ' decide.',
     )
-    if (trabados.length) {
+    if (trabados.length && p.modo !== 'revision') {
       partes.push('', 'Temas que parecen trabados (para la sección «Seguimiento»):')
       for (const t of trabados.slice(0, L.consignaTemas)) partes.push(`- ${limpiar(t.titulo)}: ${motivoTrabado(t, hoy)}`)
     }
@@ -634,6 +638,23 @@ export class MemoriaSecretaria {
       if (pend.dia) partes.push(`- Resumí el día ${pend.dia}: leelo con memoria_diario_leer {dia: "${pend.dia}"} y guardá un resumen de pocas líneas con memoria_dia_resumir.`)
       if (pend.semana) partes.push(`- Condensá la semana ${pend.semana.semana} (del ${pend.semana.desde} al ${pend.semana.hasta}, ${pend.semana.dias} días guardados, ya vieja): leela con memoria_diario_leer {desde: "${pend.semana.desde}", hasta: "${pend.semana.hasta}"} y guardá el resumen con memoria_semana_resumir {semana: "${pend.semana.semana}", resumen}. Eso borra los días de esa semana. Solo esa semana en esta revisión.`)
     }
+    return partes
+  }
+
+  /** La memoria en la consigna del reporte: los temas abiertos y cuáles parecen trabados, para «Seguimiento». */
+  seccionReporte(carpeta: string, hoy = new Date()): string[] {
+    const temas = this.temas(carpeta, { estado: 'abiertos' }, hoy)
+    const trabados = temas.filter((t) => t.trabado)
+    const partes: string[] = ['', '--- Tu memoria privada ---', '<memoria_secretaria>']
+    if (temas.length) {
+      partes.push(`Temas abiertos (${temas.length}${temas.length > L.consignaTemas ? `, van los ${L.consignaTemas} más recientes` : ''}):`)
+      for (const t of temas.slice(0, L.consignaTemas)) partes.push('- ' + limpiar(lineaTema(t, hoy)))
+    } else partes.push('No tenés temas abiertos.')
+    if (trabados.length) {
+      partes.push('', 'Temas que parecen trabados (para «Seguimiento», si siguen así):')
+      for (const t of trabados.slice(0, L.consignaTemas)) partes.push(`- ${limpiar(t.titulo)}: ${motivoTrabado(t, hoy)}`)
+    }
+    partes.push('</memoria_secretaria>')
     return partes
   }
 
