@@ -5,6 +5,7 @@
 // de reunión, pasos de flujo, acciones, coordinador, parte) y los «pedir cambios» de las entregas.
 import { randomUUID } from 'node:crypto'
 import { Adjuntos, type Adjunto } from './adjuntos.js'
+import { aplicarEleccion, eleccionCharla } from './agentes.js'
 import { ClaudeError } from './claude-runner.js'
 import { ErrorAPI } from './errores.js'
 import { ArchivosEntrega, iso, type Entrega } from './entregas.js'
@@ -23,7 +24,7 @@ import { registrarModulo, type Servicios } from './servicios.js'
 import { num, txt, type Fila, type SQLiteDB } from './sqlite.js'
 import { CajaArchivos, CajaCosto } from './stream.js'
 import {
-  Programacion, ValidarTareas, esUnica, fechaInicio, mensajeTarea, tareaJSON, zonaDelSistema, type OrigenTarea, type TareaProgramada,
+  Programacion, ValidarTareas, esUnica, type IATarea, fechaInicio, mensajeTarea, tareaJSON, zonaDelSistema, type OrigenTarea, type TareaProgramada,
 } from './tareas.js'
 import { Slug, Validar, largo, prefijo } from './validar.js'
 
@@ -619,6 +620,8 @@ export class Programador implements ProgramadorEntregas {
     const { store, runner, config, entregas } = this.s
     const ctx = contexto(act, def, { dirsExtra: config.oficinaDirsExtra, actuar, catalogo: this.s.catalogo?.(), config })
     ctx.anotarRechazos = true
+    // modelo, esfuerzo y ahorro propios de la tarea: pisan los del agente solo en esta corrida
+    if (t.ia) aplicarEleccion(ctx, t.ia)
     if (t.sistema) ctx.instrucciones = ctx.instrucciones ? `${ctx.instrucciones}\n\n${t.sistema}` : t.sistema
     for (const r of v.reglasExtra) if (!(ctx.reglas ?? []).includes(r)) ctx.reglas = [...(ctx.reglas ?? []), r]
     // MCP también fuera del chat: token con el perfil del agente, que vive lo que dura la corrida
@@ -904,6 +907,16 @@ export class TareasRouter implements SubRouter {
     return z
   }
 
+  /** «ia»: {modelo, esfuerzo, skills, memoria, colegas, mcpLocales} de las corridas de la tarea (como en una charla).
+   *  undefined = no vino (no cambia); null o {} = sin elección propia (los del agente). */
+  private static ia(v: unknown): IATarea | null | undefined {
+    if (v === undefined) return undefined
+    if (v === null) return null
+    if (!esObjeto(v)) throw new ErrorAPI(400, '«ia» tiene que ser un objeto con modelo, esfuerzo, skills, memoria, colegas o mcpLocales.')
+    const e = eleccionCharla(v)
+    return Object.keys(e).length > 0 ? e : null
+  }
+
   /** «tipo»: "repetida" | "unica" (undefined si no vino). Devuelve si es única. */
   private static tipo(v: unknown): boolean | undefined {
     if (v === undefined || v === null) return undefined
@@ -1000,6 +1013,7 @@ export class TareasRouter implements SubRouter {
     }
     const activa = TareasRouter.booleano(d.activa, 'activa') ?? true
     const origen = this.origen(d.origen)
+    const ia = TareasRouter.ia(d.ia)
     const pedidoId = Validar.texto(d.id, 'id', 41, false)
     if (pedidoId !== undefined && !Slug.valido(pedidoId)) throw new ErrorAPI(400, 'Id de tarea inválido (usá minúsculas, números y guiones).')
     const adjuntos = this.guardarAdjuntos(Adjuntos.leer(d.archivos), agente)
@@ -1015,6 +1029,7 @@ export class TareasRouter implements SubRouter {
       if (origen) t.origen = origen
       if (fecha !== undefined) t.fecha = fecha
       if (adjuntos.length > 0) t.archivos = adjuntos
+      if (ia) t.ia = ia
       ts.push(t)
       o.tareas = ts
       return t
@@ -1041,6 +1056,7 @@ export class TareasRouter implements SubRouter {
     const tipo = TareasRouter.tipo(d.tipo)
     if (d.fecha !== undefined && d.dias !== undefined) throw new ErrorAPI(400, 'Elegí días (si se repite) o una fecha (si es una sola vez), no las dos cosas.')
     const fecha = d.fecha === undefined ? undefined : TareasRouter.fecha(d.fecha)
+    const ia = TareasRouter.ia(d.ia)
     const quitar = TareasRouter.quitar(d.quitarArchivos)
     const nuevos = Adjuntos.leer(d.archivos)
     let adjuntos: string[] = []
@@ -1064,6 +1080,8 @@ export class TareasRouter implements SubRouter {
       }
       if (nombre !== undefined) t.nombre = nombre
       if (consigna !== undefined) t.consigna = consigna
+      if (ia === null) delete t.ia
+      else if (ia !== undefined) t.ia = ia
       // pasar de un tipo al otro
       const unica = tipo ?? (fecha !== undefined ? true : dias !== undefined ? false : esUnica(t))
       if (unica && !esUnica(t)) {

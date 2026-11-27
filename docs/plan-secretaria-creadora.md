@@ -55,9 +55,9 @@ persona, puede:
 - **proponer tareas programadas** (`proponer_tarea`, con `ver_oficina`, `marcar_faltante` y `descartar_tarjeta`): para sí o
   para un colega, como tarjeta del Creador que la persona aprueba. Lo decide `CambiosCharla.nombres` (`permisos.ts`): la
   secretaría tiene todas las del Creador; los demás, esas cuatro;
-- **arrancar un flujo** de la oficina (`arrancar_flujo`, en `delegar.ts`): una tarjeta de tipo `flujo` en la charla, con las
-  reglas de `delegar` (explícito → arranca después de la ventana para deshacer; deducido → propuesta que la persona
-  confirma), hasta 2 por mensaje. Los flujos activos van en sus instrucciones con su primer paso.
+- **arrancar un flujo** de la oficina (`arrancar_flujo`): lo hizo en paralelo `charla-flujos.ts` (`plan-recados.md`, R1b),
+  para todos los agentes en su charla, con datos obligatorios, «cuando», seguimiento de la corrida y aprobar pasos desde la
+  charla. Este plan no le agrega nada.
 
 Cambiar la estructura (contratar, departamentos, reglas, conectores, flujos nuevos) sigue siendo solo de la secretaría y el
 Creador. Desde una charla solo se tocan las tarjetas de esa charla (ref, `marcar_faltante`, `descartar_tarjeta`).
@@ -106,9 +106,7 @@ Tarjetas en la charla, «Te esperan» y la marca en la pantalla del Creador.
 `HerramientasCambiosCharla` filtra las herramientas del Creador según `CambiosCharla.nombres` y limita lo que toca tarjetas
 existentes a las de la charla. Instrucciones «## Tareas programadas» para los que no atienden la secretaría.
 
-### S5: arrancar un flujo desde la charla (hecho)
-`arrancar_flujo` en `delegar.ts` (tarjeta `flujo`: propuesta | esperando | arrancado | fallida | cancelada), con
-`MotorFlujos.iniciar`. En la interfaz, tarjeta con «Arrancarlo», «Deshacer», «Arrancar ya» y «Ver el flujo».
+### S5: arrancar un flujo desde la charla (hecho en `charla-flujos.ts`, ver `plan-recados.md` R1b)
 
 ## Pruebas
 - Con la secretaría: en una charla, `proponer_agente` y `proponer_tarea` crean tarjetas con el `sid` de la charla; aparecen
@@ -119,7 +117,6 @@ existentes a las de la charla. Instrucciones «## Tareas programadas» para los 
 - Otro agente (no atiende la secretaría) no las tiene ni en la charla.
 - Las instrucciones: «Armar la oficina» para la secretaría y «Tareas programadas» para los demás.
 - Otro agente propone una tarea en su charla; no puede contratar; desde otra charla no toca tarjetas ajenas.
-- `arrancar_flujo`: explícito arranca la corrida después de la ventana (y se puede deshacer antes); deducido queda como
-  propuesta y cuenta en lo que espera; errores de flujo inexistente, pausado, sin `explicito` y más de 2 por mensaje.
+- `arrancar_flujo`: en `test/unit/charla-flujos.test.ts`.
 - `--allowedTools` de la secretaría incluye los nombres del Creador; los de otro agente, no.
 - El borrador del Creador marca `deCharla` en las tarjetas que vinieron de una charla.

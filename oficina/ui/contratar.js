@@ -92,11 +92,11 @@
 
   /* Selector de una charla (como en Claude): un botón chico que abre un panel con modelo (chips), esfuerzo y ahorro
      (deslizadores) y, plegado, cada opción de consumo. Pisa lo del agente y lo de Ajustes solo en esa charla.
-     op: {modelo, esfuerzo (los del agente), valor (lo elegido antes), soloModelo (sin opciones: el Creador), alCambiar(v)}.
+     op: {modelo, esfuerzo (los del agente), valor (lo elegido antes), soloModelo (sin opciones: el Creador), titulo (del botón), alCambiar(v)}.
      .valor() devuelve solo lo que difiere de lo de por defecto. */
   App.SelectorCharla = function (op) {
     var v = Object.assign({}, op.valor || {});
-    var b = h('button.btn.chico.fantasma.selector-charla', { type: 'button', title: 'Modelo, esfuerzo y ahorro de esta charla' });
+    var b = h('button.btn.chico.fantasma.selector-charla', { type: 'button', title: op.titulo || 'Modelo, esfuerzo y ahorro de esta charla' });
     function defecto() {
       var ia = App.iaApp();
       return { modelo: op.modelo || 'sonnet', esfuerzo: op.esfuerzo || ia.esfuerzo || '', skills: ia.skills, memoria: ia.memoria, colegas: ia.colegas, mcpLocales: ia.mcpLocales };

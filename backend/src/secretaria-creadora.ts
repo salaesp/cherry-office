@@ -123,16 +123,9 @@ export function herramientasCambiosCharla(s: Servicios, token: string, identidad
 
 export function instalar(s: Servicios) {
   mcpDe(s)?.registrarHerramientas(herramientasCambiosCharla)
-  // sus instrucciones van con las de la charla (delegar.ts arma la base)
-  const previo = s.charla
-  s.charla = () => {
-    const g = previo?.()
-    if (!g) return g
-    return {
-      ...g,
-      instrucciones: (o, a) => [g.instrucciones(o, a), instruccionesCreadora(o, a)].filter((x): x is string => !!x).join('\n\n') || undefined,
-    }
-  }
+  // sus instrucciones van con las de la charla (delegar.ts arma la base y suma las piezas de otros módulos)
+  const d = s.huecos.delegaciones as Delegaciones | undefined
+  d?.extras.push((o, a) => instruccionesCreadora(o, a))
 }
 
 registrarModulo('secretaria-creadora', 80, instalar)

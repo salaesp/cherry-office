@@ -1,15 +1,15 @@
 /* Tarjetas de lo que hizo un agente en una charla (tarjetas.js): delegación, pregunta y propuesta de acción, en la charla y
    en Bandeja › Hoy. Y la grabación de audio (grabadora.js) y el micrófono flotante de la secretaría (microfono.js). */
-:root { --tj-deleg: #a46a12; --tj-deleg-suave: #fbf2e2; --tj-cal: #2f6db5; --tj-cal-suave: #e8f0fa; --tj-crea: #2d7f86; --tj-flujo: #6b4fb3; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; --tj-crea: #6cc3ca; --tj-flujo: #b8a2f0; } }
-:root[data-theme="dark"] { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; --tj-crea: #6cc3ca; --tj-flujo: #b8a2f0; }
+:root { --tj-deleg: #a46a12; --tj-deleg-suave: #fbf2e2; --tj-cal: #2f6db5; --tj-cal-suave: #e8f0fa; --tj-flujo: #3d8a5a; --tj-crea: #2d7f86; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; --tj-flujo: #7cc79a; --tj-crea: #6cc3ca; } }
+:root[data-theme="dark"] { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; --tj-flujo: #7cc79a; --tj-crea: #6cc3ca; }
 
 .tj { background: var(--panel); border: 1px solid var(--linea); border-left: 3px solid var(--tj-tinta, var(--linea-fuerte)); border-radius: var(--radio); overflow: hidden; }
 .tj.deleg { --tj-tinta: var(--tj-deleg); --tj-tinta-suave: var(--tj-deleg-suave); }
 .tj.accion { --tj-tinta: var(--tj-cal); --tj-tinta-suave: var(--tj-cal-suave); }
 .tj.preg { --tj-tinta: var(--acento); }
-.tj.cambio { --tj-tinta: var(--tj-crea); }
 .tj.flujo { --tj-tinta: var(--tj-flujo); }
+.tj.cambio { --tj-tinta: var(--tj-crea); }
 .tj.apagada { opacity: .62; }
 .tj-cab { display: flex; align-items: center; gap: 6px; padding: 9px 12px 0; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--tj-tinta, var(--suave)); }
 .tj-cab svg { width: 14px; height: 14px; }
@@ -48,6 +48,16 @@
 .chat > .tj { align-self: stretch; }
 .tj-ver { margin-right: auto; font: inherit; font-size: 12px; color: var(--suave); text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; padding: 0; cursor: pointer; }
 .parte-sec .tj + .tj { margin-top: 8px; }
+/* flujo: los pasos con el actual marcado */
+.tj-pasos { display: flex; flex-wrap: wrap; gap: 4px; }
+.tj-paso { font-size: 11.5px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--linea); color: var(--suave); }
+.tj-paso.hecho { color: var(--texto); background: var(--panel-2); }
+.tj-paso.actual { color: var(--tj-tinta); border-color: var(--tj-tinta); font-weight: 600; }
+/* lo compartido de WhatsApp, con candado */
+.tj-compartido summary { cursor: pointer; font-size: 12px; color: var(--suave); display: flex; align-items: center; gap: 5px; }
+.tj-compartido summary svg { width: 13px; height: 13px; }
+.tj-cita { margin-top: 5px; font-size: 13px; background: var(--panel-2); border-radius: var(--radio-chico); padding: 6px 9px; overflow-wrap: anywhere; }
+.tj-cita small { display: block; color: var(--suave); font-size: 11.5px; }
 
 /* mensaje que salió de un audio */
 .voz-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; opacity: .75; margin-bottom: 3px; }
