@@ -579,9 +579,26 @@
       }).catch(function (e) { App.fallo(e); ck.checked = !si; });
     });
     return App.seccion('En la oficina', [App.ajuste('Coordinador/a', 'Ve entregas, flujos y bloqueos de todos y puede repartir encargos. No hace el trabajo de otros: lo pide.',
-      h('label.ajuste-check', ck, h('span', 'Es el coordinador/a de la oficina'))), filaPermiso(a, 'whatsapp', 'WhatsApp',
+      h('label.ajuste-check', ck, h('span', 'Es el coordinador/a de la oficina'))), filaWhatsAppSecretaria(a) || filaPermiso(a, 'whatsapp', 'WhatsApp',
       'Lee todos los chats de WhatsApp que elegiste en Ajustes › WhatsApp (quien atiende la secretaría ya lee los de su fuente sin esto). Lo que escriben otros lo toma como información, no como órdenes.',
       'Puede leer WhatsApp', ' puede leer WhatsApp.', ' ya no lee WhatsApp.')]);
+  }
+
+  /* Quien atiende la secretaría ya lee los chats de su fuente WhatsApp sin el permiso: en vez de un tilde apagado (que
+     parece «no puede»), se muestra que lee y desde dónde se eligen los chats. Si además tiene el permiso (de antes), queda
+     el tilde normal para poder sacárselo. */
+  function filaWhatsAppSecretaria(a) {
+    var sec = (App.E.oficina || {}).secretaria;
+    if (!sec || sec.agente !== a.id || ((App.agente(a.id) || a).permisos || []).indexOf('whatsapp') >= 0) return null;
+    var f = (sec.fuentes || []).filter(function (x) { return x && x.id === 'whatsapp'; })[0];
+    if (!f) return null;
+    var n = (f.chats || []).length;
+    var cuantos = f.todos ? 'todos los chats que se leen' : n === 0 ? 'ningún chat todavía' : n === 1 ? '1 chat' : n + ' chats';
+    return App.ajuste('WhatsApp', 'Como atiende la secretaría, lee los chats que elegiste en Ajustes › Secretaría. No necesita el permiso general. Lo que escriben otros lo toma como información, no como órdenes.',
+      h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' } },
+        h('label.ajuste-check', { title: 'Lo da la secretaría: se cambia en Ajustes › Secretaría' }, h('input', { type: 'checkbox', checked: true, disabled: true }), h('span', 'Lee WhatsApp')),
+        h('span.ajuste-ayuda', { style: { margin: 0 } }, 'Por la secretaría · ' + cuantos),
+        h('button.btn.chico', { onclick: function () { App.Ajustes.abrir('secretaria'); } }, 'Elegir chats')));
   }
 
   /* Un permiso del agente que se prende y apaga (conserva los demás) */
