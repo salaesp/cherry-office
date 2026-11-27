@@ -52,3 +52,14 @@ test('resumir: interacción por tipo, frecuencia sin fijadas, hashtags sin disti
   assert.deepEqual(r.hashtags[0], { h: '#cafe', n: 2 })
   assert.equal(r.mejor.url, 'https://www.instagram.com/p/AAA/')
 })
+
+test('leerPagina saca la descripción y cuenta publicaciones embebidas', async () => {
+  const { leerPagina } = await import('./variantes.mjs')
+  const html = '<meta property="og:description" content="283M seguidores, 160 seguidos, 30K publicaciones - Ver fotos y videos de National Geographic (&#064;natgeo)" />'
+    + '<script>{"code":"DAbcdEFgh12","x":1}{"shortcode":"CXyz_123-ab"}{"code":"DAbcdEFgh12"}</script>'
+  const p = leerPagina(html)
+  assert.match(p.descripcion, /283M seguidores.*\(@natgeo\)/)
+  assert.equal(p.publicacionesEnLaPagina, 2)
+  assert.equal(p.pideLogin, false)
+  assert.equal(leerPagina('<a href="/accounts/login/">Entrar</a>').pideLogin, true)
+})

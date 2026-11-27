@@ -47,6 +47,38 @@ Para borrar lo descargado:
 npm run borrar
 ```
 
+## Si da `bloqueo` o `login` desde el primer pedido: diagnóstico
+Un 429 instantáneo en el primer pedido no es por cantidad: Instagram rechaza la *forma* del pedido (headers, o que no
+se conecta como un navegador). El diagnóstico prueba cuatro formas de pedir lo mismo, una vez cada una con 6 s de pausa:
+
+| Variante | Qué hace |
+|---|---|
+| `pagina` | Pide el HTML del perfil como si lo abrieras en el navegador; saca la descripción (seguidores, seguidos, publicaciones) y cuenta las publicaciones que vengan embebidas |
+| `api-i` | Lo mismo que `npm start` |
+| `api-www` | La API desde `www.instagram.com` con todos los headers que manda la web |
+| `api-www-cookies` | Abre la portada para recibir las cookies **anónimas** que Instagram le da a cualquiera (`csrftoken`, `mid`, `ig_did`) y pide como la web. Nunca usa las de una sesión iniciada |
+
+Con Node:
+
+```bash
+npm run diagnostico -- natgeo
+```
+
+Con Electron, que manda los pedidos por la red de Chromium y se conecta como Chrome (es lo que usaría la app). Usa el
+Electron de `desktop/`, así que la primera vez hay que instalarlo:
+
+```bash
+npm ci --prefix ../../desktop
+```
+
+```bash
+npm run diagnostico:electron -- natgeo
+```
+
+Se puede correr una sola variante nombrándola: `npm run diagnostico -- natgeo pagina`. Lo que devolvió cada una queda en
+`datos/diagnostico/` y un renglón por variante en `datos/diagnostico.jsonl`. Si recién te bloquearon, esperá una hora
+antes de diagnosticar: si no, todo va a dar 429 por el bloqueo anterior.
+
 ## Qué deja en `datos/`
 | Archivo | Qué tiene |
 |---|---|
@@ -80,7 +112,12 @@ se pudo conectar) o `raro` (otra cosa: mirá el `.txt`).
   privada, no existe, pedido de login, bloqueo, redirección) y pasar a este formato reels, carruseles, fotos fijadas y
   likes ocultos. La respuesta de prueba (`fixtures/perfil.json`) está armada a mano con la forma conocida de la de
   Instagram: **falta confirmarla contra una respuesta real**.
-- No se hizo ningún pedido real a Instagram desde el contenedor.
+- No se hizo ningún pedido real a Instagram desde el contenedor, y `diagnostico-electron.mjs` no se llegó a correr
+  (no se pudo bajar el binario de Electron ahí).
+
+## Resultados en una compu
+- **Linux, Node, primera lectura de `natgeo`:** `bloqueo` (429) en 109 ms. Fue el primer pedido, así que
+  Instagram rechazó la forma del pedido, no la cantidad. Siguiente paso: el diagnóstico.
 
 ## Qué hay que verificar (y anotar en el informe de abajo)
 1. **¿Anda?** `npm start -- <una cuenta pública que conozcas>`: ¿da `ok`? Si da otra cosa, mirá el `.txt`.
