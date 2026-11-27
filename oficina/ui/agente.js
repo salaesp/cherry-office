@@ -468,6 +468,12 @@
     function ajustarAlto() { txt.style.height = 'auto'; txt.style.height = Math.min(160, txt.scrollHeight + 2) + 'px'; }
     txt.addEventListener('input', function () { borradores[a.id] = txt.value; ajustarAlto(); });
     if (borradores[a.id]) { txt.value = borradores[a.id]; setTimeout(ajustarAlto, 0); }
+    /* lo que se compartió desde otra app del celular (compartir.js): queda listo para revisar y mandar */
+    if (compartido && compartido.id === a.id) {
+      var comp = compartido; compartido = null;
+      if (comp.archivos && comp.archivos.length) adj.agregar(comp.archivos);
+      if (comp.texto) { txt.value = comp.texto; borradores[a.id] = comp.texto; setTimeout(ajustarAlto, 0); }
+    }
     var claveEleccion = function () { return sesiones[a.id] || 'nueva:' + a.id; };
     var selector = App.SelectorCharla({ modelo: a.modelo, esfuerzo: a.esfuerzo, valor: eleccionDe(claveEleccion()),
       alCambiar: function (v) { guardarEleccion(claveEleccion(), v); } });
@@ -1144,6 +1150,14 @@
     App.add(pie, App.acciones(null, h('button.btn.primario.solo-compu', { onclick: function () { hojaTarea(a, null, cargar); } }, 'Nueva tarea')));
   }
 
+  /* compartir desde otra app (compartir.js): charla nueva con los archivos y el texto ya puestos, sin mandar */
+  var compartido = null;
+  function compartir(id, c) {
+    if (!App.agente(id)) return;
+    compartido = { id: id, texto: c.texto || '', archivos: c.archivos || [] };
+    nueva(id);
+  }
+
   /* charla nueva con el agente: sesión nueva y vacía (la anterior queda en la lista de charlas) */
   function nueva(id) {
     if (!App.agente(id)) return;
@@ -1350,7 +1364,7 @@
       var a = App.agente(id); if (!a) return;
       actual = id; sesionFija = sid; pestana = 'chat'; App.Oficina.elegir(id); App.abrirDerecho('agente'); abrirSesion(a, sid); App.marcarEstados();
     },
-    nueva: nueva, enviarEn: enviarEn, hablarNueva: hablarNueva,
+    nueva: nueva, compartir: compartir, enviarEn: enviarEn, hablarNueva: hablarNueva,
     ocupado: function (id) { return !!enCurso[id]; },
     sesion: function (id) { return sesiones[id] || null; },
     sesionFija: function () { return sesionFija; },

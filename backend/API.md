@@ -574,3 +574,23 @@ Para no escribir rutas a mano. Código: `backend/src/explorador.ts` (`Explorador
 **Front.** `App.elegirCarpeta(titulo, {oficinas?, crear?}) → Promise<ruta|null>` (`oficina/ui/carpetas.js`): en la app nativa manda `{accion:'elegirCarpeta', titulo, inicio, crear}` al handler `hq` y abre el diálogo del sistema (`desktop/src/main.ts`); en el navegador abre un explorador propio sobre `/api/fs/carpetas` (accesos rápidos, «Nueva carpeta» con `crear`, insignia y prioridad para carpetas de oficina con `oficinas`). Se usa en «Abrir una oficina existente», «Crear mi oficina» («Cambiar…») y «Vincular carpeta». Sin Finder (navegador), «Ver archivos de la oficina» usa `/api/oficina/archivos` y `/api/oficina/archivo`.
 
 **Handler nativo con respuesta.** `AppDelegate` registra `hq` con `addScriptMessageHandler(_:contentWorld:name:)` (`WKScriptMessageHandlerWithReply`, macOS 11+): `postMessage` devuelve una Promise. Las acciones existentes (`abrir`, `revelar`, `acerca`, `open`, `login`, `spike`) siguen igual y contestan `nil`; `elegirCarpeta` contesta la ruta o `null` si se cancela (solo desde páginas `hq://`). El diálogo no se puede automatizar sin clicarlo: probarlo a mano (Crear/Abrir oficina → «Buscar…»).
+
+## Avisos push al celular
+La oficina instalada en el celular (docs/plan-celular.md, fase 3) recibe avisos con el teléfono bloqueado. `backend/src/push.ts`
+cifra cada aviso para la suscripción del navegador (Web Push, RFC 8291 `aes128gcm`) y lo firma con las claves VAPID de esta
+instalación (RFC 8292), que se crean la primera vez en la carpeta de datos (`push.json`; las suscripciones en
+`push-suscripciones.json`). Con alguna suscripción, mira `GET /api/actividad` cada 8 s y manda solo lo nuevo: permisos (con
+`permiso` para contestarlo desde el aviso), preguntas y propuestas que te esperan, «te toca en un flujo», reuniones, entregas
+para revisar, respuestas, errores y tareas terminadas. Las esperas entre agentes no se avisan. Más de 3 juntos van en uno solo.
+Un 404/410 del servicio de push borra la suscripción. `HQ_PUSH_SUJETO` cambia el `sub` del JWT.
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| GET | `/api/push` | | `{clave, suscripciones:[{endpoint, nombre, creada, silencio?:{desde,hasta}}]}`; `clave` es la pública VAPID (base64url) para `pushManager.subscribe` |
+| POST | `/api/push/suscribir` | `{suscripcion: PushSubscription.toJSON(), nombre?}` | `{ok}`. 400 si el endpoint no es https o las claves no son válidas |
+| POST | `/api/push/desuscribir` | `{endpoint}` | `{ok}` |
+| POST | `/api/push/probar` | `{endpoint}` | `{ok}`; manda un aviso de prueba. 404 si no está anotado, 502 si el servicio de push no lo aceptó |
+| PUT | `/api/push/silencio` | `{endpoint, desde:"HH:MM", hasta:"HH:MM"}` o `{endpoint, desde:null}` | `{ok}`; horario de no molestar (puede cruzar la medianoche) |
+
+El aviso que recibe el service worker (`oficina/sw.js`) es JSON: `{titulo, texto, url, tag, permiso?, acciones?}`. Con `acciones`
+muestra «Permitir» / «No», que contestan `POST /api/permisos/<permiso>` sin abrir la app.

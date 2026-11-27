@@ -66,7 +66,7 @@ Chico y sin riesgo; con esto ya aparece «Instalar app» / «Agregar a inicio».
 6. **Pruebas**: un test del servidor que pida los tres estáticos con su tipo, y un chequeo con Playwright emulando un
    teléfono (que el manifest cargue y el service worker se registre).
 
-### Fase 2 — Modo reducido
+### Fase 2 — Modo reducido · hecha
 La idea es **la misma app con una bandera**, no una app aparte: así se reusa todo (charlas, tarjetas, revisar, permisos)
 y no hay dos versiones que mantener. Si después pesa demasiado, se puede separar un `movil.html` que cargue menos
 scripts (ver «Alternativa» abajo).
@@ -89,7 +89,7 @@ scripts (ver «Alternativa» abajo).
 7. **Batería**: el sondeo de `/api/actividad` (1 s si alguien trabaja, 4 s si no) se **frena con la app en segundo
    plano** (`visibilitychange`) y al volver pide una vez enseguida. Sirve también en la compu.
 
-### Fase 3 — Notificaciones push
+### Fase 3 — Notificaciones push · hecha
 Es lo que más cambia el uso del celular. En Android anda en Chrome; en iPhone, desde iOS 16.4 y **solo con la app
 instalada** en la pantalla de inicio.
 
@@ -106,7 +106,7 @@ instalada** en la pantalla de inicio.
 6. El servidor necesita salida a internet hacia el servicio de push (FCM / Apple); con Tailscale no hay que abrir nada
    de entrada.
 
-### Fase 4 — Compartir hacia la Oficina
+### Fase 4 — Compartir hacia la Oficina · hecha
 1. En el manifest, `share_target` con `POST` y `multipart/form-data` (archivos, título, texto, link).
 2. El **service worker** intercepta ese POST, lee el `FormData`, guarda los archivos en IndexedDB y abre
    `#/compartir`. Así el servidor no necesita aceptar multipart y sigue con sus escrituras en JSON.
@@ -117,6 +117,20 @@ instalada** en la pantalla de inicio.
 ### Fase 5 (opcional) — Leer sin señal
 Guardar en IndexedDB el último Parte del día y las últimas charlas abiertas para leerlas sin conexión, con un aviso de
 «visto a las 14:32». Solo si se nota la falta.
+
+### Cómo quedó (fases 2 a 4)
+- **Modo celular** (`oficina/ui/movil.js`): se prende con `?movil=1` (el `start_url`), con la app instalada o en una pantalla
+  táctil angosta; `?movil=0` lo apaga. Pone `<html class="modo-movil">` y cambia `App.Oficina` por un reemplazo que no hace
+  nada (la oficina pixel no se arma). `nav.js` arma Bandeja · Charlas · Trabajo · Más y manda a la Bandeja las rutas de la
+  compu (oficina, contratar, departamentos, Creador, nueva reunión, ficha del agente, editor de flujos). Lo que es de la compu
+  lleva `.solo-compu` (o `App.movil` en el código, en flujos y en la lista de Equipo). El sondeo de `/api/actividad` se frena
+  con la app en segundo plano (también en la compu).
+- **Avisos** (`backend/src/push.ts`, `oficina/ui/push.js`, `oficina/sw.js`): ver [backend/API.md](../backend/API.md#avisos-push-al-celular).
+  En Bandeja › Hoy, una tarjeta ofrece prender los avisos (o, en iPhone sin instalar, cómo instalarla); en «Más», «Avisos en
+  este teléfono» con prueba y horario de no molestar.
+- **Compartir** (`oficina/sw.js`, `oficina/ui/compartir.js`): el `share_target` del manifest llega como `POST /compartir`,
+  el service worker lo guarda en IndexedDB y abre `#/compartir`: «Mandárselo a…» abre una charla nueva con los archivos y
+  el texto puestos (`App.Agente.compartir`), y «Guardar en la biblioteca» sube lo que la biblioteca lee.
 
 ## 3. Cosas a tener en cuenta
 - **Seguridad**: la puerta es Tailscale (el servidor escucha en 127.0.0.1 y acepta solo los nombres de

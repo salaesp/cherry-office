@@ -1399,3 +1399,13 @@ textarea.campo.skill-contenido { font-family: ui-monospace, SFMono-Regular, Menl
 .push-instalar p { color: var(--suave); margin: 2px 0 6px; }
 .push-instalar ol { margin: 0; padding-left: 18px; color: var(--suave); }
 .push-instalar li { margin-bottom: 3px; }
+/* compartir hacia la oficina (ui/compartir.js) */
+.comp-vista { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.comp-vista .adjunto { display: flex; align-items: center; gap: 8px; }
+.comp-vista .adjunto img { width: 44px; height: 44px; object-fit: cover; border-radius: var(--radio-chico); }
+.comp-vista .adjunto small { margin-left: auto; color: var(--tenue); }
+.comp-personas { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.comp-persona { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 6px; border-radius: var(--radio); border: 1px solid var(--linea); background: var(--panel); cursor: pointer; font: inherit; color: inherit; text-align: center; }
+.comp-persona:hover { border-color: var(--linea-fuerte); }
+.comp-persona .retrato { width: 40px; height: 40px; border-radius: 10px; }
+.comp-persona small { font-size: 11px; color: var(--suave); line-height: 1.2; }

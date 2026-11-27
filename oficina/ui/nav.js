@@ -196,6 +196,12 @@ App.Nav = (function () {
     var r = leer(), m = App.modoDerecho();
     aplicando = true;
     try {
+      /* #/compartir: lo que llegó desde «Compartir» de otra app (sw.js); se elige qué hacer en una hoja, sobre la Bandeja */
+      var comp = /^#\/compartir(\/error)?/.exec(location.hash);
+      if (comp) {
+        empujar('#/bandeja/hoy', true); r = leer();
+        setTimeout(function () { if (App.Compartir) App.Compartir.abrir(!!comp[1]); }, 0);
+      }
       /* modo celular: sin oficina ni pantallas de la compu; la Bandeja abre directo en Hoy (que junta todo lo que espera) */
       if (App.movil && deLaCompu(r)) { empujar('#/bandeja/hoy', true); r = leer(); }
       if (App.movil && r.sec === 'bandeja' && !r.a) { empujar('#/bandeja/hoy', true); r = leer(); }

@@ -32,8 +32,37 @@ var SIN_RED = '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta 
   '<p>Fijate que Tailscale esté prendido en este teléfono y que la compu de la oficina esté prendida, despierta y con la app abierta.</p>' +
   '<button onclick="location.reload()">Reintentar</button></div></body></html>';
 
+/* ---------------- compartir hacia la Oficina (fase 4) ----------------
+   El manifest declara un share_target: lo que se comparte desde otra app llega como POST /compartir (multipart). Acá se
+   guarda en IndexedDB y se abre la app en #/compartir, donde se elige qué hacer (ui/compartir.js). El servidor no lo ve. */
+function idb() {
+  return new Promise(function (res, rej) {
+    var r = indexedDB.open('oficina', 1);
+    r.onupgradeneeded = function () { if (!r.result.objectStoreNames.contains('compartido')) r.result.createObjectStore('compartido', { keyPath: 'id' }); };
+    r.onsuccess = function () { res(r.result); };
+    r.onerror = function () { rej(r.error); };
+  });
+}
+function recibirCompartido(req) {
+  return req.formData().then(function (fd) {
+    var archivos = fd.getAll('archivos').filter(function (f) { return f && typeof f === 'object' && f.size > 0; }).slice(0, 10).map(function (f) {
+      return { nombre: f.name || 'archivo', tipo: f.type || '', datos: f };
+    });
+    var item = { id: 'ultimo', ts: Date.now(), titulo: String(fd.get('titulo') || ''), texto: String(fd.get('texto') || ''), url: String(fd.get('url') || ''), archivos: archivos };
+    return idb().then(function (db) {
+      return new Promise(function (res, rej) {
+        var tx = db.transaction('compartido', 'readwrite');
+        tx.objectStore('compartido').put(item);
+        tx.oncomplete = res; tx.onerror = function () { rej(tx.error); };
+      });
+    });
+  }).then(function () { return Response.redirect('/?movil=1#/compartir', 303); },
+    function () { return Response.redirect('/?movil=1#/compartir/error', 303); });
+}
+
 self.addEventListener('fetch', function (ev) {
   var req = ev.request;
+  if (req.method === 'POST' && new URL(req.url).pathname === '/compartir') { ev.respondWith(recibirCompartido(req)); return; }
   if (req.method !== 'GET') return;
   var url = new URL(req.url);
   if (url.pathname.indexOf('/api/') === 0 || !deLaInterfaz(url)) return;

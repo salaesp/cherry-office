@@ -93,7 +93,8 @@ aceptar además de localhost; sin eso rechaza los pedidos que llegan por otro no
 
 **Desde el celular con la app de escritorio:** Ajustes › **Celular** hace lo mismo sin terminal. Con Tailscale instalado en
 la compu y en el celular (misma cuenta), la app levanta el servidor local, lo publica con `tailscale serve` y muestra un QR.
-Desde el navegador del celular se instala como app (manifest y service worker en `oficina/`). La compu tiene que estar
+Desde el navegador del celular se instala como app (manifest y service worker en `oficina/`): en el celular
+queda una versión reducida (Bandeja, Charlas, Trabajo), con avisos push y, en Android, «Compartir › Oficina» desde otras apps. La compu tiene que estar
 prendida y con Oficina abierta; mientras el acceso está prendido, no se suspende. Plan completo: [docs/plan-celular.md](docs/plan-celular.md).
 
 Tests (con un `claude` falso, sin tocar tus datos ni tu cuenta):
