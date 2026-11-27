@@ -214,13 +214,21 @@ export const MemoriaSecretariaAgente = {
   herramientasMCP: (o: Oficina, a: AgenteDef) => (MemoriaSecretariaAgente.atiende(o, a) ? MemoriaSecretariaAgente.nombresMCP.map((n) => 'mcp__hq__' + n) : []),
 }
 
+/** El seguimiento de cada agente (seguimiento.ts): temas que sigue y fichas de personas y cosas, en
+ *  `conocimiento/agentes/<id>/`. Todo agente menos quien atiende la secretaría (lo suyo va a su memoria privada). */
+export const Seguimiento = {
+  nombresMCP: ['seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer'],
+  tiene: (o: Oficina, a: AgenteDef) => !MemoriaSecretariaAgente.atiende(o, a),
+  herramientasMCP: (o: Oficina, a: AgenteDef) => (Seguimiento.tiene(o, a) ? Seguimiento.nombresMCP.map((n) => 'mcp__hq__' + n) : []),
+}
+
 /** Para sugerir una skill propia (rutas-skills.ts): la tienen todos los agentes. */
 export const herramientaProponerSkill = 'mcp__hq__proponer_skill'
 
 export const HerramientasMCPAgente = {
   lista(o: Oficina, a: AgenteDef): string[] {
     const out: string[] = []
-    for (const h of [...herramientasMCP, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, a), ...Acciones.herramientasMCP(o, a), ...WhatsAppAgente.herramientasMCP(o, a), ...MemoriaSecretariaAgente.herramientasMCP(o, a), herramientaProponerSkill]) if (!out.includes(h)) out.push(h)
+    for (const h of [...herramientasMCP, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, a), ...Acciones.herramientasMCP(o, a), ...WhatsAppAgente.herramientasMCP(o, a), ...MemoriaSecretariaAgente.herramientasMCP(o, a), ...Seguimiento.herramientasMCP(o, a), herramientaProponerSkill]) if (!out.includes(h)) out.push(h)
     return out
   },
 }

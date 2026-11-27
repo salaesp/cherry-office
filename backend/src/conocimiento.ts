@@ -117,6 +117,10 @@ export function fuentes(carpeta: string): Fuente[] {
   for (const e of listar('conocimiento/agentes')) {
     if (!e.isDirectory() || !Slug.valido(e.name)) continue
     for (const x of listar(`conocimiento/agentes/${e.name}`)) if (x.isFile() && x.name.endsWith('.md') && !x.name.startsWith('.')) agregar(`conocimiento/agentes/${e.name}/${x.name}`, 'notas', e.name)
+    // el seguimiento del agente (seguimiento.ts): sus temas y sus fichas
+    for (const sub of ['temas', 'fichas']) {
+      for (const x of listar(`conocimiento/agentes/${e.name}/${sub}`)) if (x.isFile() && x.name.endsWith('.md') && !x.name.startsWith('.')) agregar(`conocimiento/agentes/${e.name}/${sub}/${x.name}`, 'notas', e.name)
+    }
   }
   for (const [dir, tipo] of [['temas', 'tema'], ['diario', 'diario'], ['decisiones', 'decision']] as const) {
     for (const e of listar(`conocimiento/${dir}`)) if (e.isFile() && e.name.endsWith('.md') && !e.name.startsWith('.')) agregar(`conocimiento/${dir}/${e.name}`, tipo)

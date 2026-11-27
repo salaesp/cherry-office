@@ -98,7 +98,7 @@ describe('definiciones y permisos', () => {
   test('el perfil agente ve pedir; el creador no ve ninguna; sin el módulo no hay fábrica', async () => {
     const p = await preparar()
     const t = herramientasDe(p)
-    expect(nombres(t('marce').h)).toEqual(['colegas', 'consultar', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'pedir', 'quedo_esperando', 'cancelar_espera', 'proponer_skill'])
+    expect(nombres(t('marce').h)).toEqual(['colegas', 'consultar', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'pedir', 'quedo_esperando', 'cancelar_espera', 'proponer_skill'])
     expect(nombres(t('marce', { perfil: 'creador' }).h)).not.toContain('pedir')
     expect(herramientasDependencias(p.s, 't', { oficina: p.carpeta, agente: 'marce', sid: U.a, perfil: 'creador' })).toBeUndefined()
     const pedir = t('marce').h.definiciones.find((d) => d.name === 'pedir')!
