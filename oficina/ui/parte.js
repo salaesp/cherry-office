@@ -79,6 +79,13 @@ App.Parte = (function () {
     return fila(ag || 'libro', e.titulo, (ag ? ag.nombre + ' · ' : '') + App.hace(e.creada), null, 'Revisar', function () { App.Entregables.abrir(e.id); });
   }
 
+  /* lo que falta revisar, como tarjetas (las mismas de Bandeja › Para revisar) */
+  function tarjetasHoy(entregas) {
+    var cont = h('div.entregas');
+    App.Entregables.pintarTarjetas(cont, entregas, function () { cargar(false); });
+    return cont;
+  }
+
   function filaFlujo(f) {
     var trabado = f.dias > 1;
     return fila(quienMarca(f.quien), f.nombre || f.flujoNombre,
@@ -192,7 +199,7 @@ App.Parte = (function () {
       if (necesita.length) App.add(cuerpo, seccion('Te necesita', h('div.parte-filas', necesita.map(filaAviso))));
       if (entregas.length) {
         App.add(cuerpo, seccion('Para revisar' + (rev.total > entregas.length ? ' (' + rev.total + ')' : ''),
-          [h('div.parte-filas', entregas.map(filaEntrega)),
+          [App.Entregables.pintarTarjetas ? tarjetasHoy(entregas) : h('div.parte-filas', entregas.map(filaEntrega)),
             rev.total > entregas.length ? h('button.btn.chico.fantasma', { onclick: function () { App.Nav.ir('#/bandeja/revisar'); } }, 'Ver las ' + rev.total) : null]));
       }
       if (flujos.length) App.add(cuerpo, seccion('Flujos en curso', h('div.parte-filas', flujos.map(filaFlujo))));

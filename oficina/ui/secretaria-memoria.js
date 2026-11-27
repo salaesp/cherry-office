@@ -425,5 +425,5 @@
     return caja;
   }
 
-  App.SecretariaMemoria = { abrir: abrir, bloque: bloque, importar: importar };
+  App.SecretariaMemoria = { abrir: abrir, bloque: bloque, importar: importar, ver: ver };
 })();

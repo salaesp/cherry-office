@@ -50,6 +50,8 @@ export const LimitesImportar = {
   fallidasSeguidas: 2,
   /** Cuántos salteados se listan en la API (el resto va en el conteo por motivo). */
   maxSalteadosListados: 200,
+  /** Slugs de temas y fichas que lista la entrega de una importación. */
+  maxDetalleEntrega: 50,
   /** Temas y fichas que ya hay y se le pasan a la consigna. */
   consignaTemas: 150,
   consignaFichas: 150,
@@ -728,6 +730,11 @@ export class ServicioImportar {
         temasNuevos: imp.stats.temasNuevos.length, temasActualizados: imp.stats.temasActualizados.length,
         fichasNuevas: imp.stats.fichasNuevas.length, fichasActualizadas: imp.stats.fichasActualizadas.length,
         dias: imp.stats.dias.length, escrituras: imp.stats.escrituras,
+      },
+      /** Los slugs de lo que se creó o se tocó, para mostrarlos en la entrega y abrirlos desde ahí. */
+      detalle: {
+        temasNuevos: imp.stats.temasNuevos.slice(0, L.maxDetalleEntrega), temasActualizados: imp.stats.temasActualizados.slice(0, L.maxDetalleEntrega),
+        fichasNuevas: imp.stats.fichasNuevas.slice(0, L.maxDetalleEntrega), fichasActualizadas: imp.stats.fichasActualizadas.slice(0, L.maxDetalleEntrega),
       },
       entrega: imp.entrega ?? null, cancelando: imp.cancelando && (imp.estado === 'pendiente' || imp.estado === 'corriendo'), reimportacion: imp.reimportacion,
     }

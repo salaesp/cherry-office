@@ -303,6 +303,23 @@ permisos de WhatsApp, elegir chats en dos lugares, asignar conectores). Ahora:
   captura doble y con la lógica pura de Baileys): hay que confirmar con un número de prueba que `participantAlt` y los
   `@lid` de los integrantes llegan como se espera, y cuánto tarda en aparecer el primer mensaje propio.
 
+## Revisar y avisar por separado (después de la memoria)
+Con varias fuentes, cada una con su intervalo, cada revisión dejaba su propio reporte y repetía el seguimiento y la agenda:
+la persona recibía varias cosas iguales en el día. Ahora revisar y avisar van separados:
+- **Revisión** (`secretaria:<n>`): cada fuente con su intervalo, como antes, pero sin entrega. Lee lo nuevo, actualiza la
+  memoria, propone acciones (que llegan enseguida, aparte) y responde con **notas** en el formato del reporte
+  (`## Para saber`, `## Para hacer`, `## Agenda`), que se guardan en `sec_revisiones.notas`. No hace seguimiento de temas
+  viejos: si lo único que hay son temas trabados, responde «Sin novedades».
+- **Urgente**: si las notas empiezan con `URGENTE:`, se deja una entrega en el momento («Urgente: …») con esas notas; el
+  reporte sabe que ya se avisó y no lo repite como urgente.
+- **Reporte** (`secretaria:r<n>`, tabla `sec_reportes`): a las horas de `reporte.horas` (por defecto 09:00 y 19:00; no
+  depende de la franja), junta las notas sin reportar, las propuestas del agente desde el reporte anterior y los temas
+  trabados de la memoria, y deja una sola entrega. Una fuente sin novedades no se menciona. Si no hay notas ni propuestas
+  nuevas no se lanza (queda `salteado`), salvo que haya temas trabados y no se haya dejado reporte en las últimas 20 horas.
+  Si el reporte falla, sus notas quedan para el próximo.
+- «Revisar ahora» revisa y, al terminar bien, arma el reporte enseguida. «Armar el reporte ahora» junta lo que ya hay.
+- La bandeja muestra en «Para hacer» las propuestas del tramo del reporte (`GET /api/secretaria/reportes/<entrega>`).
+
 ## Memoria de la secretaría
 Detalle (formato de los `.md`, índice, topes, herramientas y API) en la sección «Memoria de la secretaría» de
 [backend/API.md](../backend/API.md). Lo que decidió la persona y cómo quedó:

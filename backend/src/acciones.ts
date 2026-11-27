@@ -310,7 +310,7 @@ export class HerramientasAcciones implements MCPHerramientas {
         type: 'object',
         properties: {
           herramienta: { type: 'string', description: 'nombre completo de la herramienta (mcp__claude_ai_...)' },
-          resumen: { type: 'string', description: 'qué querés hacer, en una frase' },
+          resumen: { type: 'string', description: 'qué querés hacer, en una frase corta (hasta unos 70 caracteres): es el título que ve la persona en su bandeja; los detalles van en «detalle» y «nota»' },
           detalle: { type: 'object', description: 'los argumentos exactos con los que se llamaría a la herramienta' },
           origen: {
             type: 'object',

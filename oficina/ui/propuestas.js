@@ -266,6 +266,156 @@ App.Propuestas = (function () {
     return 'Reporte del ' + d.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' });
   }
 
+  /* ---------------- importación a la memoria de la secretaría ---------------- */
+  /* el texto que arma el backend (textoEntrega en secretaria-importar.ts) → {lead, nota, cifras, errores, salteados, revisar}; null si no es ese */
+  function parsearImportacion(texto) {
+    var lineas = String(texto || '').replace(/\r/g, '').split('\n');
+    var r = { lead: '', carpeta: '', nota: '', cifras: {}, errores: [], salteados: [], revisar: [] }, modo = '';
+    lineas.forEach(function (l) {
+      var t = l.trim(); if (!t) return;
+      var m;
+      if (!r.lead) {
+        m = /^(.*?las notas de «(.+?)» a mi memoria\.)\s*(.*)$/.exec(t);
+        if (!m) return;
+        r.lead = m[1]; r.carpeta = m[2]; r.nota = m[3]; return;
+      }
+      if ((m = /^- Archivos: (\d+)[^;]*; se importaron (\d+)/.exec(t))) { r.cifras.archivos = +m[1]; return; }
+      if ((m = /^- Temas en seguimiento: (\d+) cread\w+ y (\d+) actualizad/.exec(t))) { r.cifras.temasNuevos = +m[1]; r.cifras.temasAct = +m[2]; return; }
+      if ((m = /^- Fichas: (\d+) cread\w+ y (\d+) actualizad/.exec(t))) { r.cifras.fichasNuevas = +m[1]; r.cifras.fichasAct = +m[2]; return; }
+      if ((m = /^- Días del diario con anotaciones: (\d+)/.exec(t))) { r.cifras.dias = +m[1]; return; }
+      if (/^Tandas que no se pudieron hacer/.test(t)) { modo = 'errores'; return; }
+      if (/^No se importaron/.test(t)) { modo = 'salteados'; return; }
+      if (/^Entre ellos, los que podrías querer revisar/.test(t)) { modo = 'revisar'; return; }
+      if (/^Lo importado está en/.test(t)) { modo = ''; return; }
+      if (/^- /.test(t) && modo) r[modo].push(t.slice(2));
+    });
+    return r.lead && r.cifras.archivos !== undefined ? r : null;
+  }
+
+  function cifra(n, txt, sub) { return h('div.imp-cifra', h('b', (n || 0).toLocaleString('es-AR')), h('span', txt), sub ? h('small', sub) : null); }
+
+  /* op.importacion: {detalle:{temasNuevos,…}} de la API; op.memoria: {temas, fichas}; op.ver(clase, slug, titulo); op.abrirMemoria() */
+  function importacion(texto, op) {
+    var r = parsearImportacion(texto);
+    if (!r) return null;
+    op = op || {};
+    var c = r.cifras, caja = h('div.rep');
+    caja.appendChild(h('div.rep-resumen', r.lead.replace(/ a mi memoria\.$/, ' a la memoria.')));
+    if (r.nota) caja.appendChild(h('div.prop-nota', App.icono('ok'), h('span', r.nota)));
+    caja.appendChild(h('div.imp-cifras',
+      cifra(c.archivos, c.archivos === 1 ? 'archivo leído' : 'archivos leídos'),
+      cifra(c.temasNuevos, c.temasNuevos === 1 ? 'tema nuevo' : 'temas nuevos', c.temasAct ? '+ ' + c.temasAct + ' actualizados' : ''),
+      cifra(c.fichasNuevas, c.fichasNuevas === 1 ? 'ficha nueva' : 'fichas nuevas', c.fichasAct ? '+ ' + c.fichasAct + ' actualizadas' : ''),
+      cifra(c.dias, c.dias === 1 ? 'día del diario' : 'días del diario')));
+    if (r.errores.length) caja.appendChild(h('div.rep-urg', App.icono('alerta'), h('div', h('div', r.errores.length === 1 ? 'Una tanda no se pudo hacer: sus archivos quedan para «Volver a importar».' : r.errores.length + ' tandas no se pudieron hacer: sus archivos quedan para «Volver a importar».'),
+      h('div', { style: { fontWeight: 400, marginTop: '4px' } }, r.errores.join(' · ')))));
+
+    /* lo que conviene revisar: los temas y las fichas que dejó, cada uno se abre desde acá */
+    var d = (op.importacion && op.importacion.detalle) || null;
+    var temas = d ? d.temasNuevos.map(function (x) { return [x, true]; }).concat(d.temasActualizados.map(function (x) { return [x, false]; })) : [];
+    var fichas = d ? d.fichasNuevas.concat(d.fichasActualizadas) : [];
+    var abrir = op.abrirMemoria ? h('button.btn.chico', { onclick: op.abrirMemoria }, 'Abrir la memoria') : null;
+    if (temas.length) {
+      var porSlug = {};
+      ((op.memoria && op.memoria.temas) || []).forEach(function (t) { porSlug[t.slug] = t; });
+      var ESTADO = { abierto: 'Abierto', esperando: 'Esperando', resuelto: 'Resuelto', descartado: 'Descartado' };
+      var filas = temas.map(function (x) {
+        var t = porSlug[x[0]];
+        if (!t) return null;   // lo borraste o lo renombraste después
+        var sub = [ESTADO[t.estado] || t.estado, t.fecha ? 'para el ' + t.fecha.replace(/^(\d{4})-(\d\d)-(\d\d).*/, '$3/$2') : '', x[1] ? '' : 'ya estaba'].filter(Boolean).join(' · ');
+        return h('div.rep-prop', App.icono('parte'), h('div.min', h('b', t.titulo), h('div.sub', sub)),
+          op.ver ? h('button.btn.chico', { onclick: function () { op.ver('temas', t.slug, t.titulo); } }, 'Ver') : null);
+      }).filter(Boolean);
+      if (filas.length) caja.appendChild(h('div.rep-sec', h('h3', 'Temas para revisar'), h('div.rep-lista', filas)));
+    }
+    if (fichas.length) {
+      var porFicha = {};
+      ((op.memoria && op.memoria.fichas) || []).forEach(function (f) { porFicha[f.slug] = f; });
+      var chips = fichas.map(function (slug) {
+        var f = porFicha[slug]; if (!f) return null;
+        return h('button.imp-ficha', { title: 'Ver la ficha', onclick: function () { if (op.ver) op.ver('fichas', f.slug, f.nombre); } }, h('span.rep-ini.otro', inicial(f.nombre)), f.nombre);
+      }).filter(Boolean);
+      if (chips.length) caja.appendChild(h('div.rep-sec', h('h3', 'Personas y cosas'), h('div.imp-fichas', chips)));
+    }
+    if (r.salteados.length) {
+      caja.appendChild(h('div.rep-sec', h('h3', 'Lo que no se importó'),
+        h('div.rep-chips', r.salteados.map(function (x) { var m = /^(.*): (\d+)$/.exec(x); return h('span.insignia', m ? m[1] + ' · ' + m[2] : x); })),
+        r.revisar.length ? h('div.rep-lista', r.revisar.map(function (x) { return h('div.rep-seg', h('div.min', x)); })) : null));
+    }
+    caja.appendChild(h('div.imp-pie', h('span', 'Todo lo importado lleva el origen «Importado · …». Revisalo y corregí lo que haga falta.'), abrir));
+    return caja;
+  }
+
+  /* ---------------- tarjetas de la lista de la bandeja ---------------- */
+  /* Una entrega como tarjeta chica con un adelanto de su forma: el ticket de un evento, para quién va un mail, los chips de
+     un reporte, las cifras de una importación o las primeras líneas. op: {titulo, sub, cuando, retrato (elemento), accion,
+     abrir(), aprobar(boton), descartar(boton)}. Una propuesta pendiente trae sus botones para decidir desde la lista. */
+  function tarjetaLista(e, op) {
+    var ac = op.accion, nueva = e.estado === 'sin_revisar';
+    var urgente = e.origen === 'secretaria' && /^Urgente:/.test(e.titulo || '');
+    var cuerpo = [], pie = null, estado = null;
+    if (e.origen === 'propuesta' && ac) {
+      var t = tipo(ac), d = ac.detalle || {};
+      if (t === 'evento') {
+        var ini = fechaEvento(primero(d, ['start', 'startTime', 'when', 'date']));
+        var fin = fechaEvento(primero(d, ['end', 'endTime']));
+        if (ini) {
+          var cuando = ini.dia ? 'todo el día' : horaTxt(ini.d) + (fin && !fin.dia && mismoDia(ini.d, fin.d) ? ' a ' + horaTxt(fin.d) : '');
+          cuerpo.push(h('div.tl-ticket',
+            h('div.tl-dia', h('span.m', ini.d.toLocaleDateString('es', { month: 'short' }).replace('.', '')), h('span.n', String(ini.d.getDate()))),
+            h('div.tl-info', h('b', valorHumano(primero(d, ['summary', 'title'])) || 'Evento'),
+              h('span', [ini.d.toLocaleDateString('es', { weekday: 'long' }), cuando, valorHumano(d.location)].filter(Boolean).join(' · ')))));
+        }
+      } else if (t === 'mail') {
+        cuerpo.push(h('div.tl-mail', App.icono('mail'), h('div', h('b', valorHumano(d.subject) || '(sin asunto)'), h('span', 'Para ' + (valorHumano(d.to) || '…')))));
+      }
+      if (!cuerpo.length && e.resumen) cuerpo.push(h('div.tl-txt', e.resumen));
+      if (ac.estado === 'pendiente' && op.aprobar) {
+        var ok = h('button.btn.chico.primario', { onclick: function (ev) { ev.stopPropagation(); op.aprobar(ok); } }, textoAprobar(ac));
+        var no = h('button.btn.chico.fantasma', { onclick: function (ev) { ev.stopPropagation(); op.descartar(no); } }, 'Descartar');
+        pie = h('div.tl-pie', no, ok);
+      } else {
+        estado = { ejecutando: h('span.insignia.aviso', 'Ejecutando…'), hecha: h('span.insignia.ok', 'Hecha'), error: h('span.insignia.error', 'Con error'), descartada: h('span.insignia', 'Descartada') }[ac.estado] || null;
+      }
+    } else if (e.origen === 'secretaria' && e.adelanto) {
+      var r = parsear(e.adelanto);
+      if (urgente) {
+        var it = r && r.secciones.filter(function (x) { return x.clave === 'saber'; })[0];
+        var x = it && itemSaber(it.items[0] || '');
+        cuerpo.push(h('div.tl-txt', x ? (x.quien + ': ' + x.que.replace(/\*\*/g, '')) : (e.resumen || '')));
+      } else if (r) {
+        if (r.resumen.length) cuerpo.push(h('div.tl-txt', r.resumen.join(' ').replace(/\*\*/g, '')));
+        var cuenta = { wa: 0, mail: 0 }, por = {};
+        r.secciones.forEach(function (s2) { if (s2.clave) por[s2.clave] = s2.items.length; });
+        r.secciones.filter(function (s2) { return s2.clave === 'saber'; }).forEach(function (s2) {
+          s2.items.forEach(function (i) { var y = itemSaber(i); var c = y && claseFuente(y.fuente); if (c === 'wa' || c === 'mail') cuenta[c]++; });
+        });
+        var chips = [];
+        if (r.urgente.length) chips.push(h('span.prop-tag.urg', App.icono('alerta'), 'Urgente'));
+        if (por.hacer) chips.push(h('span.prop-tag', App.icono('flecha'), 'Para hacer · ' + por.hacer));
+        if (cuenta.wa) chips.push(h('span.prop-tag.wa', App.icono('charla'), 'WhatsApp · ' + cuenta.wa));
+        if (cuenta.mail) chips.push(h('span.prop-tag.mail', App.icono('mail'), 'Mails · ' + cuenta.mail));
+        if (por.seguimiento) chips.push(h('span.prop-tag', App.icono('reloj'), 'Seguimiento · ' + por.seguimiento));
+        if (por.agenda) chips.push(h('span.prop-tag.evento', App.icono('calendario'), 'Agenda · ' + por.agenda));
+        if (chips.length) cuerpo.push(h('div.tl-chips', chips));
+      } else if (e.resumen) cuerpo.push(h('div.tl-txt', e.resumen));
+    } else if (e.origen === 'importacion' && e.adelanto) {
+      var im = parsearImportacion(e.adelanto);
+      if (im) {
+        var c2 = im.cifras, cif = function (n, txt) { return h('div', h('b', (n || 0).toLocaleString('es-AR')), h('span', txt)); };
+        cuerpo.push(h('div.tl-cifras', cif(c2.archivos, 'archivos'), cif(c2.temasNuevos, 'temas'), cif(c2.fichasNuevas, 'fichas'), cif(c2.dias, 'días')));
+      } else if (e.resumen) cuerpo.push(h('div.tl-txt', e.resumen));
+    } else if (e.resumen) {
+      cuerpo.push(h('div.tl-txt', e.resumen));
+    }
+    if (e.archivos && e.archivos.length) cuerpo.push(h('div.tl-chips', h('span.prop-tag', App.icono('clip'), e.archivos.length === 1 ? '1 archivo' : e.archivos.length + ' archivos')));
+    if (e.estado === 'cambios') estado = h('span.insignia', 'Reemplazada');
+    return h('div.tl' + (nueva ? '.nueva' : '.vista') + (urgente ? '.urg' : ''), { role: 'button', tabindex: '0', title: 'Abrir', onclick: op.abrir,
+      onkeydown: function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); op.abrir(); } } },
+      h('div.tl-cab', op.retrato, h('div.tl-tit', h('div.t', op.titulo), op.sub ? h('div.s', op.sub) : null), estado, h('span.tl-cuando', op.cuando)),
+      cuerpo, pie);
+  }
+
   return { tipo: tipo, etiqueta: etiqueta, tarjeta: tarjeta, tabla: tabla, textoAprobar: textoAprobar, reporte: reporte, parsear: parsear,
-    itemSaber: itemSaber, tituloReporte: tituloReporte };
+    itemSaber: itemSaber, tituloReporte: tituloReporte, importacion: importacion, parsearImportacion: parsearImportacion, tarjetaLista: tarjetaLista };
 })();

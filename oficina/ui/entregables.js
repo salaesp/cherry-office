@@ -105,7 +105,7 @@ App.Entregables = (function () {
           : h('div.vacio', 'Todavía no hay entregas con ese filtro.'));
         return;
       }
-      es.forEach(function (e) { lista.appendChild(fila(e)); });
+      pintarTarjetas(lista, es, pintarLista);
     }).catch(function (e) { App.vaciar(lista).appendChild(h('div.error-txt', e.message)); });
   }
 
@@ -117,16 +117,52 @@ App.Entregables = (function () {
     return a ? App.retratoImg(a, 'retrato', 64) : h('div.retrato', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', background: d ? d.color : '#0a5fb4' } }, App.icono('reunion'));
   }
 
-  function fila(e) {
-    var est = e.estado === 'sin_revisar' ? h('span.insignia.aviso', 'Sin revisar') : e.estado === 'revisada' ? h('span.insignia.ok', 'Revisada') : h('span.insignia', 'Reemplazada');
-    return h('button.entrega-fila' + (e.estado === 'sin_revisar' ? '.nueva' : ''), { onclick: function () { verEntrega(e.id); } },
-      marcaAgente(e),
-      h('div.entrega-txt',
-        h('div.entrega-tit', e.titulo),
-        h('div.entrega-sub', nombreDe(e) + ' · ' + origenTxt(e.origen) + ' · ' + hace(e.creada) +
-          (e.archivos && e.archivos.length ? ' · ' + e.archivos.length + (e.archivos.length === 1 ? ' archivo' : ' archivos') : '')),
-        e.resumen ? h('div.entrega-res', e.resumen) : null),
-      est);
+  /* ---------------- tarjetas (lista y «Hoy») ---------------- */
+  /* las entregas como tarjetas (App.Propuestas.tarjetaLista); las propuestas traen su acción para aprobarla desde acá.
+     `alCambiar`: qué repintar después de aprobar o descartar */
+  function pintarTarjetas(cont, es, alCambiar) {
+    App.vaciar(cont).classList.add('tarjetas');
+    var hayPropuestas = es.some(function (e) { return e.origen === 'propuesta'; });
+    (hayPropuestas ? api().get('/api/acciones').then(function (r) { return r.acciones || []; }).catch(function () { return []; }) : Promise.resolve([])).then(function (acs) {
+      var porEntrega = {};
+      acs.forEach(function (a) { if (a.entrega) porEntrega[a.entrega] = a; });
+      /* primero lo que te pide algo: lo urgente sin ver y las propuestas que esperan tu decisión; después, por fecha */
+      var peso = function (e) {
+        if (e.estado !== 'sin_revisar') return 2;
+        if (e.origen === 'secretaria' && /^Urgente:/.test(e.titulo || '')) return 0;
+        var a = porEntrega[e.id];
+        return a && a.estado === 'pendiente' ? 1 : 2;
+      };
+      var orden = es.map(function (e, i) { return [peso(e), i, e]; }).sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+      App.vaciar(cont);
+      orden.forEach(function (x) { cont.appendChild(tarjeta(x[2], porEntrega[x[2].id], alCambiar)); });
+    });
+  }
+
+  function tarjeta(e, ac, alCambiar) {
+    var propia = e.origen === 'propuesta' || e.origen === 'secretaria' || e.origen === 'importacion';
+    var despues = function (msg) { App.aviso(msg); refrescarUltimas(); if (App.Actividad) App.Actividad.ya(); if (alCambiar) alCambiar(); };
+    return App.Propuestas.tarjetaLista(e, {
+      titulo: tituloLista(e), sub: propia ? nombreDe(e) : nombreDe(e) + ' · ' + origenTxt(e.origen), cuando: App.fecha(e.creada),
+      retrato: marcaAgente(e), accion: ac,
+      abrir: function () { App.Entregables.abrir(e.id); },
+      aprobar: function (b) {
+        b.disabled = true;
+        api().post('/api/entregas/' + e.id + '/ejecutar').then(function () { despues('Aprobado: ya se está ejecutando.'); }).catch(function (x) { App.fallo(x); b.disabled = false; });
+      },
+      descartar: function (b) {
+        b.disabled = true;
+        api().post('/api/entregas/' + e.id + '/descartar-accion').then(function () { despues('Acción descartada.'); }).catch(function (x) { App.fallo(x); b.disabled = false; });
+      }
+    });
+  }
+
+  /* el título en palabras para la lista: sin «Propuesta:» y con el día del reporte o la carpeta importada */
+  function tituloLista(e) {
+    if (e.origen === 'propuesta') return String(e.titulo || '').replace(/^Propuesta:\s*/, '');
+    if (e.origen === 'secretaria' && !/^Urgente:/.test(e.titulo || '')) return App.Propuestas.tituloReporte(e.creada);
+    var imp = e.origen === 'importacion' && /las notas de «(.+?)» a mi memoria/.exec(e.texto || e.resumen || '');
+    return imp ? 'Importé tus notas de «' + imp[1] + '»' : e.titulo;
   }
 
   /* ---------------- panel: detalle ---------------- */
@@ -179,11 +215,18 @@ App.Entregables = (function () {
     if (e.origen === 'propuesta') {
       titulo = String(e.titulo || '').replace(/^Propuesta:\s*/, '');
       sub = nombreDe(e) + ' te lo propone · ' + hace(e.creada) + costo;
+    } else if (e.origen === 'secretaria' && /^Urgente:/.test(e.titulo || '')) {
+      sub = nombreDe(e) + ' te avisa ya, sin esperar al reporte · ' + hace(e.creada) + costo;
     } else if (e.origen === 'secretaria') {
       titulo = App.Propuestas.tituloReporte(e.creada);
       sub = nombreDe(e) + ' · revisó ' + hace(e.creada) + costo;
+    } else if (e.origen === 'importacion') {
+      var imp = App.Propuestas.parsearImportacion(e.texto);
+      if (imp) titulo = 'Importé tus notas de «' + imp.carpeta + '»';
+      sub = nombreDe(e) + ' · ' + hace(e.creada) + costo;
     }
-    if ((e.origen === 'propuesta' || e.origen === 'secretaria') && ag) ico = App.retratoImg(ag, 'retrato', 96);
+    /* la cara de quien la deja (las actas siguen con el ícono de reunión) */
+    if (ag && e.origen !== 'reunion') ico = App.retratoImg(ag, 'retrato', 96);
     App.add(App.vaciar(der), cabecera(titulo, sub, volver, ico), cuerpo, pie);
     var est = e.estado === 'sin_revisar' ? h('span.insignia.aviso', 'Sin revisar') : e.estado === 'revisada' ? h('span.insignia.ok', 'Revisada') : h('span.insignia', 'Reemplazada por una versión nueva');
     var meta = h('div.entrega-meta', est, e.padre ? h('span.insignia', 'Versión con cambios') : null, linkOrigen(e));
@@ -236,17 +279,29 @@ App.Entregables = (function () {
     var pintarTexto = function (accion, propuestas) {
       App.vaciar(textoCaja);
       if (e.origen === 'propuesta' && accion) return;
-      var armado = e.origen === 'secretaria' && App.Propuestas.reporte(e.texto || '', propuestas, { ver: function (id) { App.Nav.ir('#/bandeja/revisar/' + id); } });
-      App.add(textoCaja, armado ? h('div.entrega-texto', armado) : App.htmlSeguro(h('div.md-doc.doc-panel.entrega-texto'), App.markdown(e.texto || '(sin texto)')));
+      var armado = e.origen === 'secretaria' ? App.Propuestas.reporte(e.texto || '', propuestas, { ver: function (id) { App.Nav.ir('#/bandeja/revisar/' + id); } })
+        : e.origen === 'importacion' ? App.Propuestas.importacion(e.texto || '', importacion) : null;
+      App.add(textoCaja, armado ? h('div.entrega-texto', armado) : App.htmlSeguro(h('div.md-doc.doc-panel.entrega-texto.entrega-doc'), App.markdown(e.texto || '(sin texto)')));
     };
+    /* una importación: con los temas y fichas que dejó, para abrirlos desde acá */
+    var importacion = { ver: verMemoria, abrirMemoria: App.SecretariaMemoria ? function () { App.SecretariaMemoria.abrir(); } : null };
     if (e.origen !== 'propuesta' && e.origen !== 'secretaria') pintarTexto(null, []);
+    var idImp = e.origen === 'importacion' && /^importar:(\d+)$/.exec(e.ref || '');
+    if (idImp) Promise.all([
+      api().get('/api/secretaria/memoria/importar/' + idImp[1]),
+      api().get('/api/secretaria/memoria')
+    ]).then(function (r) {
+      if (!abiertoPanel() || abierta !== e.id) return;
+      importacion.importacion = r[0]; importacion.memoria = r[1];
+      pintarTexto(null, []);
+    }).catch(function () { /* sin secretaría o sin la importación: queda el resumen */ });
     /* flujo y acción llegan aparte: hasta entonces el pie queda vacío, para no ofrecer «Listo» sobre una propuesta sin resolver */
     var extra = { corrida: null, accion: null };
     Promise.all([
       api().get('/api/flujos/corridas', { entrega: e.id, estado: 'todas' }).then(function (r) { return (r.corridas || [])[0] || null; }).catch(function () { return null; }),
       api().get('/api/acciones', { entrega: e.id }).then(function (r) { return r.accion || null; }).catch(function () { return null; }),
       api().get('/api/esperas', { entrega: e.id, estado: 'todas' }).then(function (r) { return r.esperas || []; }).catch(function () { return []; }),
-      e.origen === 'secretaria' && e.sid ? api().get('/api/acciones', { sid: e.sid }).then(function (r) { return r.acciones || []; }).catch(function () { return []; }) : Promise.resolve([])
+      e.origen === 'secretaria' ? accionesDelReporte(e) : Promise.resolve([])
     ]).then(function (r) {
       if (!abiertoPanel() || abierta !== e.id) return;
       extra.corrida = r[0]; extra.accion = r[1];
@@ -329,6 +384,19 @@ App.Entregables = (function () {
   }
 
   /* ---------------- acción hacia afuera (plan §8) ---------------- */
+  /* las propuestas de un reporte de la secretaría: las de su tramo (los reportes nuevos lo guardan) o, en los viejos, las de
+     su misma sesión */
+  function accionesDelReporte(e) {
+    var porSid = function () { return e.sid ? api().get('/api/acciones', { sid: e.sid }).then(function (r) { return r.acciones || []; }).catch(function () { return []; }) : []; };
+    if (/^Urgente:/.test(e.titulo || '')) return Promise.resolve(porSid());   // un aviso urgente sale de una revisión, no de un reporte
+    return api().get('/api/secretaria/reportes/' + e.id).then(function (r) { return r.acciones || []; }).catch(porSid);
+  }
+
+  /* un tema o una ficha de la memoria de la secretaría, en su hoja */
+  function verMemoria(clase, slug, titulo) {
+    if (App.SecretariaMemoria && App.SecretariaMemoria.ver) App.SecretariaMemoria.ver(clase + '/' + slug + '.md', titulo, { compartir: true });
+  }
+
   function textoAprobar(ac) { return App.Propuestas.textoAprobar(ac); }
 
   /* la acción propuesta con la forma de su tipo (docs: bocetos/secretaria, dirección A): ticket de evento, mail o tabla,
@@ -533,7 +601,7 @@ App.Entregables = (function () {
   if (App.on) App.on('actividad', alActividad);
 
   return {
-    abrir: abrir, siguiente: siguiente,
+    abrir: abrir, siguiente: siguiente, pintarTarjetas: pintarTarjetas,
     abierta: function () { return abierta; },
     sinRevisar: function () { return sinRevisar; },
     refrescar: refrescarUltimas,
