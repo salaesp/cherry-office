@@ -92,11 +92,11 @@
 
   /* Selector de una charla (como en Claude): un botón chico que abre un panel con modelo (chips), esfuerzo y ahorro
      (deslizadores) y, plegado, cada opción de consumo. Pisa lo del agente y lo de Ajustes solo en esa charla.
-     op: {modelo, esfuerzo (los del agente), valor (lo elegido antes), soloModelo (sin opciones: el Creador), alCambiar(v)}.
+     op: {modelo, esfuerzo (los del agente), valor (lo elegido antes), soloModelo (sin opciones: el Creador), titulo (del botón), alCambiar(v)}.
      .valor() devuelve solo lo que difiere de lo de por defecto. */
   App.SelectorCharla = function (op) {
     var v = Object.assign({}, op.valor || {});
-    var b = h('button.btn.chico.fantasma.selector-charla', { type: 'button', title: 'Modelo, esfuerzo y ahorro de esta charla' });
+    var b = h('button.btn.chico.fantasma.selector-charla', { type: 'button', title: op.titulo || 'Modelo, esfuerzo y ahorro de esta charla' });
     function defecto() {
       var ia = App.iaApp();
       return { modelo: op.modelo || 'sonnet', esfuerzo: op.esfuerzo || ia.esfuerzo || '', skills: ia.skills, memoria: ia.memoria, colegas: ia.colegas, mcpLocales: ia.mcpLocales };
@@ -301,7 +301,12 @@
   App.Contratar = {
     abrir: function (op) {
       op = op || {};
-      if (!App.E.oficina.departamentos.length) { App.aviso('Primero creá un departamento.', true); App.Nav.ir('#/equipo/departamentos'); return; }
+      if (!App.E.oficina.departamentos.length) {
+        var sec = App.secretaria && App.secretaria();
+        /* con secretaría, armar el equipo se le pide a ella (docs/plan-secretaria-creadora.md) */
+        if (sec) { App.aviso('Todavía no hay departamentos: pedile a ' + sec.nombre + ' que arme el equipo.'); App.Agente.abrir(sec.id); return; }
+        App.aviso('Primero creá un departamento.', true); App.Nav.ir('#/equipo/departamentos'); return;
+      }
       var hj = App.hojaEnPanel({ titulo: 'Contratar', icono: 'personas' }, 'contratar');
       var desc = h('textarea.campo', { rows: 5, autofocus: true, maxlength: 4000, placeholder: 'Ej.: alguien que mire las ventas de cada semana, me diga qué productos se mueven y arme un resumen corto para el lunes.' });
       var deptos = App.E.oficina.departamentos;
@@ -310,6 +315,8 @@
       var err = h('div.error-txt'), estado = h('div');
       var pedir = h('button.btn.primario', { onclick: borrador }, App.icono('chispa'), 'Proponer con Claude');
       App.add(hj.cuerpo,
+        /* contratar también se le puede pedir a la secretaría (docs/plan-secretaria-creadora.md) */
+        App.pistaSecretaria ? App.pistaSecretaria('Contale qué necesitás y te propone a quién sumar.') : null,
         h('p', { style: { color: 'var(--suave)', marginTop: '4px', marginBottom: '14px' } }, 'Contá con tus palabras qué necesitás. Claude arma el perfil del agente y lo revisás antes de contratarlo.'),
         h('div.fila-campo', h('label.etiqueta-campo', '¿Qué tiene que hacer?'), desc),
         h('div.fila-campo', h('label.etiqueta-campo', 'Departamento'), h('div.ayuda', 'Dónde se sienta en la oficina.'), dep), estado, err);

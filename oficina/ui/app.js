@@ -25,7 +25,7 @@
   function opcionesOficina() {
     return [
       { icono: 'edificio', texto: 'Crear una oficina', bajada: 'Ponele nombre y elegí los departamentos.', accion: crearOficina },
-      { icono: 'chispa', texto: 'Armar una oficina charlando', bajada: 'Contale al Creador cómo trabajás y te propone departamentos, agentes y flujos.', accion: armarCharlando },
+      { icono: 'chispa', texto: 'Armar una oficina charlando', bajada: 'Tu secretaría te pregunta cómo trabajás y te propone departamentos, agentes y flujos.', accion: armarCharlando },
       { icono: 'carpeta', texto: 'Abrir una oficina existente', bajada: 'Buscá la carpeta de una oficina que ya tengas.', accion: abrirExistente },
       { icono: 'importar', texto: 'Importar una oficina', bajada: 'Abrí un archivo .zip que alguien exportó desde Oficina.', accion: importarOficina },
     ];
@@ -59,16 +59,21 @@
     }).catch(function () {});
   }
 
-  /* Campos comunes a «Crear una oficina» y «Armar una oficina charlando»: nombre, tu nombre y dónde se guarda. */
+  /* Campos comunes a «Crear una oficina» y «Armar una oficina charlando»: nombre, tu nombre, tu secretaría y dónde se
+     guarda. Toda oficina nueva viene con secretaría: es a quien le pedís crear cosas (docs/plan-secretaria-creadora.md). */
   function camposOficina() {
     var nombre = h('input.campo', { placeholder: 'Ej.: Estudio Cherry', maxlength: 80, autofocus: true });
     var duenio = h('input.campo', { placeholder: 'Cómo te llaman los agentes', maxlength: 80, value: App.Yo.nombre() });
+    var sec = h('input.campo', { placeholder: 'Por ejemplo, Sofía o Alex', maxlength: 60 });
     var carpeta = null, dondeTxt = h('span', { style: { color: 'var(--suave)' } });
     function pintarDonde() { dondeTxt.textContent = carpeta || ('Oficinas / ' + (nombre.value.trim() || '…') + ' (en tu carpeta de usuario)'); }
     nombre.addEventListener('input', pintarDonde);
     pintarDonde();
     return {
       nombre: nombre, duenio: duenio,
+      secretaria: function () { return { nombre: sec.value.trim() }; },
+      campoSecretaria: h('div.fila-campo', h('label.etiqueta-campo', 'Tu secretaría'), sec,
+        h('div.ayuda', 'Es a quien le pedís lo que necesites: contratar a alguien, armar un flujo, programar una tarea. Te propone y vos aprobás. Si no le ponés nombre, se llama «Secretaría».')),
       carpeta: function () { return carpeta || undefined; },
       cabecera: h('div.dos', h('div.fila-campo', h('label.etiqueta-campo', 'Nombre de la oficina'), nombre), h('div.fila-campo', h('label.etiqueta-campo', 'Tu nombre'), duenio)),
       donde: h('div.fila-campo', h('label.etiqueta-campo', 'Dónde se guarda'), h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px' } }, App.icono('carpeta'), dondeTxt,
@@ -83,12 +88,20 @@
     montar(r.carpeta, r.oficina);
   }
 
-  /* La oficina arranca sin departamentos y se abre el Creador para armarla. */
+  /* Abre la charla con la secretaría de la oficina recién creada (o avisa si no se pudo contratar). */
+  function hablarConSecretaria(r) {
+    var sec = r.oficina && r.oficina.secretaria;
+    if (sec && sec.agente && App.agente(sec.agente)) { App.Agente.abrir(sec.agente); return true; }
+    App.aviso('No pude contratar la secretaría: contratala en Ajustes › Secretaría.', true);
+    return false;
+  }
+
+  /* La oficina arranca sin departamentos y se abre la charla con la secretaría para armarla. */
   function armarCharlando() {
     var hj = App.hoja({ titulo: 'Armar una oficina charlando', ancho: 560 });
     var c = camposOficina(), err = h('div.error-txt');
-    hj.cuerpo.appendChild(h('div', c.cabecera,
-      h('div.fila-campo', h('label.etiqueta-campo', 'Cómo sigue'), h('div.ayuda', 'Se abre el Creador: le contás cómo trabajás, de a poco o pegando un texto, y te propone departamentos, agentes y flujos. No se crea nada hasta que lo apruebes.')),
+    hj.cuerpo.appendChild(h('div', c.cabecera, c.campoSecretaria,
+      h('div.fila-campo', h('label.etiqueta-campo', 'Cómo sigue'), h('div.ayuda', 'Se abre la charla con tu secretaría: le contás cómo trabajás, de a poco o pegando un texto, y te propone departamentos, agentes y flujos. No se crea nada hasta que lo apruebes.')),
       c.donde, err));
     var btn = h('button.btn.primario', { onclick: enviar }, 'Empezar a charlar');
     App.add(hj.pie, h('button.btn', { onclick: hj.cerrar }, 'Cancelar'), btn);
@@ -96,8 +109,8 @@
       err.textContent = '';
       if (!c.nombre.value.trim()) { err.textContent = 'Ponele un nombre a la oficina.'; c.nombre.focus(); return; }
       btn.disabled = true; btn.textContent = 'Creando…';
-      api.post('/api/oficinas', { nombre: c.nombre.value.trim(), duenio: c.duenio.value.trim(), vacia: true, carpeta: c.carpeta() })
-        .then(function (r) { hj.cerrar(); montarNueva(r); App.Creador.abrir(); })
+      api.post('/api/oficinas', { nombre: c.nombre.value.trim(), duenio: c.duenio.value.trim(), vacia: true, carpeta: c.carpeta(), secretaria: c.secretaria() })
+        .then(function (r) { hj.cerrar(); montarNueva(r); if (!hablarConSecretaria(r)) App.Creador.abrir(); })
         .catch(function (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Empezar a charlar'; });
     }
   }
@@ -126,7 +139,7 @@
     pintar();
     hj.cuerpo.appendChild(h('div', c.cabecera,
       h('div.fila-campo', h('label.etiqueta-campo', 'Departamentos'), lista, sug, h('div.ayuda', 'Cada departamento es una sala del edificio. Podés cambiarlos después.')),
-      c.donde, err));
+      c.campoSecretaria, c.donde, err));
     var btn = h('button.btn.primario', { onclick: enviar }, 'Crear oficina');
     App.add(hj.pie, h('button.btn', { onclick: hj.cerrar }, 'Cancelar'), btn);
     function enviar() {
@@ -135,8 +148,13 @@
       var lis = deps.filter(function (d) { return d[0].trim(); }).map(function (d) { return { nombre: d[0].trim(), color: d[1] }; });
       if (!lis.length) { err.textContent = 'Agregá al menos un departamento.'; return; }
       btn.disabled = true; btn.textContent = 'Creando…';
-      api.post('/api/oficinas', { nombre: c.nombre.value.trim(), duenio: c.duenio.value.trim(), departamentos: lis, carpeta: c.carpeta() })
-        .then(function (r) { hj.cerrar(); montarNueva(r); App.aviso('Oficina creada. Ya podés contratar a tu primer agente.'); })
+      api.post('/api/oficinas', { nombre: c.nombre.value.trim(), duenio: c.duenio.value.trim(), departamentos: lis, carpeta: c.carpeta(), secretaria: c.secretaria() })
+        .then(function (r) {
+          hj.cerrar(); montarNueva(r);
+          var a = App.secretaria();
+          App.aviso(a ? 'Oficina creada. Para sumar gente, armar flujos o programar tareas, pedíselo a ' + a.nombre + '.' : 'Oficina creada. Ya podés contratar a tu primer agente.');
+          if (a) App.Agente.abrir(a.id);
+        })
         .catch(function (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Crear oficina'; });
     }
   }
@@ -255,16 +273,43 @@
   /* ---------------- estructura principal ---------------- */
   App.atajoMod = /Mac/.test(navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl+';
 
+  /* ---------------- la secretaría: a quien se le pide crear cosas (docs/plan-secretaria-creadora.md) ---------------- */
+  App.secretaria = function () {
+    var sec = App.E && App.E.oficina && App.E.oficina.secretaria;
+    return sec && sec.agente && App.agente ? App.agente(sec.agente) || null : null;
+  };
+  /* abre la charla con ella; sin secretaría (oficinas de antes), la pantalla de armar la oficina con el Creador */
+  App.pedirleASecretaria = function () {
+    var a = App.secretaria();
+    if (a) App.Agente.abrir(a.id); else App.Nav.ir('#/equipo/creador');
+  };
+  /* la línea «¿Preferís pedírselo a Sofía?» arriba de lo que se crea a mano (contratar, departamento, tarea) */
+  App.pistaSecretaria = function (que, alIr) {
+    var a = App.secretaria();
+    if (!a) return null;
+    return h('div.pista-sec', App.retratoImg(a, 'pista-sec-cara', 48),
+      h('span', '¿Preferís pedírselo a ' + a.nombre + '? ' + que + ' '),
+      h('button.enlace', { type: 'button', onclick: function () { if (alIr) alIr(); App.pedirleASecretaria(); } }, 'Hablarle a ' + a.nombre));
+  };
+
   /* «+»: todo lo que empieza algo nuevo, en un solo botón (arriba del riel) */
   function menuNuevo(ancla) {
+    /* en el celular, solo empezar algo: charlar, programar una tarea o correr un flujo (armar la oficina es cosa de la compu) */
+    if (App.movil) {
+      App.menu(ancla, [
+        { texto: 'Charlar con alguien…', icono: 'charla', accion: function () { App.Nav.elegirAgente(ancla, function (id) { App.Agente.nueva(id); }, 'Charlar con'); } },
+        { texto: 'Nueva tarea…', icono: 'reloj', accion: function () { App.Agente.nuevaTarea(null, {}); } },
+        { texto: 'Correr un flujo…', icono: 'flujo', accion: function () { App.Nav.ir('#/trabajo/flujos'); App.Flujos.nueva(); } }]);
+      return;
+    }
     App.menu(ancla, [
       { texto: 'Charlar con alguien…', icono: 'charla', accion: function () { App.Nav.elegirAgente(ancla, function (id) { App.Agente.nueva(id); }, 'Charlar con'); } },
       { texto: 'Llamar a reunión…', icono: 'reunion', accion: function () { App.Reunion.nueva(); } },
       { texto: 'Nueva tarea…', icono: 'reloj', accion: function () { App.Agente.nuevaTarea(null, {}); } },
       { texto: 'Nueva corrida de flujo…', icono: 'flujo', accion: function () { App.Flujos.abrir(); App.Flujos.nueva(); } },
       '-',
+      { texto: App.secretaria() ? 'Pedírselo a ' + App.secretaria().nombre + '…' : 'Armar con el Creador…', icono: 'chispa', accion: function () { App.pedirleASecretaria(); } },
       { texto: 'Contratar un agente…', icono: 'personas', accion: function () { App.Nav.ir('#/equipo/contratar'); } },
-      { texto: 'Armar con el Creador…', icono: 'chispa', accion: function () { App.Nav.ir('#/equipo/creador'); } },
       { texto: 'Nuevo departamento…', icono: 'capas', accion: function () { App.Departamentos.agregar(); } },
     ]);
   }
@@ -286,7 +331,6 @@
       dom.navEnt = h('span.insignia.aviso.oculto');
       dom.navParte = h('span.insignia.oculto');
       dom.navTar = h('span.insignia.oculto');
-      dom.navRec = h('span.insignia.aviso.oculto');
       dom.navFlu = h('span.insignia.info.oculto');
       dom.navCon = h('span.insignia.oculto');
       dom.lienzo = h('div.lienzo');
@@ -310,7 +354,7 @@
       new MutationObserver(refrescarRuta).observe(dom.derecho, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'data-modo'] });
       var riel = App.Nav.riel({
         menuOficina: menuOficina, menuNuevo: menuNuevo,
-        insignias: { bandeja: dom.navEnt, recados: dom.navRec, equipo: dom.navReu, trabajo: dom.navTar },
+        insignias: { bandeja: dom.navEnt, equipo: dom.navReu, trabajo: dom.navTar },
         extra: [
           App.Uso ? App.Uso.boton() : null,
           h('button.riel-item.riel-extra', { title: 'Buscar o ir a… (' + App.atajoMod + 'K)', onclick: function () { App.Paleta.abrir(); } }, App.icono('buscar'), h('span', App.atajoMod + 'K')),
@@ -324,6 +368,7 @@
           dom.ventana));
       App.vaciar(raiz).appendChild(dom.app);
       App.dom = dom;
+      if (App.Microfono) App.Microfono.montar(dom.app);
       App.Oficina.iniciar(dom.lienzo);
       App.Oficina.alElegirAgente(function (id) { App.Agente.abrir(id); });
       App.Oficina.alElegirLugar(function (t, id) {
@@ -332,7 +377,7 @@
         else if (t === 'entregables' || t === 'direccion') App.Entregables.abrir();
         else if (t === 'yo') App.Yo.abrir();
         else if (t === 'entrega') App.Entregables.abrir(id);
-        else if (t === 'creador') App.Creador.abrir();
+        else if (t === 'creador') App.pedirleASecretaria();
         else if (t === 'secretaria' && App.Ajustes) App.Ajustes.abrir('secretaria');
         else if (t === 'flujos') App.Flujos.abrir();
       });
@@ -344,9 +389,8 @@
     App.Biblioteca.vigilarEstado();
     if (App.Conocimiento) App.Conocimiento.vigilarEstado();
     if (App.Tareas) App.Tareas.vigilar();
-    if (App.Recados) App.Recados.vigilar();
     /* la ruta (#/charlas/…) decide qué se ve; al cambiar de oficina se vuelve a la maqueta */
-    if (!primera || !/^#\/\w/.test(location.hash)) history.replaceState(null, '', '#/oficina');
+    if (!primera || !/^#\/\w/.test(location.hash)) history.replaceState(null, '', App.movil ? '#/bandeja/hoy' : '#/oficina');
     App.Nav.aplicar();
   }
   App.montar = montar;
@@ -479,7 +523,6 @@
     else if (m === 'entregables' && App.Entregables) App.Entregables.alCerrarPanel();
     else if (m === 'parte' && App.Parte && App.Parte.alCerrarPanel) App.Parte.alCerrarPanel();
     else if (m === 'tareas' && App.Tareas) App.Tareas.alCerrarPanel();
-    else if (m === 'recados' && App.Recados) App.Recados.alCerrarPanel();
     else if (m === 'flujos' && App.Flujos && App.Flujos.alCerrarPanel) App.Flujos.alCerrarPanel();
   };
   /* La × de cada ventana (Biblioteca, una charla, Tareas…): el riel abre ventanas de a una y la × la cierra. En la compu

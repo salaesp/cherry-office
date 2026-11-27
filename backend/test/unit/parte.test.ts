@@ -174,11 +174,12 @@ describe('Parte.armar / GET /api/parte con datos sembrados', () => {
   test('consigna del parte narrado: lleva los datos, sin el narrado, y se corta en 15000', () => {
     const o = { version: 1, nombre: 'O', duenio: 'Ana', departamentos: [], agentes: [] }
     const c = Parte.consigna(o, { a: 1, narrado: { texto: 'viejo' } })
-    expect(c).toContain('para Ana')
-    expect(c).toContain('{"a":1}')
-    expect(c).not.toContain('viejo')
-    expect(Parte.consigna({ ...o, duenio: '' }, {})).toContain('para la persona')
-    const grande = Parte.consigna(o, { x: 'y'.repeat(20000) })
+    // qué escribir va como mensaje de sistema; en la charla, solo los datos
+    expect(c.sistema).toContain('para Ana')
+    expect(c.mensaje).toBe('Los datos del parte:\n{"a":1}')
+    expect(c.mensaje).not.toContain('viejo')
+    expect(Parte.consigna({ ...o, duenio: '' }, {}).sistema).toContain('para la persona')
+    const grande = Parte.consigna(o, { x: 'y'.repeat(20000) }).mensaje
     expect(grande).toContain('…')
     expect(grande.length).toBeLessThan(15000 + 1000)
   })

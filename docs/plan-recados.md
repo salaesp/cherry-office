@@ -212,6 +212,64 @@ Para la página móvil, si se hace: un **API acotado** solo para recados (`/movi
 aprobar o descartar propuestas, ver una entrega), no todo `/api`. Emparejamiento con QR desde Ajustes (token de 32 bytes,
 revocable, uno por dispositivo), `Host` y `Origin` controlados como en `servidor-dev.ts`, apagado por defecto.
 
+## Cambio de rumbo: los recados pasan a la charla (decidido el 2026-11-27)
+Después de R0, la persona vio que la sección Recados era casi una segunda charla con la secretaría (el hilo ya se guardaba
+como una charla suya). Se decide unirlo con la charla y abrirlo a todos los agentes. Bocetos:
+[bandeja-y-microfono.html](../bocetos/secretaria/bandeja-y-microfono.html) (lo que te espera en la Bandeja y el micrófono
+de la secretaría) y [recados.html](../bocetos/secretaria/recados.html) (las tarjetas y cómo decide).
+
+**Decisiones de la persona**
+1. **Se le habla a cualquier agente desde su charla** (Equipo), con texto o audio. La sección Recados se saca cuando
+   esté lo nuevo.
+2. **Tarjetas dentro de la charla:** debajo de la respuesta, lo que hizo: delegación (con los 45 segundos para deshacer),
+   pregunta con opciones, propuesta de acción.
+3. **Lo que te espera va a la Bandeja,** como siempre: en Bandeja › Hoy, una sección «Te esperan» arriba de «Para
+   revisar» junta las preguntas abiertas, las delegaciones propuestas, las propuestas de acción y los permisos, de todas
+   las charlas. Se contesta ahí o en la charla y queda resuelto en los dos lados. La insignia de la Bandeja las cuenta.
+4. **Del backend de recados se reusa** el procesamiento en segundo plano, la transcripción, los resultados con su estado
+   y la ventana para deshacer.
+5. **`delegar` y `preguntar` para todos los agentes,** solo cuando el mensaje lo escribió la persona en una charla.
+   Corriendo solos (encargos, tareas, pasos de flujo) no los tienen, salvo el coordinador en sus tareas programadas
+   («cada mañana repartí el trabajo»). Son distintas de lo que ya existe entre agentes: `consultar` (preguntarle algo a
+   un colega) y `pedir` / `quedo_esperando` (necesitar algo de un colega para el trabajo propio y esperarlo) siguen igual.
+   `delegar` es pasarle a un colega un pedido de la persona, cuyo resultado le llega a ella; `preguntar` es preguntarle a
+   la persona, con opciones.
+6. **`delegar` reemplaza a `encargar`** del coordinador: una sola forma de pasar trabajo. El coordinador conserva ver el
+   estado de la oficina (`estado_oficina`, `entregas`, `corridas`, `bloqueos`).
+7. **Las instrucciones van como mensaje de sistema** (`--append-system-prompt`) para todos, como ya quedó en R0.
+8. **Micrófono en el campo de escribir de cada charla:** grabás y se manda a ese agente. Se transcribe en la compu.
+9. **Micrófono flotante de la secretaría:** abajo a la derecha (en el celular, arriba de la barra), con su cara y «Hablale
+   a <nombre> · Secretaría». Siempre le habla a la secretaría, aunque haya otra charla abierta, y mientras graba dice para
+   quién es. Sin secretaría, ofrece contratarla.
+10. **Cada audio del micrófono flotante abre una charla nueva** con la secretaría. Cuando ella lo entiende (termina de
+    procesarlo), la app abre esa charla para seguir desde ahí.
+11. **La próxima versión sale cuando esté todo esto.**
+
+**Hecho (U1–U5).** Como se describe en «Pasar trabajo, preguntar y hablar por audio en la charla» de
+[backend/API.md](../backend/API.md). Lo que hay que saber:
+- `recados.ts` y la sección Recados se fueron; sus tablas (`sec_recados*`) quedan sin uso en las bases viejas y los hilos
+  de recados siguen legibles como charlas de la secretaría. Lo de delegar y preguntar vive en `delegar.ts` (tarjetas por
+  charla, `charla_res`) y la transcripción suelta en `audio.ts` (`POST /api/audio/transcribir`).
+- En R0, `delegar` y `preguntar` no estaban en `--allowedTools`: con el claude de verdad habrían pedido permiso. Ahora van
+  permitidas para todos los agentes (el servidor solo las ofrece cuando corresponde).
+- El coordinador delega (sin preguntar) en todas sus corridas sin la persona, como hacía con `encargar`, no solo en sus
+  tareas programadas: el servidor MCP no distingue una tarea de un encargo o un paso de flujo.
+- Elegir una opción (en la charla o en la Bandeja) manda «Elijo: …» en esa charla; desde la Bandeja, la abre.
+- El micrófono flotante no aparece si el navegador no deja grabar; en el celular se esconde con un panel abierto y sube
+  cuando hay un aviso abajo. El atajo de teclado para grabar (tipo walkie-talkie) quedó afuera.
+- **Sin probar todavía:** con el claude de verdad (si separa bien qué delegar, cuándo pregunta y si respeta `explicito`) y
+  la grabación dentro de la app de escritorio empaquetada (macOS pide el permiso del micrófono la primera vez).
+
+**Orden**
+- **U1.** Micrófono en el campo de escribir de todas las charlas (transcripción con el mismo transcriptor; el texto
+  transcripto se ve en el mensaje).
+- **U2.** `delegar` y `preguntar` en la charla para todos, con tarjetas en la charla; `encargar` sale y el coordinador
+  delega con las mismas reglas (también en sus tareas programadas).
+- **U3.** «Te esperan» en Bandeja › Hoy, con respuesta desde ahí.
+- **U4.** Micrófono flotante de la secretaría: charla nueva por audio y se abre al entenderlo.
+- **U5.** Sacar la sección Recados (ruta, riel, `recados.js`); los recados guardados quedan legibles como charlas de la
+  secretaría. Pasar las rutas de `/api/recados` a la charla o retirarlas, con la API y el README al día.
+
 ## Fases
 ### R0: recados en la app (la base) (hecho)
 Implementado como se describe en «Recados a la secretaría» de [backend/API.md](../backend/API.md). Cambios respecto de lo
@@ -239,18 +297,44 @@ Lo planeado:
   (delegado a X, esperando tu ok, esperando respuesta).
 - Botón «Dejar un recado» en el ícono de la bandeja del sistema (abre el hilo con el micrófono listo).
 
-### R1: cerrar el circuito
+### R1: cerrar el circuito (hecho, sobre la charla)
 - `alTerminar` con `origen.recado`: mensaje en el hilo + notificación; recado `hecho` cuando terminan todas sus delegaciones.
 - «Cancelar» una delegación que no empezó.
 - Lectura de lo que está en curso para «¿cómo va…?».
 - Tema de memoria por delegación abierta.
 
-### R1b: flujos
+Como quedó (detalle en «Pasar trabajo, preguntar y hablar por audio en la charla» de [backend/API.md](../backend/API.md)):
+- Ya no hay hilo de recados: al terminar una delegación la tarjeta cambia, sale un aviso que abre esa charla (con
+  notificación) y queda una **novedad** que el agente recibe en su próximo mensaje ahí («Novedades desde tu último mensaje»),
+  una sola vez. No se escribe un mensaje falso en la charla: la sesión de claude no lo vería.
+- «Cancelar» ya estaba (U2).
+- `en_curso` en la charla, para todos: delegaciones abiertas, flujos por arrancar y corridas abiertas.
+- El tema de memoria por delegación abierta no se hizo: las novedades y `en_curso` cubren el «¿cómo va?» sin escribir en la
+  memoria de la secretaría.
+
+### R1b: flujos (hecho, sobre la charla)
 - `arrancar_flujo` (ahora), con `origen: {recado}` en la corrida.
 - Aviso de paso con aprobación o paso tuyo, con botones; `aprobar_paso`, `pedir_cambios` y `paso_hecho` en el hilo.
 - Estado de corridas para «¿cómo va…?» y aviso al terminar o al trabarse.
 - Ajuste: avisar por recados solo de las corridas que nacieron de un recado (por defecto) o de todas.
 - Después: tarea programada que arranca un flujo; sugerencia de guardar una cadena repetida como flujo.
+
+Como quedó (detalle en «Flujos desde la charla» de [backend/API.md](../backend/API.md); código en `charla-flujos.ts`):
+- `arrancar_flujo` para cualquier agente en la charla con la persona, con `disparadores` y `datos` en `FlujoDef` (el editor
+  de flujos los pide). Directo solo si el mensaje nombra el flujo; si no, propuesta. 45 s para deshacer.
+- La corrida no guarda `origen`: la tarjeta guarda la corrida (`datos.corrida`) y `MotorFlujos.alCambiar` la actualiza.
+- La tarjeta del flujo muestra los pasos con el actual marcado y, cuando te espera, **Aprobar**, **Pedir cambios** (con
+  nota) o **Hecho** (con nota opcional; sin archivos: para adjuntar, desde la corrida en Flujos).
+- Se avisa solo de las corridas que nacieron en una charla (la propuesta por defecto de la decisión 4). El ajuste para
+  avisar de todas no se hizo.
+- **Programado:** `arrancar_flujo` con `cuando` deja la tarjeta programada (una vez). Una tarea programada *repetida* que
+  arranque un flujo sigue pendiente.
+- Sugerir guardar una cadena repetida como flujo: pendiente (era «después»).
+
+### Citas de WhatsApp (hecho)
+Lo de «Datos de WhatsApp y de su memoria»: `[wa:N]` en lo que se lee, cambiado por el mensaje real en la respuesta, y
+`citas` en `delegar` y `arrancar_flujo` con el candado en la tarjeta (`citas-whatsapp.ts`). Las citas de la memoria de la
+secretaría no se hicieron.
 
 ### R2: Telegram
 - Ajustes › Toda la app › Telegram: pegar el token del bot (guardado con `safeStorage`), emparejar con un código de 6

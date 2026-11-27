@@ -29,8 +29,10 @@ App.Entregables = (function () {
   function abiertoPanel() { return App.modoDerecho && App.modoDerecho() === 'entregables'; }
 
   /* ---------------- contador (con cada /api/actividad) ---------------- */
+  var teEsperan = 0;   // preguntas y delegaciones propuestas de las charlas (las propuestas de acción ya son entregas)
   function alActividad(r) {
-    var n = r.entregasSinRevisar | 0;
+    var n = r.entregasSinRevisar | 0, te = r.teEsperan | 0;
+    if (te !== teEsperan) { teEsperan = te; pintarContador(); }
     if (n === sinRevisar && firma !== null) return;
     sinRevisar = n;
     refrescarUltimas();
@@ -47,7 +49,8 @@ App.Entregables = (function () {
 
   function pintarContador() {
     var b = App.dom && App.dom.navEnt;
-    if (b) { b.textContent = sinRevisar; b.classList.toggle('oculto', !sinRevisar); }
+    var total = sinRevisar + teEsperan;
+    if (b) { b.textContent = total; b.classList.toggle('oculto', !total); }
     if (App.Oficina && App.Oficina.muro) App.Oficina.muro(ultimas, sinRevisar);
     if (App.Avisos && App.Avisos.insignia) App.Avisos.insignia();
     if (App.Yo && App.Yo.refrescar) App.Yo.refrescar();
@@ -180,7 +183,7 @@ App.Entregables = (function () {
     /* solo los encargos `encargo:<reunión>:<n>` vienen de una reunión (los `coord:xxxx` del coordinador no) */
     var reu = e.origen === 'reunion' ? e.ref : (e.origen === 'encargo' && e.ref.indexOf('encargo:') === 0 ? (e.ref.split(':')[1] || '') : '');
     if (reu && App.Reunion && App.Reunion.ver) return h('button.btn.chico.fantasma', { onclick: function () { App.Reunion.ver(reu); } }, App.icono('reunion'), 'Ver la reunión');
-    if (e.origen === 'tarea' && e.agente) return h('button.btn.chico.fantasma', { onclick: function () { App.Agente.abrir(e.agente, 'tareas'); } }, 'Ver la tarea');
+    if (e.origen === 'tarea' && e.agente) return h('button.btn.chico.fantasma', { onclick: function () { if (e.ref) App.Agente.verTarea(e.ref); else App.Agente.abrir(e.agente, 'tareas'); } }, 'Ver la tarea');
     return null;
   }
 
@@ -279,9 +282,18 @@ App.Entregables = (function () {
     var pintarTexto = function (accion, propuestas) {
       App.vaciar(textoCaja);
       if (e.origen === 'propuesta' && accion) return;
-      var armado = e.origen === 'secretaria' ? App.Propuestas.reporte(e.texto || '', propuestas, { ver: function (id) { App.Nav.ir('#/bandeja/revisar/' + id); } })
+      var armado = e.origen === 'secretaria' ? App.Propuestas.reporte(e.texto || '', propuestas, { ver: function (id) { App.Nav.ir('#/bandeja/revisar/' + id); },
+          temas: memoriaSec.temas, verTema: function (slug, titulo) { verMemoria('temas', slug, titulo); }, alCambiar: function () { leerMemoriaSec(accion, propuestas); } })
         : e.origen === 'importacion' ? App.Propuestas.importacion(e.texto || '', importacion) : null;
       App.add(textoCaja, armado ? h('div.entrega-texto', armado) : App.htmlSeguro(h('div.md-doc.doc-panel.entrega-texto.entrega-doc'), App.markdown(e.texto || '(sin texto)')));
+    };
+    /* un reporte de la secretaría: sus temas, para ver qué «Para hacer» sigue y contestarle desde acá */
+    var memoriaSec = { temas: null };
+    var leerMemoriaSec = function (accion, propuestas) {
+      return api().get('/api/secretaria/memoria').then(function (m) {
+        if (!abiertoPanel() || abierta !== e.id) return;
+        memoriaSec.temas = m.temas || []; pintarTexto(accion, propuestas);
+      }).catch(function () { /* sin memoria: las filas quedan sin seguimiento */ });
     };
     /* una importación: con los temas y fichas que dejó, para abrirlos desde acá */
     var importacion = { ver: verMemoria, abrirMemoria: App.SecretariaMemoria ? function () { App.SecretariaMemoria.abrir(); } : null };
@@ -306,6 +318,7 @@ App.Entregables = (function () {
       if (!abiertoPanel() || abierta !== e.id) return;
       extra.corrida = r[0]; extra.accion = r[1];
       if (e.origen === 'propuesta' || e.origen === 'secretaria') pintarTexto(r[1], r[3]);
+      if (e.origen === 'secretaria') leerMemoriaSec(r[1], r[3]);
       pintarEspera(e, r[2], bloqueEspera);
       if (extra.corrida) {
         var c = extra.corrida;

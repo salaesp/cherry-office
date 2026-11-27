@@ -329,12 +329,14 @@ describe('consigna de la revisión', () => {
     await llamar(p.b, 'PUT', '/api/whatsapp/chats/' + encodeURIComponent(MAMA), { elegido: true })
     await llamar(p.b, 'PUT', '/api/secretaria', { agente: 'sofia', fuentes: [{ id: 'whatsapp', cada: { valor: 1, unidad: 'horas' }, chats: [MAMA] }] })
     const mensaje = (texto: string) => c.emitir({ tipo: 'mensaje', m: { id: 'm' + Math.random(), chat: MAMA, de: MAMA, propio: false, ts: Math.floor(Date.now() / 1000) - 300, tipo: 'texto', texto } })
-    const ultima = () => { const a = p.sb.llamadas.at(-1) ?? []; return a[a.length - 1] ?? '' }
-    return { ...p, mensaje, ultima }
+    /** La última revisión: el mensaje de sistema y el mensaje, juntos (la memoria va en el mensaje; qué anotar, en el sistema). */
+    const ultima = () => { const a = p.sb.llamadas.at(-1) ?? []; const i = a.indexOf('--append-system-prompt'); return (i >= 0 ? a[i + 1] ?? '' : '') + '\n\n' + (a[a.length - 1] ?? '') }
+    const mensajeDe = () => { const a = p.sb.llamadas.at(-1) ?? []; return a[a.length - 1] ?? '' }
+    return { ...p, mensaje, ultima, mensajeDe }
   }
 
   test('lleva los temas abiertos, las fichas de quienes aparecen, lo anotado hoy y las instrucciones', async () => {
-    const { sb, b, carpeta, sec, mem, mensaje, ultima } = await conWhatsApp()
+    const { sb, b, carpeta, sec, mem, mensaje, ultima, mensajeDe } = await conWhatsApp()
     mem.guardarTema(carpeta, { tema: 'Turno cardiólogo de mamá', estado: 'esperando', fecha: '2026-12-04 10:00', proximo: 'confirmar con el consultorio', nota: 'pidió turno' })
     mem.guardarTema(carpeta, { tema: 'Cuota del colegio', nota: 'vence el 10', hoy: haceDias(9) })
     mem.guardarTema(carpeta, { tema: 'Mudanza', estado: 'resuelto', nota: 'listo' })
@@ -346,8 +348,13 @@ describe('consigna de la revisión', () => {
     const r = await sec.revisar()
     expect(r).toBeDefined()
     await esperar(() => !sec.store.corriendo(carpeta))
+    // lo que ya sabía va en el mensaje, con lo nuevo; qué anotar va en el mensaje de sistema
+    const m = mensajeDe()
+    expect(m).toContain('<memoria_secretaria>')
+    expect(m).toContain('Temas abiertos (2):')
+    expect(m).not.toContain('memoria_diario_anotar')
     const c = ultima()
-    const mem0 = c.slice(c.indexOf('--- Tu memoria privada ---'))
+    const mem0 = c
     expect(mem0).toContain('Temas abiertos (2):')
     expect(mem0).toContain('turno-cardiologo-de-mama · Turno cardiólogo de mamá · esperando · 2026-12-04 10:00 · próximo: confirmar con el consultorio')
     expect(mem0).toContain('Cuota del colegio · abierto')
@@ -447,6 +454,15 @@ describe('API', () => {
     const t = mem.leerTema(carpeta, 'turno-cardiologo')!
     expect(t.historial.at(-1)).toMatchObject({ origen: 'Ana', texto: 'Fue al turno (pasó a «resuelto»)' })
     expect((await llamar(b, 'POST', raiz + '/tema', { slug: 'nada', estado: 'resuelto' })).status).toBe(404)
+
+    // desde un «Para hacer» del reporte: con título y sin slug lo crea; con un título parecido actualiza ese
+    const n = await llamar(b, 'POST', raiz + '/tema', { titulo: 'Responderle a Mamá por el café', proximo: 'Responderle y coordinar la entrega', nota: 'Lo anotó desde el reporte' })
+    expect(n.obj).toMatchObject({ slug: 'responderle-a-mama-por-el-cafe', titulo: 'Responderle a Mamá por el café', estado: 'abierto', nuevo: true })
+    const n2 = await llamar(b, 'POST', raiz + '/tema', { titulo: 'Responderle a Mamá por el café', estado: 'resuelto', nota: 'Ya lo hizo' })
+    expect(n2.obj).toMatchObject({ slug: 'responderle-a-mama-por-el-cafe', estado: 'resuelto', nuevo: false })
+    expect(mem.leerTema(carpeta, 'responderle-a-mama-por-el-cafe')!.historial.at(-1)).toMatchObject({ origen: 'Ana' })
+    expect((await llamar(b, 'POST', raiz + '/tema', { titulo: '' })).status).toBe(400)
+    expect((await llamar(b, 'DELETE', raiz + '/archivo', undefined, { ruta: 'temas/responderle-a-mama-por-el-cafe.md' })).status).toBe(200)
 
     // borrar
     expect((await llamar(b, 'DELETE', raiz + '/archivo', undefined, { ruta: 'temas/viejo.md' })).status).toBe(200)

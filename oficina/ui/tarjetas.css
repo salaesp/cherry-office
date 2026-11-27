@@ -1,0 +1,111 @@
+/* Tarjetas de lo que hizo un agente en una charla (tarjetas.js): delegación, pregunta y propuesta de acción, en la charla y
+   en Bandeja › Hoy. Y la grabación de audio (grabadora.js) y el micrófono flotante de la secretaría (microfono.js). */
+:root { --tj-deleg: #a46a12; --tj-deleg-suave: #fbf2e2; --tj-cal: #2f6db5; --tj-cal-suave: #e8f0fa; --tj-flujo: #3d8a5a; --tj-crea: #2d7f86; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; --tj-flujo: #7cc79a; --tj-crea: #6cc3ca; } }
+:root[data-theme="dark"] { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; --tj-flujo: #7cc79a; --tj-crea: #6cc3ca; }
+
+.tj { background: var(--panel); border: 1px solid var(--linea); border-left: 3px solid var(--tj-tinta, var(--linea-fuerte)); border-radius: var(--radio); overflow: hidden; }
+.tj.deleg { --tj-tinta: var(--tj-deleg); --tj-tinta-suave: var(--tj-deleg-suave); }
+.tj.accion { --tj-tinta: var(--tj-cal); --tj-tinta-suave: var(--tj-cal-suave); }
+.tj.preg { --tj-tinta: var(--acento); }
+.tj.flujo { --tj-tinta: var(--tj-flujo); }
+.tj.cambio { --tj-tinta: var(--tj-crea); }
+.tj.apagada { opacity: .62; }
+.tj-cab { display: flex; align-items: center; gap: 6px; padding: 9px 12px 0; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--tj-tinta, var(--suave)); }
+.tj-cab svg { width: 14px; height: 14px; }
+.tj-est { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 500; font-variant-numeric: tabular-nums; }
+.tj-cuerpo { padding: 6px 12px 10px; display: flex; flex-direction: column; gap: 7px; font-size: 13.5px; min-width: 0; }
+.tj-tit { font-weight: 600; font-size: 14px; line-height: 1.3; overflow-wrap: anywhere; }
+.tj-consigna summary { cursor: pointer; font-size: 12px; color: var(--suave); }
+.tj-consigna > div { margin-top: 4px; font-size: 13px; white-space: pre-wrap; background: var(--panel-2); border-radius: var(--radio-chico); padding: 7px 9px; overflow-wrap: anywhere; }
+.tj-nota { font-size: 12px; color: var(--suave); }
+.tj-nota.error { color: var(--peligro); }
+.tj-pie { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; padding: 8px 12px; border-top: 1px solid var(--linea); background: var(--panel-2); }
+.tj-opciones { display: flex; flex-direction: column; gap: 6px; }
+.tj-opcion { text-align: left; font: inherit; font-size: 13px; padding: 8px 10px; border-radius: var(--radio-chico); border: 1px solid var(--linea-fuerte); background: var(--panel); color: var(--texto); cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.tj-opcion:hover:not(:disabled) { border-color: var(--texto); }
+.tj-opcion:disabled { cursor: default; }
+.tj-opcion.elegida { border-color: var(--texto); box-shadow: inset 0 0 0 1px var(--texto); }
+.tj-opcion.elegida::after { content: 'Elegiste esta'; font-size: 11px; color: var(--suave); }
+.tj-opcion small { color: var(--suave); font-size: 12px; }
+.tj .prop { margin: 0; }
+/* cambios en la oficina que propuso la secretaría (docs/plan-secretaria-creadora.md) */
+.tj-cambio + .tj-cambio { border-top: 1px solid var(--linea); padding-top: 9px; }
+.tj-cambio { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tj-cambio-cab { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--suave); }
+.tj-cambio-cab svg { width: 13px; height: 13px; }
+.tj-cambio-campos { font-size: 13px; background: var(--panel-2); border-radius: var(--radio-chico); padding: 5px 9px; }
+.tj-cambio .tb-origen { margin: 2px 0 0; }
+.tj-cambios { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tj-cambios li { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.tj-cambio-tipo { flex: none; width: 92px; font-size: 11.5px; color: var(--tenue); }
+.tj-cambio-tit { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tj-cambio-est { margin-left: auto; flex: none; font-size: 11.5px; color: var(--suave); }
+.tj-cambio-est.borrador, .tj-cambio-est.error { color: var(--peligro); }
+.tj-cambio-est.creada { color: var(--ok); }
+.tj-dif { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; background: var(--panel-2); border-radius: var(--radio-chico); padding: 7px 9px; }
+.tj-dif > b { font-size: 11.5px; font-weight: 600; color: var(--suave); }
+.tj-dif-fila { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: baseline; }
+.tj-dif-etq { color: var(--suave); }
+.tj-dif-antes { color: var(--suave); text-decoration: line-through; text-decoration-color: var(--linea-fuerte); overflow-wrap: anywhere; }
+.tj-dif-ahora { overflow-wrap: anywhere; }
+.tj-dif-flecha { color: var(--tenue); }
+@media (max-width: 520px) { .tj-dif-fila { grid-template-columns: 1fr; gap: 0; } .tj-dif-flecha { display: none; } }
+
+.tj { max-width: 100%; }
+.chat > .tj { align-self: stretch; }
+.tj-ver { margin-right: auto; font: inherit; font-size: 12px; color: var(--suave); text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; padding: 0; cursor: pointer; }
+.parte-sec .tj + .tj { margin-top: 8px; }
+/* flujo: los pasos con el actual marcado */
+.tj-pasos { display: flex; flex-wrap: wrap; gap: 4px; }
+.tj-paso { font-size: 11.5px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--linea); color: var(--suave); }
+.tj-paso.hecho { color: var(--texto); background: var(--panel-2); }
+.tj-paso.actual { color: var(--tj-tinta); border-color: var(--tj-tinta); font-weight: 600; }
+/* lo compartido de WhatsApp, con candado */
+.tj-compartido summary { cursor: pointer; font-size: 12px; color: var(--suave); display: flex; align-items: center; gap: 5px; }
+.tj-compartido summary svg { width: 13px; height: 13px; }
+.tj-cita { margin-top: 5px; font-size: 13px; background: var(--panel-2); border-radius: var(--radio-chico); padding: 6px 9px; overflow-wrap: anywhere; }
+.tj-cita small { display: block; color: var(--suave); font-size: 11.5px; }
+
+/* mensaje que salió de un audio */
+.voz-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; opacity: .75; margin-bottom: 3px; }
+.voz-chip svg { width: 13px; height: 13px; }
+
+/* grabando: la franja que reemplaza el campo de escribir */
+.grab-franja { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; }
+.grab-vum { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--suave); }
+.grab-tiempo { font-variant-numeric: tabular-nums; color: var(--texto); font-weight: 600; }
+.grab-estado { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grab-trans { display: inline-flex; align-items: center; gap: 8px; }
+.grab-punto { width: 10px; height: 10px; border-radius: 50%; background: var(--peligro); animation: grab-latido 1.2s ease-in-out infinite; flex: none; }
+@keyframes grab-latido { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .grab-punto { animation: none; } }
+.redactar .btn-mic { flex: none; }
+
+/* micrófono flotante de la secretaría */
+.mic-sec { position: fixed; right: 18px; bottom: 18px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.mic-sec > * { pointer-events: auto; }
+.mic-sec-boton { display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 7px 0 6px; border-radius: 26px; border: 1px solid var(--linea); background: var(--panel); color: var(--texto); box-shadow: var(--sombra-alta); font: inherit; cursor: pointer; }
+.mic-sec-boton:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.mic-sec-cara { width: 38px; height: 38px; border-radius: 50%; image-rendering: pixelated; background: var(--panel-2); box-shadow: 0 0 0 1px var(--linea); flex: none; object-fit: cover; }
+.mic-sec-txt { display: flex; flex-direction: column; line-height: 1.15; text-align: left; }
+.mic-sec-txt b { font-size: 13.5px; }
+.mic-sec-txt small { font-size: 11.5px; color: var(--suave); }
+.mic-sec-ico { width: 38px; height: 38px; border-radius: 50%; background: var(--acento); color: var(--sobre-acento); display: grid; place-items: center; flex: none; }
+.mic-sec-ico.apagado { background: var(--panel-2); color: var(--suave); }
+.mic-sec-grabando { display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 8px; border-radius: 28px; background: var(--panel); border: 1px solid var(--linea); box-shadow: var(--sombra-alta); width: min(380px, calc(100vw - 32px)); }
+.mic-sec-grabando .grab-franja { min-height: 0; width: auto; flex: 1; min-width: 0; }
+.mic-sec-grabando .grab-franja .btn { flex: none; }
+.mic-sec-tostada { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 8px; border-radius: 12px; background: var(--acento); color: var(--sobre-acento); box-shadow: var(--sombra-alta); font-size: 13px; max-width: calc(100vw - 32px); }
+.mic-sec-tostada button { font: inherit; font-weight: 600; color: inherit; background: none; border: 0; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; padding: 0; }
+.mic-sec-tostada .mic-sec-cara { width: 24px; height: 24px; }
+@media (max-width: 720px) {
+  .mic-sec { right: 14px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .mic-sec-boton { padding: 0 6px; gap: 0; height: 56px; position: relative; }
+  .mic-sec-boton .mic-sec-txt { display: none; }
+  .mic-sec-boton .mic-sec-cara { position: absolute; left: -10px; top: -8px; width: 28px; height: 28px; border: 2px solid var(--panel); }
+  .mic-sec-boton .mic-sec-ico { width: 44px; height: 44px; }
+  .app.con-detalle .mic-sec { display: none; }
+  /* con un aviso abajo («Sofía te respondió»), el botón sube para no taparlo */
+  .app:has(.avisos-banner:not(.oculto)) .mic-sec { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+}

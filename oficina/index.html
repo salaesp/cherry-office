@@ -2,8 +2,18 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Oficina</title>
+<!-- instalable desde el celular (docs/plan-celular.md): manifest, íconos y service worker; la app de escritorio los ignora -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="iconos/icono-192.png">
+<link rel="apple-touch-icon" href="iconos/apple-touch-icon.png">
+<meta name="theme-color" content="#f2f0ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#19191b" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Oficina">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="ui/estilo.css">
 <link rel="stylesheet" href="ui/parte.css">
 <link rel="stylesheet" href="ui/flujos.css">
@@ -12,7 +22,7 @@
 <link rel="stylesheet" href="ui/ficha.css">
 <link rel="stylesheet" href="ui/archivos.css">
 <link rel="stylesheet" href="ui/revisar.css">
-<link rel="stylesheet" href="ui/recados.css">
+<link rel="stylesheet" href="ui/tarjetas.css">
 </head>
 <body>
 <div id="raiz"></div>
@@ -22,12 +32,18 @@
 <script src="ui/pixel/avatar.js"></script>
 <script src="ui/pixel/oficina-pixel.js"></script>
 <script src="ui/base.js"></script>
+<script src="ui/movil.js"></script>
 <script src="ui/chat-rico.js"></script>
 <script src="ui/revisar.js"></script>
 <script src="ui/actividad.js"></script>
 <script src="ui/avisos.js"></script>
 <script src="ui/permisos.js"></script>
 <script src="ui/propuestas.js"></script>
+<script src="ui/grabadora.js"></script>
+<script src="ui/tarjetas.js"></script>
+<script src="ui/microfono.js"></script>
+<script src="ui/push.js"></script>
+<script src="ui/compartir.js"></script>
 <script src="ui/entregables.js"></script>
 <script src="ui/paleta.js"></script>
 <script src="ui/nav.js"></script>
@@ -50,9 +66,15 @@
 <script src="ui/whatsapp.js"></script>
 <script src="ui/secretaria.js"></script>
 <script src="ui/secretaria-memoria.js"></script>
-<script src="ui/recados.js"></script>
+<script src="ui/celular.js"></script>
 <script src="ui/ajustes.js"></script>
 <script src="ui/uso.js"></script>
 <script src="ui/app.js"></script>
+<script>
+/* service worker: solo en el navegador (https o localhost), no en la app de escritorio (hq://) */
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && window.isSecureContext) {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+</script>
 </body>
 </html>

@@ -68,7 +68,7 @@ App.Flujos = (function () {
     clearTimeout(relojDetalle);
     if (abierta !== null) { abierta = null; App.Nav.alAbrir('flujos'); }
     var der = App.dom.derecho, cuerpo = h('div.der-cuerpo'), pie = h('div.der-pie');
-    var zona = h('div', App.cargando('Trayendo las corridas y los flujos…'));
+    var zona = h('div.der-secciones', App.cargando('Trayendo las corridas y los flujos…'));
     function chip(est, txt) {
       return h('button.chip' + (filtro === est ? '.sel' : ''), { onclick: function () { filtro = est; pintarLista(); } }, txt);
     }
@@ -92,12 +92,13 @@ App.Flujos = (function () {
       if (fs === null) catalogo.appendChild(h('div.error-txt', 'No pude traer los flujos.'));
       else if (!fs.length) {
         catalogo.appendChild(App.vacio('flujo', 'Todavía no hay flujos', 'Un flujo pasa un trabajo de agente en agente, con tu aprobación donde haga falta.',
-          [h('button.btn', { onclick: function () { App.Creador.abrir(); } }, App.icono('chispa'), 'Armar un flujo con el Creador'),
+          App.movil ? [App.secretaria() ? h('button.btn', { onclick: function () { App.pedirleASecretaria(); } }, App.icono('chispa'), 'Pedírselo a ' + App.secretaria().nombre) : h('span.ayuda', 'Los flujos se arman desde la compu.')] :
+          [h('button.btn', { onclick: function () { App.pedirleASecretaria(); } }, App.icono('chispa'), App.secretaria() ? 'Pedírselo a ' + App.secretaria().nombre : 'Armar un flujo con el Creador'),
             h('button.btn.primario', { onclick: function () { editor(null); } }, App.icono('mas'), 'Crear uno')]));
       } else fs.forEach(function (f) { catalogo.appendChild(filaFlujo(f)); });
       App.add(App.vaciar(zona),
         App.seccion('En marcha', [h('div.entregas-filtros', chip('abiertas', 'En curso'), chip('terminadas', 'Terminadas'), chip('todas', 'Todas')), lista]),
-        App.seccion('Flujos de la oficina', catalogo, { accion: fs && fs.length ? h('button.btn.chico.fantasma', { onclick: function () { editor(null); } }, App.icono('mas'), 'Nuevo flujo') : null }));
+        App.seccion('Flujos de la oficina', catalogo, { accion: fs && fs.length && !App.movil ? h('button.btn.chico.fantasma', { onclick: function () { editor(null); } }, App.icono('mas'), 'Nuevo flujo') : null }));
     }).catch(function (e) { App.vaciar(zona).appendChild(h('div.error-txt', e.message)); });
   }
 
@@ -106,11 +107,12 @@ App.Flujos = (function () {
     var n = (f.pasos || []).length, activo = f.activo !== false;
     var txt = n + (n === 1 ? ' paso' : ' pasos') + (f.descripcion ? ' · ' + f.descripcion : '');
     return App.filaDecision({
-      marca: 'flujo', titulo: f.nombre, sub: txt, clase: 'flu-def', alTocar: function () { editor(f.id); },
+      /* en el celular los flujos solo se corren: editarlos es cosa de la compu */
+      marca: 'flujo', titulo: f.nombre, sub: txt, clase: 'flu-def', alTocar: function () { if (App.movil) { if (activo) nuevaCorrida(f.id); } else editor(f.id); },
       estado: activo ? null : h('span.insignia', 'Pausado'),
       principal: activo ? h('button.btn.chico.primario', { onclick: function () { nuevaCorrida(f.id); } }, 'Correr')
-        : h('button.btn.chico', { onclick: function () { editor(f.id); } }, 'Editar'),
-      mas: [{ texto: 'Editar…', icono: 'lapiz', accion: function () { editor(f.id); } }]
+        : App.movil ? null : h('button.btn.chico', { onclick: function () { editor(f.id); } }, 'Editar'),
+      mas: App.movil ? null : [{ texto: 'Editar…', icono: 'lapiz', accion: function () { editor(f.id); } }]
     });
   }
 
@@ -400,10 +402,12 @@ App.Flujos = (function () {
       var fs = (r.flujos || []).filter(function (f) { return f.activo !== false; });
       App.vaciar(hj.cuerpo);
       if (!fs.length) {
-        App.add(hj.cuerpo, App.vacio('flujo', 'Todavía no hay flujos para correr', 'Armalos con el Creador o a mano.'));
+        App.add(hj.cuerpo, App.vacio('flujo', 'Todavía no hay flujos para correr', App.secretaria() ? 'Pedíselos a ' + App.secretaria().nombre + ' o armalos a mano.' : 'Armalos con el Creador o a mano.'));
+        /* celular: el editor y el Creador son de la compu; a la secretaría sí se le puede pedir */
+        if (App.movil && !App.secretaria()) App.add(hj.cuerpo, h('p.ayuda', 'Los flujos se arman desde la compu.'));
         App.add(hj.pie, h('button.btn', { onclick: hj.cerrar }, 'Cerrar'),
-          h('button.btn', { onclick: function () { hj.cerrar(); App.Creador.abrir(); } }, App.icono('chispa'), 'Armar con el Creador'),
-          h('button.btn.primario', { onclick: function () { hj.cerrar(); editor(); } }, 'Crear un flujo'));
+          App.movil && !App.secretaria() ? null : h('button.btn', { onclick: function () { hj.cerrar(); App.pedirleASecretaria(); } }, App.icono('chispa'), App.secretaria() ? 'Pedírselo a ' + App.secretaria().nombre : 'Armar con el Creador'),
+          App.movil ? null : h('button.btn.primario', { onclick: function () { hj.cerrar(); editor(); } }, 'Crear un flujo'));
         return;
       }
       /* el flujo: si ya viene elegido, un resumen con «Cambiar»; si no, la lista para elegir (sin <select>) */
@@ -477,13 +481,16 @@ App.Flujos = (function () {
     }
 
     function vacioEd() {
-      return { id: null, nombre: '', descripcion: '', activo: true, siguiente: '', cierreAbierto: false, pasos: [pasoNuevo()] };
+      return { id: null, nombre: '', descripcion: '', activo: true, siguiente: '', disparadores: '', datos: '', cierreAbierto: false, pasos: [pasoNuevo()] };
     }
     function pasoNuevo() {
       return { id: null, nombre: '', quien: '', consigna: '', recibe: '', entrega: '', aprobacion: false, plazoDias: '', esperaDias: '', recibeDe: [], recibeNada: false, abierto: true };
     }
     function desdeFlujo(f) {
       return { id: f.id, nombre: f.nombre || '', descripcion: f.descripcion || '', activo: f.activo !== false, origen: f.origen, siguiente: f.siguiente || '', cierreAbierto: false,
+        /* cómo se nombra en una charla y qué necesita para arrancar: se editan como texto separado por comas (* = obligatorio) */
+        disparadores: (f.disparadores || []).join(', '),
+        datos: (f.datos || []).map(function (d) { return d.nombre + (d.obligatorio ? '*' : ''); }).join(', '),
         pasos: (f.pasos || []).map(function (p) {
           return { id: p.id, nombre: p.nombre || '', quien: p.quien || '', consigna: p.consigna || '', recibe: p.recibe || '', entrega: p.entrega || '',
             aprobacion: !!p.aprobacion, plazoDias: p.plazoDias || '', esperaDias: p.esperaDias || '', recibeDe: (p.recibeDe || []).slice(),
@@ -542,6 +549,8 @@ App.Flujos = (function () {
       var nombre = h('input.campo', { value: ed.nombre, maxlength: 80, placeholder: 'Producción de una clase', oninput: function () { ed.nombre = nombre.value; sucio = true; } });
       var desc = h('textarea.campo', { rows: 2, maxlength: 600, placeholder: 'Para qué sirve este flujo (opcional)', oninput: function () { ed.descripcion = desc.value; sucio = true; } });
       desc.value = ed.descripcion;
+      var disp = h('input.campo', { value: ed.disparadores, maxlength: 800, placeholder: 'presupuesto, cotización', oninput: function () { ed.disparadores = disp.value; sucio = true; } });
+      var datosIn = h('input.campo', { value: ed.datos, maxlength: 800, placeholder: 'cliente*, pedido*, plazo', oninput: function () { ed.datos = datosIn.value; sucio = true; } });
       var estado = App.elegir({ forma: 'interruptor', etiqueta: 'Estado', valor: ed.activo,
         opciones: [{ valor: true, titulo: 'Activo' }, { valor: false, titulo: 'Pausado' }],
         alCambiar: function (v) { ed.activo = v; sucio = true; } });
@@ -553,6 +562,8 @@ App.Flujos = (function () {
       App.add(formulario,
         campo('Nombre', null, nombre),
         campo('Descripción', null, desc),
+        campo('Cómo lo nombrás', 'Palabras que usás para pedirlo en una charla, separadas por comas. Si las usás, el agente lo arranca sin preguntarte (con unos segundos para deshacer).', disp),
+        campo('Qué necesita para arrancar', 'Datos que el agente tiene que juntar antes de arrancarlo, separados por comas. Con * es obligatorio: si falta, te lo pregunta.', datosIn),
         campo('Estado', 'Un flujo pausado queda guardado pero no se puede correr.', estado),
         h('div.etiqueta-campo', { style: { marginTop: '12px' } }, 'Pasos'),
         h('div.ayuda', 'Tocá un paso para ver o cambiar sus detalles.'));
@@ -716,6 +727,9 @@ App.Flujos = (function () {
       var cuerpo = { nombre: ed.nombre.trim(), pasos: pasos, activo: !!ed.activo };
       cuerpo.descripcion = ed.descripcion.trim();
       cuerpo.siguiente = ed.siguiente || null;
+      var lista = function (t) { return String(t || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean); };
+      cuerpo.disparadores = lista(ed.disparadores);
+      cuerpo.datos = lista(ed.datos);
       if (!ed.id && ed.origen) cuerpo.origen = ed.origen;   // un flujo nuevo armado desde una reunión o desde esperas recuerda de dónde salió
       return cuerpo;
     }

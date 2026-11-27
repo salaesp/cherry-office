@@ -65,7 +65,7 @@
   /* «Convertir en skill»: guarda lo que sirve de esta charla como skill propia del agente (skills-propias.js) */
   function botonSkill(a, fantasma) {
     if (!App.SkillsPropias) return null;
-    return h('button.btn.chico.convertir-skill' + (fantasma ? '.fantasma' : ''), { title: 'Guardar lo que sirve de esta charla como skill de ' + a.nombre + ', para la próxima vez',
+    return h('button.btn.chico.convertir-skill.solo-compu' + (fantasma ? '.fantasma' : ''), { title: 'Guardar lo que sirve de esta charla como skill de ' + a.nombre + ', para la próxima vez',
       onclick: function () { App.SkillsPropias.desdeCharla(a, sesiones[a.id]); } }, App.icono('libro'), 'Convertir en skill');
   }
 
@@ -98,6 +98,7 @@
     }).then(function () { return cargarConsultas(id); }).then(function () {
       delete vivos[id]; delete cancelando[id];
       ocupado(id, false);
+      if (m.alResponder) { try { m.alResponder(); } catch (e) {} }
       if (actual === id && pestana === 'chat') pintar();   // si no, el aviso llega por /api/actividad (banner y faro)
       if (App.Nav) App.Nav.refrescar();                    // la lista de charlas: título, último mensaje y orden
       seguirCola(id);
@@ -149,17 +150,55 @@
 
   /* Consultas a colegas (Fase 4): /api/consultas?session= trae lo que el agente consultó en esa conversación; cada una trae
      `pos` = índice, en el historial, de la respuesta del agente que la hizo. Se cuelgan de esa respuesta como `m.consultas`. */
+  /* las tarjetas de lo que hizo el agente en la charla (delegaciones, preguntas, propuestas): cada una va debajo de la
+     respuesta de su turno; las que todavía no tienen respuesta (o se pasan del historial) van al final */
+  var sueltas = {};         // id -> tarjetas sin respuesta todavía
+  var sondeoTj = null;
+  function cargarTarjetas(id) {
+    var sid = sesiones[id];
+    if (!sid) return Promise.resolve();
+    return api.get('/api/charlas/tarjetas', { session: sid }).then(function (r) {
+      if (sesiones[id] !== sid) return;
+      var msgs = chats[id] || [];
+      msgs.forEach(function (m) { delete m.tarjetas; });
+      var resto = [];
+      /* los cambios en la oficina que propuso la secretaría van juntos, uno por turno (docs/plan-secretaria-creadora.md) */
+      var porTurno = {}, grupos = [];
+      (r.cambios || []).forEach(function (c) {
+        if (!porTurno[c.turno]) { porTurno[c.turno] = { c: [], turno: c.turno }; grupos.push(porTurno[c.turno]); }
+        porTurno[c.turno].c.push(c);
+      });
+      (r.tarjetas || []).map(function (t) { return { t: t }; }).concat((r.acciones || []).map(function (a) { return { a: a, turno: a.turno }; }), grupos).forEach(function (x) {
+        var turno = x.t ? x.t.turno : x.turno, m = msgs[turno];
+        if (m && m.r === 'a') (m.tarjetas = m.tarjetas || []).push(x); else resto.push(x);
+      });
+      sueltas[id] = resto;
+    }).catch(function () { /* sin tarjetas: el chat se ve igual */ });
+  }
+  function tarjetasEl(lista, id) {
+    return lista.map(function (x) {
+      var op = { alCambiar: function () { cargarTarjetas(id).then(function () { repintar(id); }); } };
+      return x.c ? App.Tarjetas.cambios(x.c, op) : x.a ? App.Tarjetas.accion(x.a, op) : App.Tarjetas.de(x.t, op);
+    });
+  }
+  function hayVivas(id) {
+    var todas = [].concat(sueltas[id] || []);
+    (chats[id] || []).forEach(function (m) { if (m.tarjetas) todas = todas.concat(m.tarjetas); });
+    return todas.some(function (x) { return x.t && (x.t.estado === 'esperando' || x.t.estado === 'corriendo' || x.t.estado === 'en_curso'); });
+  }
+
   function cargarConsultas(id) {
     var sid = sesiones[id];
     if (!sid) return Promise.resolve();
-    return api.get('/api/consultas', { session: sid }).then(function (r) {
+    var pT = cargarTarjetas(id);
+    return Promise.all([pT, api.get('/api/consultas', { session: sid }).then(function (r) {
       var msgs = chats[id] || [];
       msgs.forEach(function (m) { delete m.consultas; });
       (r.consultas || []).forEach(function (c) {
         var m = msgs[c.pos];
         if (m && m.r === 'a') (m.consultas = m.consultas || []).push(c);
       });
-    }).catch(function () { /* sin consultas: el chat se ve igual */ });
+    }).catch(function () { /* sin consultas: el chat se ve igual */ })]);
   }
 
   /* «Consultó a Patricia» plegable, con la pregunta y la respuesta de cada consulta */
@@ -174,8 +213,10 @@
       }));
   }
 
-  function abrir(id, pest) {
+  /* foco: id de una tarea a destacar si se abre en Tareas */
+  function abrir(id, pest, foco) {
     var a = App.agente(id); if (!a) return;
+    if (foco) tareaFoco = foco;
     var mismo = actual === id;
     ladoMovil = false;   // celular: elegir una charla (o volver a abrirla) muestra la charla, no los detalles
     if (!mismo) { sesionFija = null; lado = 'detalles'; ladoFiltro = ''; visor = null; }
@@ -201,7 +242,12 @@
   /* cambia lo que muestra la columna del costado sin rearmar la charla */
   function verLado(cual) {
     lado = cual || 'detalles'; ladoFiltro = '';
-    if (!esCompu()) { ladoMovil = true; detallesVistos(); }
+    if (!esCompu()) {
+      /* celular: los detalles (y cada lista adentro) dejan una entrada en el historial, así Atrás vuelve un paso */
+      var st = history.state && history.state.lado ? history.state : null;
+      if (!(st && st.lado === lado)) { try { history.pushState({ lado: lado, n: (st ? st.n : 0) + 1 }, '', location.href); } catch (e) { /* sin historial */ } }
+      ladoMovil = true; detallesVistos();
+    }
     if (visor && !visorJunto()) visor = null;   // el archivo tapaba la columna: se cierra para mostrar lo pedido
     pintarSoloLado();
   }
@@ -225,8 +271,10 @@
     pintarSoloLado();
     return obj;
   }
-  /* celular: cierra la columna de detalles y vuelve a la charla */
-  function cerrarLadoMovil() {
+  /* celular: cierra la columna de detalles y vuelve a la charla. Con la ✕ (no por Atrás) saca también sus entradas del
+     historial, si nadie navegó mientras tanto */
+  function cerrarLadoMovil(porHistorial) {
+    if (porHistorial !== true) setTimeout(function () { var st = history.state; if (st && st.lado && st.n > 0) history.go(-st.n); }, 0);
     ladoMovil = false; lado = 'detalles'; ladoFiltro = '';
     var der = App.dom.derecho;
     Array.prototype.forEach.call(der.querySelectorAll(':scope > aside.relacionado'), function (x) { x.remove(); });
@@ -251,6 +299,13 @@
     if (visor) der.setAttribute('data-visor', junto ? 'junto' : 'solo'); else der.removeAttribute('data-visor');
     der.classList.toggle('lado-movil', !esCompu());
   }
+  /* celular: Atrás y Adelante entre la charla, los detalles y sus listas */
+  window.addEventListener('popstate', function (e) {
+    if (esCompu() || !actual || App.modoDerecho() !== 'agente' || pestana !== 'chat') return;
+    var l = e.state && e.state.lado;
+    if (l) { if (!ladoMovil || lado !== l) { lado = l; ladoFiltro = ''; ladoMovil = true; pintarSoloLado(); } }
+    else if (ladoMovil) cerrarLadoMovil(true);
+  });
   /* si cambia el ancho de la ventana, el archivo pasa de al lado a en lugar de los detalles (o al revés) */
   window.addEventListener('resize', function () {
     if (!visor || !actual || App.modoDerecho() !== 'agente') return;
@@ -264,15 +319,16 @@
     var latCab = function () {
       var c = App.add(h('div.lat-cab'), Array.prototype.slice.call(arguments));
       c.appendChild(esCompu() ? h('button.btn.fantasma.icono.lat-cerrar', { title: 'Cerrar la charla', onclick: App.cerrarVentana }, App.icono('cerrar'))
-        : h('button.btn.fantasma.icono.lat-cerrar', { title: 'Volver a la charla', onclick: cerrarLadoMovil }, App.icono('cerrar')));
+        : h('button.btn.fantasma.icono.lat-cerrar', { title: 'Volver a la charla', onclick: function () { cerrarLadoMovil(); } }, App.icono('cerrar')));
       return c;
     };
     if (lado === 'detalles') {
-      var lapiz = esCompu() ? null : h('button.btn.fantasma.icono', { title: 'Perfil, apariencia y permisos de ' + a.nombre, onclick: function () { verLado('perfil'); } }, App.icono('lapiz'));
+      var lapiz = esCompu() ? null : h('button.btn.fantasma.icono', { title: 'Perfil, apariencia y permisos de ' + a.nombre, 'aria-label': 'Perfil, apariencia y permisos de ' + a.nombre, onclick: function () { verLado('perfil'); } }, App.icono('lapiz'));
       App.add(caja, latCab(h('b', 'Detalles'), lapiz), App.Nav.relacionado(a.id));
       return caja;
     }
-    var volver = h('button.btn.fantasma.icono', { title: 'Volver a los detalles', onclick: function () { verLado('detalles'); } }, App.icono('atras'));
+    var volver = h('button.btn.fantasma.icono', { title: 'Volver a los detalles', onclick: function () {
+      if (!esCompu() && history.state && history.state.lado && history.state.n > 1) history.back(); else verLado('detalles'); } }, App.icono('atras'));
     var cuerpo = h('div.der-cuerpo'), pie = h('div.der-pie');
     if (esFicha(lado)) {
       App.add(caja, latCab(volver, h('div.pestanas.lat-pest', FICHA_LADO.map(function (p) {
@@ -355,13 +411,13 @@
           App.retratoImg(a, 'retrato', 120),
           h('div.der-tit', h('h2', a.nombre), sub),
           h('div.der-acciones.agente-herr',
-            h('button.btn.fantasma.icono.agente-lapiz-btn', { title: 'Perfil, apariencia y permisos de ' + a.nombre, 'aria-pressed': String(esFicha(lado)),
+            h('button.btn.fantasma.icono.agente-lapiz-btn.solo-compu', { title: 'Perfil, apariencia y permisos de ' + a.nombre, 'aria-pressed': String(esFicha(lado)),
               onclick: function () { verLado(esFicha(lado) ? 'detalles' : 'perfil'); } }, App.icono('lapiz')),
-            h('button.btn.fantasma.icono', { title: 'Ver dónde está ' + a.nombre + ' en la oficina', onclick: function () {
+            h('button.btn.fantasma.icono.solo-compu', { title: 'Ver dónde está ' + a.nombre + ' en la oficina', onclick: function () {
               if (App.Oficina.marcar) App.Oficina.marcar(a.id); else if (App.Oficina.enfocarAgente) App.Oficina.enfocarAgente(a.id); } }, App.icono('pin')),
             /* cerrar no va acá: queda arriba a la derecha del todo, en la cabecera de la columna del costado */)),
         h('div.charla-barra', h('b.charla-tit', App.Nav.tituloCharla ? App.Nav.tituloCharla(a.id) : ''), chipContexto(a),
-          h('button.btn.chico.fantasma.sacar-tareas', { title: 'Convertir esta charla en tareas (para ' + a.nombre + ' o para otros)', onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), 'Sacar tareas'), botonSkill(a, true)),
+          botonSkill(a, true)),
         cuerpo, pie);
       der.classList.add('con-relacionado');
       ponerColumnas(a);
@@ -380,7 +436,7 @@
             App.retratoImg(a, 'retrato', 120),
             h('span.der-tit', h('span.agente-nombre', h('h2', a.nombre), App.icono('flecha')), sub, pista)),
           h('div.der-acciones', chipContexto(a),
-            h('button.btn.chico.sacar-tareas', { title: 'Convertir esta charla en tareas (para ' + a.nombre + ' o para otros)', onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), 'Sacar tareas'), botonSkill(a)),
+            botonSkill(a)),
           cerrarBtn),
         filaCuentas(a),
         cuerpo, pie);
@@ -392,7 +448,7 @@
           h('div.der-tit', h('h2', a.nombre), sub),
           /* con texto: un ícono solo no dice qué hace. La charla actual no se pierde: queda en la lista de Charlas */
           h('div.der-acciones', chipContexto(a),
-            h('button.btn.chico.sacar-tareas', { title: 'Convertir esta charla en tareas (para ' + a.nombre + ' o para otros)', onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), 'Sacar tareas'), botonSkill(a),
+            botonSkill(a),
             h('button.btn.chico', { title: 'Empezar de cero con ' + a.nombre + '. Esta charla queda guardada en Charlas.', onclick: function () { nueva(a.id); } }, App.icono('mas'), 'Nueva charla')),
           cerrarBtn),
         cuerpo, pie);
@@ -403,7 +459,7 @@
           h('div.der-tit', h('h2', a.nombre), sub),
           /* lo que se hace con alguien del equipo, a la vista: charlar, juntarlo en una reunión, darle una tarea */
           h('div.der-acciones',
-            h('button.btn.chico', { title: 'Llamar a reunión con ' + a.nombre, onclick: function () { App.Reunion.nueva([a.id]); } }, App.icono('reunion'), h('span.btn-txt', 'Reunión')),
+            App.movil ? null : h('button.btn.chico', { title: 'Llamar a reunión con ' + a.nombre, onclick: function () { App.Reunion.nueva([a.id]); } }, App.icono('reunion'), h('span.btn-txt', 'Reunión')),
             h('button.btn.chico', { title: 'Nueva tarea para ' + a.nombre, onclick: function () { nuevaTarea(a.id, {}); } }, App.icono('reloj'), h('span.btn-txt', 'Tarea')),
             h('button.btn.chico.primario', { title: 'Ir a la charla con ' + a.nombre, onclick: function () { irPestana('chat'); } }, App.icono('charla'), 'Charlar')),
           cerrarBtn),
@@ -426,26 +482,73 @@
   function pintarChat(a, cuerpo, pie) {
     var lista = h('div.chat'), sug = h('div.sugerencias');
     App.add(cuerpo, lista, sug);
-    var txt = h('textarea.campo', { rows: 1, placeholder: 'Escribile a ' + a.nombre + '…', maxlength: 20000 });
-    var enviar = h('button.btn.primario.icono', { title: 'Enviar (Enter)', onclick: mandar }, App.icono('enviar'));
-    var parar = h('button.btn.peligro.icono', { style: { display: 'none' }, onclick: function () { detener(a.id); } }, App.icono('parar'));
-    var adj = App.Adjuntos();
+    /* a la secretaría se le piden cosas (docs/plan-secretaria-creadora.md), y se le puede pegar cómo trabajás */
+    var esSecretaria = !!(App.secretaria && App.secretaria() && App.secretaria().id === a.id);
+    var invitacion = (esSecretaria ? 'Pedile algo a ' : 'Escribile a ') + a.nombre + '…';
+    var txt = h('textarea.campo', { rows: 1, placeholder: invitacion, maxlength: esSecretaria ? 60000 : 20000 });
+    /* un solo botón grande (como WhatsApp): con la caja vacía graba un audio; con algo escrito o adjunto, envía */
+    var enviar = h('button.btn.primario.icono.redactar-accion', { title: 'Enviar (Enter)', onclick: function () { if (modoMic()) grabar(); else mandar(); } });
+    var parar = h('button.btn.peligro.icono.redactar-parar', { style: { display: 'none' }, onclick: function () { detener(a.id); } }, App.icono('parar'));
+    var adj = App.Adjuntos({ alCambiar: function () { accion(); } });
     adj.zona(cuerpo); adj.zona(pie, txt);
-    txt.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); mandar(); } });
+    /* Enter manda; en el celular no (el teclado no tiene Shift+Enter): ahí Enter es un renglón nuevo y se manda con el botón */
+    txt.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !App.tactil()) { e.preventDefault(); mandar(); } });
     function ajustarAlto() { txt.style.height = 'auto'; txt.style.height = Math.min(160, txt.scrollHeight + 2) + 'px'; }
-    txt.addEventListener('input', function () { borradores[a.id] = txt.value; ajustarAlto(); });
+    txt.addEventListener('input', function () { borradores[a.id] = txt.value; ajustarAlto(); accion(); });
     if (borradores[a.id]) { txt.value = borradores[a.id]; setTimeout(ajustarAlto, 0); }
+    /* lo que se compartió desde otra app del celular (compartir.js): queda listo para revisar y mandar */
+    if (compartido && compartido.id === a.id) {
+      var comp = compartido; compartido = null;
+      if (comp.archivos && comp.archivos.length) adj.agregar(comp.archivos);
+      if (comp.texto) { txt.value = comp.texto; borradores[a.id] = comp.texto; setTimeout(ajustarAlto, 0); }
+    }
     var claveEleccion = function () { return sesiones[a.id] || 'nueva:' + a.id; };
     var selector = App.SelectorCharla({ modelo: a.modelo, esfuerzo: a.esfuerzo, valor: eleccionDe(claveEleccion()),
       alCambiar: function (v) { guardarEleccion(claveEleccion(), v); } });
-    App.add(pie, adj.lista, adj.error, adj.input, h('div.redactar', adj.boton, txt, parar, enviar),
-      h('div.pie-charla', selector, h('div.ayuda', 'Enter para enviar (con ' + a.nombre + ' trabajando, queda en cola) · Mayús+Enter para otra línea · arrastrá o pegá archivos')));
+    var puedeGrabar = App.Grabadora.puede();
+    function modoMic() { return puedeGrabar && !txt.value.trim() && !adj.hay(); }
+    var ultimoModo = null;
+    function accion() {
+      var mic = modoMic();
+      if (mic === ultimoModo) return;
+      ultimoModo = mic;
+      App.vaciar(enviar).appendChild(mic ? App.Grabadora.icono() : App.icono('flechaArriba'));
+      enviar.classList.toggle('es-mic', mic);
+      enviar.setAttribute('aria-label', mic ? 'Grabar un audio para ' + a.nombre : 'Enviar');
+      if (mic) enviar.title = 'Grabar un audio para ' + a.nombre; else if (enviar.title.indexOf('Grabar') === 0) enviar.title = 'Enviar (Enter)';
+    }
+    adj.boton.classList.add('fantasma');
+    /* la píldora con el clip y el texto; al costado, Detener (si está trabajando) y el botón grande */
+    var redactar = h('div.redactar.pildora', h('div.redactar-caja', adj.boton, txt), parar, enviar);
+    accion();
+    /* grabar: la franja reemplaza al campo; al mandar, se transcribe en la compu y sale como «(nota de voz) …» */
+    function grabar() {
+      var franja, g = App.Grabadora.crear({ alTiempo: function (sg) { franja.tiempo(sg); }, alTope: terminar });
+      function volver() { franja.el.replaceWith(redactar); }
+      function terminar() {
+        var wav = g.terminar();
+        if (!wav) { volver(); App.aviso('El audio quedó vacío.', true); return; }
+        franja.transcribiendo();
+        App.Grabadora.transcribir(wav).then(function (t) {
+          volver();
+          txt.value = App.Grabadora.MARCA + t;
+          mandar();
+        }).catch(function (e) { volver(); App.aviso(e.message, true); });
+      }
+      franja = App.Grabadora.franja({ para: 'Para ' + a.nombre, alCancelar: function () { g.cancelar(); volver(); }, alMandar: terminar });
+      g.empezar().then(function () { redactar.replaceWith(franja.el); }).catch(function (e) { App.aviso(e.message, true); });
+    }
+    App.add(pie, adj.lista, adj.error, adj.input, redactar,
+      h('div.pie-charla.solo-compu', selector, h('div.ayuda', 'Enter para enviar (con ' + a.nombre + ' trabajando, queda en cola) · Mayús+Enter para otra línea · arrastrá o pegá archivos')));
 
     function render() {
       App.vaciar(lista); App.vaciar(sug);
       var msgs = chats[a.id] || [];
       if (!msgs.length) {
-        lista.appendChild(h('div.chat-intro', App.retratoImg(a, 'x', 192), h('div', { style: { fontWeight: 600, color: 'var(--texto)' } }, a.nombre), h('div', a.rol)));
+        var esSec = App.secretaria && App.secretaria() && App.secretaria().id === a.id;
+        lista.appendChild(h('div.chat-intro', App.retratoImg(a, 'x', 192), h('div', { style: { fontWeight: 600, color: 'var(--texto)' } }, a.nombre), h('div', a.rol),
+          /* la secretaría es a quien se le pide crear cosas (docs/plan-secretaria-creadora.md) */
+          esSec ? h('div.chat-intro-sec', 'Pedime lo que necesites: contratar a alguien, crear un departamento, programar una tarea o arrancar un flujo. Te lo propongo y nada se crea hasta que lo apruebes.') : null));
         (a.chips || []).forEach(function (c) { sug.appendChild(h('button.chip', { onclick: function () { txt.value = c; mandar(); } }, c)); });
       }
       msgs.forEach(function (m) {
@@ -454,7 +557,8 @@
           var sp = App.Adjuntos.separar(m.t);
           var chipsAdj = sp.rutas.length ? App.Adjuntos.chips(sp.rutas)
             : (m.adj && m.adj.length ? h('div.adjuntos', m.adj.map(function (n) { return h('div.adjunto', App.icono('clip'), h('span', n)); })) : null);
-          lista.appendChild(h('div.msg.u', sp.texto, chipsAdj)).dataset.texto = sp.texto;
+          var vz = App.Grabadora.partir(sp.texto);
+          lista.appendChild(h('div.msg.u', vz.voz ? h('div.voz-chip', App.Grabadora.icono(), 'Nota de voz') : null, vz.voz ? h('div', vz.texto) : sp.texto, chipsAdj)).dataset.texto = sp.texto;
         }
         else {
           var plegados = m.pasos ? App.ChatRico.pasosPlegados(m.pasos) : null;
@@ -465,8 +569,12 @@
           if (arch) burbuja.appendChild(arch);
           lista.appendChild(burbuja);
           if (m.consultas && m.consultas.length) lista.appendChild(bloqueConsultas(m.consultas));
+          if (m.tarjetas && m.tarjetas.length) App.add(lista, tarjetasEl(m.tarjetas, a.id));
         }
       });
+      if ((sueltas[a.id] || []).length) App.add(lista, tarjetasEl(sueltas[a.id], a.id));
+      clearTimeout(sondeoTj);
+      if (hayVivas(a.id)) sondeoTj = setTimeout(function () { if (lista.isConnected && actual === a.id) cargarTarjetas(a.id).then(function () { repintar(a.id); }); }, 3000);
       refrescarVivo = null;
       if (enCurso[a.id]) {
         var vivoEl = lista.appendChild(App.ChatRico.burbujaVivo(vivos[a.id], a.nombre));
@@ -485,14 +593,22 @@
       cuerpo.scrollTop = cuerpo.scrollHeight;
       /* con el agente trabajando se puede seguir escribiendo (queda en cola) y aparece «Detener» */
       var ocup = !!enCurso[a.id];
-      enviar.title = ocup ? 'Dejar en cola (Enter): sale cuando ' + a.nombre + ' termine' : 'Enviar (Enter)';
-      txt.placeholder = ocup ? 'Dejalo en cola…' : 'Escribile a ' + a.nombre + '…';
+      if (!modoMic()) enviar.title = ocup ? 'Dejar en cola (Enter): sale cuando ' + a.nombre + ' termine' : 'Enviar (Enter)';
+      txt.placeholder = ocup ? 'Dejalo en cola…' : invitacion;
       parar.style.display = ocup ? '' : 'none';
       parar.disabled = !!cancelando[a.id];
       parar.title = cancelando[a.id] ? 'Deteniendo…' : 'Detener lo que está haciendo ' + a.nombre;
-      /* «Sacar tareas»: solo con una charla que tenga algo tuyo y sin respuesta en curso */
+      /* «Convertir en skill»: solo con una charla que tenga algo tuyo y sin respuesta en curso */
       var sinCharla = !!enCurso[a.id] || !sesiones[a.id] || !msgs.some(function (m) { return m.r === 'u'; });
-      App.dom.derecho.querySelectorAll('.sacar-tareas, .convertir-skill').forEach(function (b) { b.disabled = sinCharla; });
+      App.dom.derecho.querySelectorAll('.convertir-skill').forEach(function (b) { b.disabled = sinCharla; });
+      /* «Sacar tareas» ya no es un botón fijo: los agentes proponen tareas en la charla (proponer_tarea, delegar). Queda
+         como sugerencia debajo de la última respuesta, para el repaso del final, cuando la charla ya tiene sustancia
+         (3 idas y vueltas) y no hay nada en curso ni en cola. */
+      var idas = msgs.filter(function (m) { return m.r === 'u'; }).length;
+      if (!sinCharla && idas >= 3 && !(colas[a.id] || []).length) {
+        sug.appendChild(h('button.chip.sug-tareas', { title: 'Repasar la charla y convertir lo pendiente en tareas (para ' + a.nombre + ' o para otros)',
+          onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), '¿Sacamos tareas de esta charla?'));
+      }
     }
 
     var leyendo = false;
@@ -508,7 +624,7 @@
       adj.leer().then(function (archivos) {
         txt.value = ''; txt.style.height = '';
         delete borradores[id];
-        adj.vaciar();
+        adj.vaciar(); accion();
         var m = { t: t, nombres: nombres, archivos: archivos, eleccion: eleccion, sesion: sesion, guardar: adj.guardarEnBiblioteca };
         // el agente está ocupado: queda en la cola y sale solo cuando termine
         if (enCurso[id]) { (colas[id] = colas[id] || []).push(m); repintar(id); }
@@ -943,10 +1059,98 @@
     return h('span.insignia' + (e.estado === 'ok' ? '.ok' : '.error'), e.estado === 'ok' ? 'Hecha' : 'Con error');
   }
 
+  var CUANDO_CORREN = 'Corren mientras Oficina está abierta (aunque cierres la ventana). Si la app estuvo cerrada, una que se repite se pone al día al abrirla, hasta 12 horas después de su hora; una de una sola vez se hace igual, aunque sea tarde.';
+  /* estado en una insignia, y qué es lo que hay que hacer: reintentar, ver el pedido de permiso o nada */
+  function estadoTarea(t, activa, hecha) {
+    var u = t.ultima;
+    if (t.corriendo) return { ins: h('span.insignia.aviso', 'Corriendo…'), texto: 'Corriendo ahora' };
+    if (u && u.estado === 'esperando_permiso') return { ins: h('span.insignia.aviso', 'Espera tu permiso'), verPedido: true, texto: 'Frenó: necesita tu permiso para seguir' };
+    if (hecha) return { ins: h('span.insignia.ok', 'Hecha') };
+    if (!activa) return { ins: h('span.insignia', 'En pausa') };
+    if (u && u.estado === 'error') return { ins: h('span.insignia.error', 'Falló'), reintentar: true, texto: 'La última vez falló' + (u.error ? ': ' + u.error : '.') };
+    if (!u) return { ins: h('span.insignia', 'Todavía no corrió') };
+    return { ins: h('span.insignia.ok', 'Funcionó') };
+  }
+  /* una sola vez: en qué quedó */
+  function estadoUnica(t, activa, hecha) {
+    if (hecha) return 'Hecha el ' + fechaCorta(t.hecha, t.zona, false) + '. Su entrega está en Entregables.';
+    if (t.corriendo) return 'Haciéndola ahora…';
+    if (!activa) return 'No se hace mientras esté en pausa';
+    if (t.proxima) return 'Pendiente: se hace ese día a esa hora';
+    if (t.ultima && t.ultima.estado === 'error' && !t.ultima.manual) return 'Falló. Reintentala, o cambiale la fecha.';
+    return 'Ya es la hora: se hace en cuanto se pueda';
+  }
+  /* lo que se dice de una tarea, igual en la fila de la ficha y en su hoja (desde la Bandeja) */
+  function datosTarea(t) {
+    var sis = zonaSistema();
+    var activa = t.activa !== false;
+    var unica = t.tipo === 'unica', hecha = unica && !!t.hecha;
+    var zonaTxt = t.zona && t.zona !== sis ? ' (' + t.zona + ')' : '';
+    var cuando = unica ? 'Una sola vez · ' + (t.cuando ? fechaCorta(t.cuando, t.zona, true) : (t.fecha + ' ' + t.hora)) + zonaTxt
+      : textoDias(t.dias) + ' · ' + t.hora + zonaTxt;
+    /* modelo o esfuerzo propios de la tarea (pisan los del agente) */
+    var modelo = t.ia && (t.ia.modelo || t.ia.esfuerzo) ? [t.ia.modelo ? App.tituloModelo(t.ia.modelo) : '', t.ia.esfuerzo ? App.tituloEsfuerzo(t.ia.esfuerzo) : ''].filter(Boolean).join(' · ') : '';
+    var proxima = unica ? estadoUnica(t, activa, hecha)
+      : (activa ? (t.proxima ? 'Próxima: ' + fechaCorta(t.proxima, t.zona, true) : 'Sin próxima corrida') : 'No corre mientras esté en pausa');
+    var ultima = t.ultima && !hecha ? 'Última: ' + fechaCorta(t.ultima.inicio, t.zona, false) + (t.ultima.manual ? (unica ? ' (a mano)' : ' (prueba)') : '') : null;
+    return { activa: activa, unica: unica, hecha: hecha, cuando: cuando, modelo: modelo, proxima: proxima, ultima: ultima, est: estadoTarea(t, activa, hecha) };
+  }
+  /* el botón que importa ahora: ver el pedido de permiso, reintentar, probar o hacer ahora */
+  function botonPrincipal(t, d, alCorrer, grande) {
+    var cls = grande ? 'button.btn' : 'button.btn.chico';
+    if (d.est.verPedido) return h(cls + '.primario', { onclick: function () { App.Nav.ir('#/bandeja/permisos'); } }, 'Ver pedido');
+    var texto = d.unica ? (d.hecha ? 'Hacer de nuevo' : d.est.reintentar ? 'Reintentar' : 'Hacer ahora') : (d.est.reintentar ? 'Reintentar' : 'Probar ahora');
+    return h(cls, { disabled: !!t.corriendo, onclick: function (ev) {
+      var btn = ev.currentTarget; btn.disabled = true;
+      api.post('/api/tareas/' + encodeURIComponent(t.id) + '/correr').then(function () {
+        App.aviso('Probando «' + t.nombre + '»…');
+        if (alCorrer) alCorrer();
+        if (App.Actividad) setTimeout(App.Actividad.ya, 300);
+      }).catch(function (e) { App.fallo(e); btn.disabled = false; });
+    } }, texto);
+  }
+  /* alAbrirChat: antes de saltar al chat de una corrida (p. ej. cerrar la hoja de la tarea) */
+  function cargarHistorial(a, t, caja, alAbrirChat) {
+    App.vaciar(caja).appendChild(App.cargando('Trayendo el historial…'));
+    api.get('/api/tareas/' + encodeURIComponent(t.id) + '/ejecuciones').then(function (r) {
+      App.vaciar(caja);
+      var es = r.ejecuciones || [];
+      if (!es.length) { caja.appendChild(h('div.ayuda', 'Todavía no se ejecutó.')); return; }
+      es.forEach(function (e) { caja.appendChild(filaEjecucion(a, e, t, alAbrirChat)); });
+    }).catch(function (e) { App.vaciar(caja).appendChild(h('div.ayuda', e.message)); });
+  }
+  function filaEjecucion(a, e, t, alAbrirChat) {
+    var texto = h('div', { style: { display: 'none', marginTop: '6px' } });
+    if (e.estado === 'esperando_permiso') {
+      App.add(texto, h('div', 'Frenó: necesita tu permiso para seguir. ', h('button.btn.chico', { onclick: function () { App.Nav.ir('#/bandeja/permisos'); } }, 'Ver pedido')));
+    } else {
+      var detalle = e.estado === 'error' ? (e.error || 'Falló.') : (e.resultado || (e.estado === 'corriendo' ? 'Todavía está corriendo…' : '(sin respuesta)'));
+      App.add(texto, e.estado === 'error' ? h('div.error-txt', detalle) : App.htmlSeguro(h('div.md-doc.doc-panel'), App.markdown(detalle)));
+    }
+    var ver = h('button.btn.chico.fantasma', { onclick: function () {
+      var abierto = texto.style.display !== 'none';
+      texto.style.display = abierto ? 'none' : 'block';
+      ver.textContent = abierto ? 'Ver texto' : 'Ocultar';
+    } }, 'Ver texto');
+    var chatBtn = e.sid && e.estado !== 'corriendo' ? h('button.btn.chico.fantasma', { onclick: function () {
+      if (alAbrirChat) alAbrirChat();
+      App.Agente.abrirSesion(a.id, e.sid);
+    } }, 'Abrir en el chat') : null;
+    var costo = typeof e.costo === 'number' && e.costo > 0 ? ' · ≈ US$ ' + e.costo.toFixed(2) : '';
+    return h('div', { style: { borderTop: '1px solid var(--linea)', padding: '7px 0' } },
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
+        estadoEjecucion(e),
+        h('span.ayuda', { style: { margin: 0, flex: 1 } }, fechaCorta(e.inicio, null, false) + (e.manual ? (t && t.tipo === 'unica' ? ' · a mano' : ' · prueba') : '') + costo),
+        ver, chatBtn),
+      texto);
+  }
+
+  var tareaFoco = null;   // la tarea a destacar al abrir la pestaña Tareas (se llegó tocándola en otro lado)
   function pintarTareas(a, cuerpo, pie) {
     var cont = h('div', { style: { padding: '14px' } }, App.cargando('Trayendo las tareas…'));
     cuerpo.appendChild(cont);
     var id = a.id;
+    var foco = tareaFoco; tareaFoco = null;
     function vigente() { return actual === id && viendo('tareas') && cont.isConnected; }
     function cargar() {
       clearTimeout(sondeoTareas);
@@ -958,7 +1162,7 @@
         if (mias.some(function (t) { return t.corriendo; })) sondeoTareas = setTimeout(function () { if (vigente()) cargar(); }, 3000);
       }).catch(function (e) { if (vigente()) App.vaciar(cont).appendChild(h('div.vacio', e.message)); });
     }
-    var CUANDO_CORREN = 'Corren mientras Oficina está abierta (aunque cierres la ventana). Si la app estuvo cerrada, una que se repite se pone al día al abrirla, hasta 12 horas después de su hora; una de una sola vez se hace igual, aunque sea tarde.';
+    var verAyuda = false;
     function listar(ts) {
       App.vaciar(cont);
       if (!ts.length) {
@@ -967,56 +1171,33 @@
       }
       // las de una sola vez ya hechas van al final
       var ordenadas = ts.slice().sort(function (x, y) { return (x.hecha ? 1 : 0) - (y.hecha ? 1 : 0); });
-      cont.appendChild(App.seccion('Tareas programadas', ordenadas.map(fila), { cuenta: String(ts.length), ayuda: CUANDO_CORREN }));
-    }
-    function recargarDespues() { cargar(); if (App.Actividad) setTimeout(App.Actividad.ya, 300); }
-
-    /* estado en una insignia, y qué es lo que hay que hacer: reintentar, ver el pedido de permiso o nada */
-    function estadoTarea(t, activa, hecha) {
-      var u = t.ultima;
-      if (t.corriendo) return { ins: h('span.insignia.aviso', 'Corriendo…') };
-      if (u && u.estado === 'esperando_permiso') return { ins: h('span.insignia.aviso', 'Espera tu permiso'), verPedido: true };
-      if (hecha) return { ins: h('span.insignia.ok', 'Hecha') };
-      if (!activa) return { ins: h('span.insignia', 'En pausa') };
-      if (u && u.estado === 'error') return { ins: h('span.insignia.error', 'Falló'), reintentar: true };
-      if (!u) return { ins: h('span.insignia', 'Todavía no corrió') };
-      return { ins: h('span.insignia.ok', 'Funcionó') };
+      /* la explicación de cuándo corren, detrás de un «?»: no tapa la lista */
+      var ayuda = h('div.seccion-ayuda' + (verAyuda ? '' : '.oculto'), CUANDO_CORREN);
+      var q = h('button.btn.fantasma.icono.chico.ayuda-q', { title: 'Cuándo corren las tareas', 'aria-label': 'Cuándo corren las tareas', 'aria-expanded': String(verAyuda), onclick: function () {
+        verAyuda = !verAyuda; ayuda.classList.toggle('oculto', !verAyuda); q.setAttribute('aria-expanded', String(verAyuda));
+      } }, '?');
+      var filas = ordenadas.map(fila);
+      cont.appendChild(App.seccion('Tareas programadas', [ayuda].concat(filas), { cuenta: String(ts.length), accion: q }));
+      if (foco) {
+        var el = cont.querySelector('.tarea-item[data-tarea="' + (window.CSS && CSS.escape ? CSS.escape(foco) : foco) + '"]');
+        if (el) { el.classList.add('foco'); setTimeout(function () { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 50); }
+        foco = null;
+      }
     }
 
     function fila(t) {
-      var sis = zonaSistema();
-      var activa = t.activa !== false;
-      var unica = t.tipo === 'unica', hecha = unica && !!t.hecha;
-      var zonaTxt = t.zona && t.zona !== sis ? ' (' + t.zona + ')' : '';
-      var est = estadoTarea(t, activa, hecha);
+      var d = datosTarea(t), activa = d.activa, hecha = d.hecha;
       var historial = h('div.tarea-historial.oculto'), abiertoHist = false;
       function verHistorial() {
         abiertoHist = !abiertoHist;
         historial.classList.toggle('oculto', !abiertoHist);
-        if (abiertoHist) cargarHistorial(t, historial);
-      }
-      function probar(btn) {
-        btn.disabled = true;
-        api.post('/api/tareas/' + encodeURIComponent(t.id) + '/correr').then(function () {
-          App.aviso('Probando «' + t.nombre + '»…');
-          recargarDespues();
-        }).catch(function (e) { App.fallo(e); btn.disabled = false; });
+        if (abiertoHist) cargarHistorial(a, t, historial);
       }
       function editar() { hojaTarea(a, t, cargar); }
-      var principal;
-      if (est.verPedido) principal = h('button.btn.chico.primario', { onclick: function () { App.Nav.ir('#/bandeja/permisos'); } }, 'Ver pedido');
-      else {
-        var texto = unica ? (hecha ? 'Hacer de nuevo' : est.reintentar ? 'Reintentar' : 'Hacer ahora') : (est.reintentar ? 'Reintentar' : 'Probar ahora');
-        principal = h('button.btn.chico', { disabled: !!t.corriendo, onclick: function (ev) { probar(ev.currentTarget); } }, texto);
-      }
-      var linea1 = unica ? 'Una sola vez · ' + (t.cuando ? fechaCorta(t.cuando, t.zona, true) : (t.fecha + ' ' + t.hora)) + zonaTxt
-        : textoDias(t.dias) + ' · ' + t.hora + zonaTxt;
-      var linea2 = unica ? estadoUnica(t, activa, hecha)
-        : (activa ? (t.proxima ? 'Próxima: ' + fechaCorta(t.proxima, t.zona, true) : 'Sin próxima corrida') : 'No corre mientras esté en pausa');
-      var ultima = t.ultima && !hecha ? 'Última: ' + fechaCorta(t.ultima.inicio, t.zona, false) + (t.ultima.manual ? (unica ? ' (a mano)' : ' (prueba)') : '') : null;
+      var linea1 = d.cuando + (d.modelo ? ' · ' + d.modelo : '');
       var filaDec = App.filaDecision({
-        marca: 'reloj', titulo: t.nombre, alTocar: editar, estado: est.ins, principal: principal,
-        sub: [h('div', linea1), h('div', linea2), ultima ? h('div', ultima) : null],
+        marca: 'reloj', titulo: t.nombre, alTocar: editar, estado: d.est.ins, principal: botonPrincipal(t, d, cargar),
+        sub: [h('div', linea1), h('div', d.proxima), d.ultima ? h('div', d.ultima) : null],
         mas: [
           { texto: 'Editar', icono: 'lapiz', accion: editar },
           hecha ? null : { texto: activa ? 'Pausar' : 'Reanudar', accion: function () {
@@ -1036,55 +1217,64 @@
             });
           } }]
       });
-      return h('div.tarea-item' + (activa ? '' : '.pausada'), filaDec,
+      return h('div.tarea-item' + (activa ? '' : '.pausada'), { 'data-tarea': t.id }, filaDec,
         t.archivos && t.archivos.length ? h('div.tarea-archivos', App.Adjuntos.chips(t.archivos)) : null, historial);
     }
 
-    /* una sola vez: en qué quedó */
-    function estadoUnica(t, activa, hecha) {
-      if (hecha) return 'Hecha el ' + fechaCorta(t.hecha, t.zona, false) + '. Su entrega está en Entregables.';
-      if (t.corriendo) return 'Haciéndola ahora…';
-      if (!activa) return 'No se hace mientras esté en pausa';
-      if (t.proxima) return 'Pendiente: se hace ese día a esa hora';
-      if (t.ultima && t.ultima.estado === 'error' && !t.ultima.manual) return 'Falló. Reintentala, o cambiale la fecha.';
-      return 'Ya es la hora: se hace en cuanto se pueda';
-    }
-
-    function cargarHistorial(t, caja) {
-      App.vaciar(caja).appendChild(App.cargando('Trayendo el historial…'));
-      api.get('/api/tareas/' + encodeURIComponent(t.id) + '/ejecuciones').then(function (r) {
-        App.vaciar(caja);
-        var es = r.ejecuciones || [];
-        if (!es.length) { caja.appendChild(h('div.ayuda', 'Todavía no se ejecutó.')); return; }
-        es.forEach(function (e) { caja.appendChild(filaEjecucion(e, t)); });
-      }).catch(function (e) { App.vaciar(caja).appendChild(h('div.ayuda', e.message)); });
-    }
-
-    function filaEjecucion(e, t) {
-      var texto = h('div', { style: { display: 'none', marginTop: '6px' } });
-      if (e.estado === 'esperando_permiso') {
-        App.add(texto, h('div', 'Frenó: necesita tu permiso para seguir. ', h('button.btn.chico', { onclick: function () { App.Nav.ir('#/bandeja/permisos'); } }, 'Ver pedido')));
-      } else {
-        var detalle = e.estado === 'error' ? (e.error || 'Falló.') : (e.resultado || (e.estado === 'corriendo' ? 'Todavía está corriendo…' : '(sin respuesta)'));
-        App.add(texto, e.estado === 'error' ? h('div.error-txt', detalle) : App.htmlSeguro(h('div.md-doc.doc-panel'), App.markdown(detalle)));
-      }
-      var ver = h('button.btn.chico.fantasma', { onclick: function () {
-        var abierto = texto.style.display !== 'none';
-        texto.style.display = abierto ? 'none' : 'block';
-        ver.textContent = abierto ? 'Ver texto' : 'Ocultar';
-      } }, 'Ver texto');
-      var chatBtn = e.sid && e.estado !== 'corriendo' ? h('button.btn.chico.fantasma', { onclick: function () { abrirSesion(a, e.sid); } }, 'Abrir en el chat') : null;
-      var costo = typeof e.costo === 'number' && e.costo > 0 ? ' · ≈ US$ ' + e.costo.toFixed(2) : '';
-      return h('div', { style: { borderTop: '1px solid var(--linea)', padding: '7px 0' } },
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } },
-          estadoEjecucion(e),
-          h('span.ayuda', { style: { margin: 0, flex: 1 } }, fechaCorta(e.inicio, null, false) + (e.manual ? (t && t.tipo === 'unica' ? ' · a mano' : ' · prueba') : '') + costo),
-          ver, chatBtn),
-        texto);
-    }
-
     cargar();
-    App.add(pie, App.acciones(null, h('button.btn.primario', { onclick: function () { hojaTarea(a, null, cargar); } }, 'Nueva tarea')));
+    App.add(pie, App.acciones(null, h('button.btn.primario.solo-compu', { onclick: function () { hojaTarea(a, null, cargar); } }, 'Nueva tarea')));
+  }
+
+  /* Una tarea sola, en una hoja (docs: bocetos «Ficha de tarea», propuesta A). Es lo que abre tocar una tarea desde la
+     Bandeja (Hoy, una entrega, lo que falló): se ve en qué anda y se actúa sin dejar la Bandeja; cerrar la hoja vuelve
+     ahí. Desde la hoja se puede ir a la ficha de su agente, con la tarea destacada. */
+  function verTarea(tid) {
+    if (!tid) return;
+    api.get('/api/tareas/' + encodeURIComponent(tid)).then(function (r) {
+      var t = r.tarea, a = t && App.agente(t.agente);
+      if (!a) { App.aviso('Esa tarea ya no está.', true); return; }
+      var sondeo = null;
+      var hj = App.hoja({ titulo: t.nombre, ancho: 520, clave: 'ver-tarea', alCerrar: function () { clearTimeout(sondeo); } });
+      hj.el.classList.add('hoja-tarea');
+      function abierta() { return hj.el.isConnected; }
+      function recargar() {
+        api.get('/api/tareas/' + encodeURIComponent(tid)).then(function (r2) { if (abierta() && r2.tarea) { t = r2.tarea; pintarHoja(); } })
+          .catch(function () { /* se queda con lo que mostraba */ });
+      }
+      function pintarHoja() {
+        clearTimeout(sondeo);
+        var d = datosTarea(t), dep = App.depto(a.departamento);
+        hj.titulo(t.nombre);
+        var irFicha = h('button.ver-tarea-quien', { title: 'Ver la ficha de ' + a.nombre + ', con esta tarea', onclick: function () {
+          hj.cerrar(); tareaFoco = t.id; abrir(a.id, 'tareas');
+        } }, App.retratoImg(a, 'retrato', 48), h('span', a.nombre + (dep ? ' · ' + dep.nombre : '')), App.icono('flecha'));
+        var estado = d.est.texto ? h('div.ver-tarea-estado' + (t.corriendo || d.est.verPedido ? '.aviso' : d.est.reintentar ? '.error' : ''), d.est.texto)
+          : h('div.ver-tarea-estado.calmo', d.est.ins);
+        var datos = h('dl.ver-tarea-datos',
+          h('dt', 'Cuándo'), h('dd', d.cuando),
+          h('dt', d.unica ? 'Estado' : 'Próxima'), h('dd', d.unica ? d.proxima : d.proxima.replace(/^Próxima: /, '')),
+          d.ultima ? h('dt', 'Última') : null, d.ultima ? h('dd', d.ultima.replace(/^Última: /, '')) : null,
+          d.modelo ? h('dt', 'Modelo') : null, d.modelo ? h('dd', d.modelo) : null);
+        var hist = h('div.tarea-historial');
+        App.add(App.vaciar(hj.cuerpo), h('div.ver-tarea', irFicha, estado, datos,
+          t.archivos && t.archivos.length ? h('div.tarea-archivos', App.Adjuntos.chips(t.archivos)) : null,
+          h('h4.seccion-tit', h('span', 'Corridas')), hist));
+        cargarHistorial(a, t, hist, hj.cerrar);
+        App.add(App.vaciar(hj.pie), App.acciones(null, [
+          h('button.btn', { onclick: function () { hojaTarea(a, t, recargar); } }, App.icono('lapiz'), 'Editar'),
+          botonPrincipal(t, d, recargar, true)]));
+        if (t.corriendo) sondeo = setTimeout(function () { if (abierta()) recargar(); }, 3000);
+      }
+      pintarHoja();
+    }).catch(App.fallo);
+  }
+
+  /* compartir desde otra app (compartir.js): charla nueva con los archivos y el texto ya puestos, sin mandar */
+  var compartido = null;
+  function compartir(id, c) {
+    if (!App.agente(id)) return;
+    compartido = { id: id, texto: c.texto || '', archivos: c.archivos || [] };
+    nueva(id);
   }
 
   /* charla nueva con el agente: sesión nueva y vacía (la anterior queda en la lista de charlas) */
@@ -1099,15 +1289,47 @@
   }
 
   /* abre la conversación de una ejecución en la pestaña de chat (se puede seguir escribiendo en esa sesión) */
-  function abrirSesion(a, sid) {
+  function abrirSesion(a, sid, despues) {
     api.get('/api/historial', { agent: a.id, session: sid }).then(function (r) {
       sesiones[a.id] = sid; soltarCola(a.id);
       chats[a.id] = (r.msgs || []).map(function (m) { return { r: m.r, t: m.t, e: !!m.e }; });
       App.ChipContexto.fijar(a.id, r.contexto);
       pestana = 'chat';
-      pintar();
-      if (App.Nav) App.Nav.pintarLista();
+      ladoMovil = false;   // celular: abrir una charla la muestra, no deja los detalles encima
+      return cargarConsultas(a.id).then(function () {
+        pintar();
+        if (App.Nav) App.Nav.pintarLista();
+        if (despues) despues();
+      });
     }).catch(App.fallo);
+  }
+
+  /* manda `texto` en una charla concreta (p. ej. la opción que elegiste de una pregunta, desde la Bandeja): la abre si hace
+     falta y, si el agente está respondiendo, lo deja en la cola */
+  function enviarEn(id, sid, texto) {
+    var a = App.agente(id); if (!a) return;
+    var m = { t: texto, nombres: [], archivos: [], eleccion: eleccionDe(sid), sesion: sid };
+    function ya() { if (enCurso[id]) { (colas[id] = colas[id] || []).push(m); repintar(id); } else enviarMensaje(id, m); }
+    if (actual === id && sesiones[id] === sid && App.modoDerecho() === 'agente') { pestana = 'chat'; ya(); return; }
+    actual = id; sesionFija = sid; pestana = 'chat'; App.Oficina.elegir(id); App.abrirDerecho('agente'); App.marcarEstados();
+    abrirSesion(a, sid, ya);
+  }
+
+  /* una charla nueva con `texto` (el micrófono flotante de la secretaría): no la abre; `alResponder(sid)` cuando contesta.
+     Si el agente está respondiendo otra cosa, espera a que termine. */
+  function hablarNueva(id, texto, alResponder) {
+    var a = App.agente(id); if (!a) return null;
+    var sid = App.uuid();
+    function intentar() {
+      if (!App.agente(id)) return;
+      if (enCurso[id]) { setTimeout(intentar, 1000); return; }
+      var viendo = actual === id && App.modoDerecho() === 'agente';
+      sesiones[id] = sid; soltarCola(id); chats[id] = []; sueltas[id] = [];
+      if (viendo) { sesionFija = sid; pestana = 'chat'; pintar(); }
+      enviarMensaje(id, { t: texto, nombres: [], archivos: [], eleccion: {}, sesion: sid, alResponder: function () { if (alResponder) alResponder(sid); } });
+    }
+    intentar();
+    return sid;
   }
 
   /* hoja para crear (t = null) o editar una tarea. `a` puede ser null al crear: arriba se elige para quién es. */
@@ -1132,7 +1354,17 @@
 
     var agenteEl = a ? null : App.elegir({ etiqueta: 'Para quién', valor: elegido ? elegido.id : null,
       opciones: agentes.map(function (x) { return { valor: x.id, titulo: x.nombre, retrato: x }; }),
-      alCambiar: function (id) { elegido = App.agente(id); hj.titulo(tituloHoja()); pintarTipo(); } });
+      alCambiar: function (id) { elegido = App.agente(id); hj.titulo(tituloHoja()); pintarTipo(); armarSelectorIA(); } });
+    /* modelo, esfuerzo y ahorro de sus corridas (el mismo selector de las charlas): por defecto, los del agente.
+       Sirve para darle más potencia (o gastar menos) a una tarea puntual sin tocar la ficha del agente. */
+    var iaElegida = (t && t.ia) || {}, selectorIA = null, cajaIA = h('div');
+    function armarSelectorIA() {
+      if (selectorIA) iaElegida = selectorIA.valor();
+      selectorIA = App.SelectorCharla({ modelo: elegido ? elegido.modelo : null, esfuerzo: elegido ? elegido.esfuerzo : null, valor: iaElegida,
+        titulo: 'Modelo, esfuerzo y ahorro de esta tarea' });
+      App.add(App.vaciar(cajaIA), selectorIA);
+    }
+    armarSelectorIA();
     var tipoEl = App.elegir({ etiqueta: 'Tipo', valor: unica, opciones: [{ valor: false, titulo: 'Se repite' }, { valor: true, titulo: 'Una sola vez' }],
       alCambiar: function (v) { unica = v; pintarTipo(); } });
     var cuandoEl = t ? null : App.elegir({ etiqueta: 'Cuándo', valor: ahora, opciones: [{ valor: true, titulo: 'Ahora' }, { valor: false, titulo: 'En una fecha' }],
@@ -1189,6 +1421,8 @@
     var filaCharla = t && t.charla && t.origen && t.origen.chat ? h('div.ct-de-charla', App.icono('charla'),
       h('span', 'Salió de una charla con ', h('b', t.charla.nombre)),
       h('button.btn.chico.fantasma', { type: 'button', onclick: function () { hj.cerrar(); App.Agente.abrirSesion(t.charla.agente, t.origen.chat); } }, 'Ver la charla')) : null;
+    /* una tarea nueva también se le puede pedir a la secretaría (docs/plan-secretaria-creadora.md) */
+    if (!t && App.pistaSecretaria) App.add(hj.cuerpo, App.pistaSecretaria('Decile qué querés que se haga y cuándo.', hj.cerrar));
     App.add(hj.cuerpo,
       filaCharla,
       filaAgente,
@@ -1196,6 +1430,7 @@
       campo('Nombre', null, nombre),
       campo('Consigna', ayudaConsigna, consigna),
       campo('Archivos', ayudaArchivos, [guardados, h('div', adj.boton, adj.input), adj.lista]),
+      campo('Modelo y esfuerzo', h('div.ayuda', 'Por defecto, los del agente. Cambialos si esta tarea necesita más potencia (o menos gasto); vale solo para ella.'), cajaIA),
       filaCuando, filaDias,
       h('div', { style: { display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' } }, filaFecha, filaHora),
       zonaLink, zonaCaja,
@@ -1223,6 +1458,9 @@
       }
       guardar.disabled = true; err.textContent = '';
       if (t && quitados.length) cuerpo.quitarArchivos = quitados;
+      var ia = selectorIA.valor();
+      if (Object.keys(ia).length) cuerpo.ia = ia;
+      else if (t && t.ia) cuerpo.ia = null;
       var leidos = [];
       var p = adj.leer().then(function (archivos) {
         leidos = archivos;
@@ -1262,9 +1500,14 @@
       var a = App.agente(id); if (!a) return;
       actual = id; sesionFija = sid; pestana = 'chat'; App.Oficina.elegir(id); App.abrirDerecho('agente'); abrirSesion(a, sid); App.marcarEstados();
     },
-    nueva: nueva,
+    nueva: nueva, compartir: compartir, enviarEn: enviarEn, hablarNueva: hablarNueva,
+    ocupado: function (id) { return !!enCurso[id]; },
     sesion: function (id) { return sesiones[id] || null; },
     sesionFija: function () { return sesionFija; },
     pestana: function () { return actual ? pestana : 'chat'; },
-    lado: function () { return pestana === 'chat' ? lado : pestana; }, verLado: verLado, repintarLado: repintarLado, PESTANAS: PESTANAS };
+    lado: function () { return pestana === 'chat' ? lado : pestana; }, verLado: verLado, repintarLado: repintarLado, PESTANAS: PESTANAS,
+    verTarea: verTarea,
+    /* elegiste una charla en la columna de detalles: en la compu la columna vuelve a «Detalles»; en el celular se cierra
+       (estaba encima de la charla) y queda la charla a la vista */
+    alElegirCharla: function () { if (esCompu()) verLado('detalles'); else if (ladoMovil) cerrarLadoMovil(); } };
 })();

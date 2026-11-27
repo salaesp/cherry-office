@@ -53,6 +53,20 @@ describe('almacén', () => {
     expect(fs.existsSync(path.join(carpeta, 'conocimiento', 'agentes', 'marce', 'fichas', 'juan-acme.md'))).toBe(true)
   })
 
+  test('un próximo paso largo se recorta en vez de fallar, y el texto entero queda en el historial', async () => {
+    const { carpeta, g } = await preparar()
+    const largo = 'Llamar a Juan para confirmar el presupuesto ' + 'y revisar cada punto con él '.repeat(10)
+    const r = g.guardarTema(carpeta, 'marce', { tema: 'Acme', proximo: largo })
+    const t = g.leerTema(carpeta, 'marce', r.slug)!
+    expect(t.proximo.length).toBeLessThanOrEqual(LimitesSeguimiento.maxProximo)
+    expect(t.proximo.endsWith('…')).toBe(true)
+    expect(t.proximo.startsWith('Llamar a Juan')).toBe(true)
+    expect(t.historial.at(-1)!.texto).toBe('Próximo paso: ' + largo.trim())
+    // con nota, la nota manda
+    g.guardarTema(carpeta, 'marce', { tema: 'Acme', proximo: largo + ' otra vez', nota: 'Hablé con Juan' })
+    expect(g.leerTema(carpeta, 'marce', r.slug)!.historial.at(-1)!.texto).toBe('Hablé con Juan')
+  })
+
   test('errores con mensaje, trabados y filtros por estado', async () => {
     const { carpeta, g } = await preparar()
     expect(() => g.guardarTema(carpeta, 'marce', { tema: 'x', estado: 'pendiente' })).toThrow(ErrorSeguimiento)

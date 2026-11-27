@@ -586,8 +586,8 @@ export function acta(p: { oficina: Oficina; tema: string; participantes: AgenteD
 export function consignaEncargo(p: { tema: string; acta?: string; pendiente: Pendiente }): string {
   let s = `Pendiente de la reunión «${p.tema}»`
   if (p.acta !== undefined) s += ` (acta: \`${p.acta}\`)`
-  s += `:\n\n${p.pendiente.que}\n\nHacelo ahora. Si producís un documento, guardalo en \`archivos/entregables/\` y decí al final qué archivo dejaste.`
-  return s
+  s += `:\n\n${p.pendiente.que}`
+  return s   // qué hacer con él va como mensaje de sistema (`Programador.sistemaPendiente`)
 }
 
 export const ReunionTexto = {

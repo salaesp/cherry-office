@@ -349,7 +349,8 @@ describe('Caso Próspera de punta a punta (en proceso)', () => {
     expect(await esperar(() => esperaEn(3, 'esperando_aprobacion'), 15)).toBe(true)
     const plan = sb.llamadas.filter((l) => Sandbox.valor(l, '--agent') === 'don-armando').at(-1)!
     const consigna = plan.at(-1) ?? ''
-    expect(consigna).toContain('Paso 4 de 6: Plan de edición')
+    expect(Sandbox.valor(plan, '--append-system-prompt')).toContain('Paso 4 de 6: Plan de edición')   // va como mensaje de sistema
+    expect(consigna).toContain('Paso 4: Plan de edición')
     expect(consigna).toContain('Grabada')
     expect(consigna).toContain(`archivos/entregables/persona/${cid}-2/clase7.txt`)
     expect(consigna).toContain('hola sofia')
@@ -383,10 +384,10 @@ describe('Caso Próspera de punta a punta (en proceso)', () => {
     const ident = { oficina: carpeta, agente: 'coordi', sid: U.a, perfil: 'coordinador' }
     const h = mcp.consultas.herramientas(mcp.tokens.emitir(ident), ident)
     const nombres = (h.definiciones as O[]).map((d) => d.name)
-    expect(nombres.includes('proponer_accion') && nombres.includes('encargar')).toBe(true)
+    expect(nombres.includes('proponer_accion') && nombres.includes('delegar')).toBe(true)
     const acc = (await h.llamar('proponer_accion', { herramienta: crear, resumen: 'Crear la reunión', detalle: { titulo: 'Reunión' } }))!
     expect(acc.esError, acc.texto).toBe(false)
-    const enc = (await h.llamar('encargar', { agente: 'nico', consigna: 'Preparame el informe' }))!
+    const enc = (await h.llamar('delegar', { agente: 'nico', nombre: 'Informe', consigna: 'Preparame el informe de la semana con lo que entregó cada uno y dejalo en un archivo' }))!
     expect(enc.esError, enc.texto).toBe(false)
     expect(await esperar(() => s.entregas.lista(carpeta, { origen: 'encargo' }).length === 1, 15)).toBe(true)
     const todas = (await get('/api/entregas')).obj.entregas as O[]
@@ -409,14 +410,17 @@ describe('Caso Próspera de punta a punta (en proceso)', () => {
     expect(ej.status, JSON.stringify(ej.obj)).toBe(202)
     expect(await esperar(async () => (await accionDe()).estado === 'hecha', 15)).toBe(true)
     expect(await estado()).toBe('esperando_persona')
-    const correAccion = sb.llamadasConPrompt('exactamente esto').at(-1)!
+    const correAccion = sb.llamadasConPrompt('Acción aprobada (').at(-1)!
     expect(Sandbox.reglas(correAccion)).toContain(crear)
     // la corrida del paso de flujo, en cambio, no tenía la herramienta de actuar
-    const correPaso = sb.llamadasConPrompt('Paso 1 de 2')[0]!
+    const correPaso = sb.llamadas.filter((l) => (Sandbox.valor(l, '--append-system-prompt') ?? '').includes('Paso 1 de 2'))[0]!
     expect(Sandbox.reglas(correPaso)).not.toContain(crear)
+    // el resultado queda en la propia propuesta: ejecutarla no deja una entrega aparte
+    expect((await accionDe()).resultado).toBeTruthy()
     // tres cosas distintas, tres orígenes y una sola corrida abierta
     const origenes = new Set(((await get('/api/entregas')).obj.entregas as O[]).map((x) => x.origen))
-    for (const o of ['flujo', 'propuesta', 'encargo', 'accion']) expect(origenes.has(o), o).toBe(true)
+    for (const o of ['flujo', 'propuesta', 'encargo']) expect(origenes.has(o), o).toBe(true)
+    expect(origenes.has('accion')).toBe(false)
     expect(((await get('/api/actividad')).obj.corridas as O[]).length).toBe(1)
   }, 60_000)
 

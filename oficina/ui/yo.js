@@ -20,7 +20,7 @@ App.Yo = (function () {
   function refrescar() { var el = document.querySelector('.persona.yo .persona-rol'); if (el) el.textContent = subtitulo(); }
   function fila() {
     var sub = subtitulo();
-    return h('div',
+    return h('div.yo-grupo',
       h('div.grupo-tit', h('span.punto', { style: { background: '#f5cd2f' } }), 'Vos'),
       /* como con cualquiera del equipo, tocarte abre tu perfil (nombre y apariencia); lo que te espera está en la Bandeja */
       h('div.persona.yo', { title: 'Cambiar tu nombre o tu apariencia', onclick: function () { abrir(); } },

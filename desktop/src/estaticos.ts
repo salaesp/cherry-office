@@ -4,7 +4,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { mime } from '../../backend/src/servidor-dev.js'
 
-const estaticos = new Set(['index.html', 'logo-prospera.svg'])
+// manifest.webmanifest, sw.js e iconos/: la oficina instalable en el celular (docs/plan-celular.md)
+const estaticos = new Set(['index.html', 'logo-prospera.svg', 'manifest.webmanifest', 'sw.js'])
 
 export type Raices = { ui: string; vendor: string }
 
@@ -18,7 +19,7 @@ export function archivo(r: Raices, ruta: string): string | undefined {
   let rel = ruta === '/' ? 'index.html' : ruta.slice(1)
   if (!ruta.startsWith('/') || rel.includes('\0') || rel.includes('\\') || rel.split('/').includes('..')) return undefined
   let base: string
-  if (estaticos.has(rel) || rel.startsWith('ui/')) base = r.ui
+  if (estaticos.has(rel) || rel.startsWith('ui/') || rel.startsWith('iconos/')) base = r.ui
   else if (rel.startsWith('vendor/')) {
     base = r.vendor
     rel = rel.slice('vendor/'.length)

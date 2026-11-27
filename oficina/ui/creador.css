@@ -83,3 +83,18 @@
   .tb-dif-fila { grid-template-columns: 1fr; }
   .tb-flecha { display: none; }
 }
+
+/* tarjeta que propuso la secretaría en una charla (docs/plan-secretaria-creadora.md) */
+.tb-de-charla { font: inherit; font-size: 11.5px; color: var(--suave); background: var(--panel-2); border: 1px solid var(--linea); border-radius: 10px; padding: 0 8px; margin-top: 3px; align-self: flex-start; cursor: pointer; }
+.tb-de-charla:hover { color: var(--texto); border-color: var(--linea-fuerte); }
+
+/* con secretaría: la columna izquierda la presenta (docs/plan-secretaria-creadora.md) */
+.creador-sec-cuerpo { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 28px 22px; }
+.creador-sec-cuerpo p { margin: 6px 0 0; max-width: 36ch; line-height: 1.45; }
+.creador-sec-cuerpo .btn { margin-top: 12px; }
+.creador-sec-cara { width: 96px; height: 96px; border-radius: 50%; image-rendering: pixelated; background: var(--panel-2); box-shadow: 0 0 0 1px var(--linea); object-fit: cover; margin-bottom: 4px; }
+/* sin secretaría: el aviso arriba del chat con el Creador */
+.creador-aviso-sec { display: flex; align-items: center; gap: 10px; margin: 10px 12px 0; padding: 10px 12px; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--panel-2); font-size: 13px; }
+.creador-aviso-sec > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.creador-aviso-sec > div span { color: var(--suave); }
+.creador-aviso-sec svg { width: 18px; height: 18px; flex: none; color: var(--suave); }

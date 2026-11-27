@@ -59,19 +59,20 @@ export function createBackend({ config, claudePath, env = process.env, whatsapp 
   const s: Servicios = {
     config, store, runner, oficinas, avisos, entregas, log, env, canal,
     router: undefined as unknown as Router,
-    huecos: whatsapp ? { whatsappHost: whatsapp } : {}, alAbrir: [], validaciones: [], alCerrar: [], despuesDeProcesos: [], alArrancar: [],
+    huecos: whatsapp ? { whatsappHost: whatsapp } : {}, alAbrir: [], alCrear: [], validaciones: [], alCerrar: [], despuesDeProcesos: [], alArrancar: [],
   }
   const router = new Router(() => s.listo?.() ?? Promise.resolve())
   ;(s as { router: Router }).router = router
 
   router.explorador = new ExploradorRouter(config, oficinas, log)
   router.registrarExtra(new TrabajoRouter(oficinas, log))
-  router.nucleo.push(rutasOficinas({ config, oficinas, claude: infoClaude(runner), alAbrir: s.alAbrir, ocupada: (c) => runner.actividad.vista(c).size > 0 }))
+  router.nucleo.push(rutasOficinas({ config, oficinas, claude: infoClaude(runner), alAbrir: s.alAbrir, alCrear: s.alCrear, ocupada: (c) => runner.actividad.vista(c).size > 0 }))
   router.nucleo.push(rutasDepartamentos({ oficinas }))
   router.nucleo.push(rutasChat({
     config, store, runner, oficinas, avisos, entregas, log,
     mcp: () => s.mcp?.(), permisosTareas: () => s.permisosTareas?.(), catalogo: () => s.catalogo?.(),
     corridas: (o) => s.corridas?.(o) ?? [], creadorVersion: (o) => s.creadorVersion?.(o) ?? 0,
+    charla: () => s.charla?.(),
   }))
 
   for (const m of modulosRegistrados()) m.instalar(s)

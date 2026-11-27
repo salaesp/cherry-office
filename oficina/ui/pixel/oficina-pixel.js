@@ -611,7 +611,8 @@ App.Oficina = (function () {
   function armarEtiquetas() {
     etiquetas.forEach(function (e) { if (e.el.parentNode) e.el.parentNode.removeChild(e.el); }); etiquetas = []; etqSalas = [];
     salas.forEach(function (s) { var e = etiqueta('sala', s.nombre, s.tipo === 'depto' ? s.color : null); e.sala = s; e.wx = s.r[0] + .5; e.wy = s.r[1] + .3; e.z = 18; etqSalas.push(e); s.etq = e; });
-    if (recepcion) { var c = etiqueta('sala', 'Armar con el Creador', '#f2c14e'); c.wx = recepcion.x - .4; c.wy = recepcion.y - .6; c.z = 16; c.creador = true; }
+    /* con secretaría, la recepción no lleva el cartel del Creador: se le pide a ella (docs/plan-secretaria-creadora.md) */
+    if (recepcion && !(App.secretaria && App.secretaria())) { var c = etiqueta('sala', 'Armar con el Creador', '#f2c14e'); c.wx = recepcion.x - .4; c.wy = recepcion.y - .6; c.z = 16; c.creador = true; }
     Object.keys(figs).forEach(function (id) { var f = figs[id];
       f.etqNombre = etiqueta('agente', f.yo ? 'Vos' : f.a.nombre || id, null); f.etqNombre.fig = f;
       if (!f.yo) {

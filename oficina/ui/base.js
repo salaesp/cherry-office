@@ -66,6 +66,11 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
       if (!puente) return Promise.resolve(undefined);
       try { return Promise.resolve(puente.postMessage({ accion: 'borrarOficina', carpeta: carpeta })); } catch (e) { return Promise.reject(e); }
     },
+    /* acceso desde el celular (Ajustes › Celular): hacer = 'estado' | 'prender' | 'apagar' | 'probar'; undefined sin app */
+    celular: function (hacer) {
+      if (!puente) return Promise.resolve(undefined);
+      try { return Promise.resolve(puente.postMessage({ accion: 'celular', hacer: hacer || 'estado' })); } catch (e) { return Promise.reject(e); }
+    },
     elegirCarpeta: function (titulo, inicio, crear) {
       if (!puente) return Promise.resolve(undefined);
       try {
@@ -124,6 +129,7 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
     capas: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5',
     carpeta: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
     subir: 'M12 16V4M7 9l5-5 5 5M5 20h14',
+    flechaArriba: 'M12 19V5M6 11l6-6 6 6',
     buscar: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4',
     enviar: 'M5 12h13M13 6l6 6-6 6',
     parar: 'M7 7h10v10H7z',
@@ -155,6 +161,7 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
     campana: 'M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 21h4',
     mail: 'M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM3.5 7l8.5 6.5L20.5 7',
     alerta: 'M12 3l9.5 17h-19zM12 10v4.5M12 17.5v.01',
+    telefono: 'M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2',
     clip: 'M20 11.5l-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4L15 7.1'
   };
   /* «hace 5 min»: acepta segundos epoch, milisegundos, un Date o una fecha ISO */
@@ -201,7 +208,17 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
   App.fallo = function (e) { App.aviso((e && e.message) || String(e), true); };
 
   /* ---------------- hojas modales (apiladas; Esc cierra la de arriba) ---------------- */
-  var pila = [];
+  /* Atrás cierra la hoja de arriba, como en una app: cada hoja deja una entrada en el historial (misma ruta, con la marca
+     `hoja`). Cerrarla con su ✕ saca esa entrada; si mientras tanto se navegó a otra ruta, la hoja se cierra sola. */
+  var pila = [], nHojas = 0;
+  function alVolverHistorial(e) {
+    var marca = e.state && e.state.hoja;
+    for (var i = pila.length - 1; i >= 0; i--) { if (pila[i].marca === marca) break; pila[i].cerrar(true); }
+  }
+  window.addEventListener('popstate', alVolverHistorial);
+  window.addEventListener('hashchange', function () {
+    for (var i = pila.length - 1; i >= 0; i--) if (pila[i].ruta !== location.hash) pila[i].cerrar(true);
+  });
   App.hoja = function (op) {
     var cuerpo = h('div.hoja-cuerpo'), pie = h('div.hoja-pie');
     var cab = h('div.hoja-cab', h('h2', op.titulo || ''), h('button.btn.fantasma.icono', { title: 'Cerrar', onclick: function () { cerrar(); } }, App.icono('cerrar')));
@@ -210,21 +227,28 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
     var ajuste = moverYAgrandar(caja, cab, op);
     velo.addEventListener('mousedown', function (e) { if (e.target === velo && !op.modal) cerrar(); });
     document.body.appendChild(velo);
-    var obj = { el: caja, cuerpo: cuerpo, pie: pie, cab: cab, cerrar: cerrar, titulo: function (t) { cab.firstChild.textContent = t; },
-      restaurar: ajuste.restaurar };
+    var marca = 'h' + (++nHojas);
+    var obj = { el: caja, cuerpo: cuerpo, pie: pie, cab: cab, cerrar: function () { cerrar(); }, titulo: function (t) { cab.firstChild.textContent = t; },
+      restaurar: ajuste.restaurar, marca: marca, ruta: location.hash };
+    try { history.pushState({ hoja: marca }, '', location.href); } catch (e) { obj.marca = null; }
     pila.push(obj);
     var cerrada = false;
-    function cerrar() {
+    /* porHistorial: la cerró Atrás o un cambio de ruta (su entrada ya no está arriba: no hay que sacarla) */
+    function cerrar(porHistorial) {
       if (cerrada) return; cerrada = true;
       velo.remove();
       pila.splice(pila.indexOf(obj), 1);
+      /* si nadie navegó justo después (al cerrar se suele abrir otra cosa), se saca su entrada del historial */
+      if (porHistorial !== true && obj.marca) setTimeout(function () { if (history.state && history.state.hoja === obj.marca) history.back(); }, 0);
       if (op.alCerrar) op.alCerrar();
     }
     /* el primer campo para escribir (no una hora ni un buscador de una lista larga, que se llevarían la vista hacia abajo) */
-    setTimeout(function () { var f = caja.querySelector('[autofocus]') || caja.querySelector('input:not([type=time]):not([type=search]):not([type=checkbox]):not([type=radio]):not([type=range]),textarea,select'); if (f) f.focus({ preventScroll: true }); }, 30);
+    if (!App.tactil()) setTimeout(function () { var f = caja.querySelector('[autofocus]') || caja.querySelector('input:not([type=time]):not([type=search]):not([type=checkbox]):not([type=radio]):not([type=range]),textarea,select'); if (f) f.focus({ preventScroll: true }); }, 30);
     return obj;
   };
   App.hojaAbierta = function () { return pila.length > 0; };
+  /* pantalla táctil sin mouse (el celular): ahí Enter no manda y las hojas no enfocan solas */
+  App.tactil = function () { return !!App.movil || (window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches); };
 
   /* Hojas que se mueven (arrastrando la barra) y cambian de tamaño (desde los bordes y las esquinas). Sólo en la compu:
      en el celular son paneles que suben desde abajo. Al tocarla por primera vez la hoja deja de estar centrada y pasa a
@@ -330,7 +354,7 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
   App.cabPanel = function (op) {
     var ico = op.icono ? (typeof op.icono === 'string' ? h('div.der-ico', App.icono(op.icono)) : op.icono) : null;
     return h('div.der-cab' + (op.clase ? '.' + op.clase : ''),
-      op.volver ? h('button.btn.fantasma.chico.volver', { title: op.volver.titulo || op.volver.texto, onclick: op.volver.accion }, App.icono('atras'), op.volver.texto) : null,
+      op.volver ? h('button.btn.fantasma.chico.volver', { title: op.volver.titulo || op.volver.texto, 'aria-label': op.volver.titulo || op.volver.texto, onclick: op.volver.accion }, App.icono('atras'), h('span.volver-txt', op.volver.texto)) : null,
       ico,
       h('div.der-tit', h('h2', { title: op.titulo }, op.titulo || ''), op.sub ? h('div.sub', op.sub) : null),
       op.acciones && op.acciones.length ? h('div.der-acciones', op.acciones) : null,

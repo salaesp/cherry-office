@@ -1,24 +1,20 @@
 // Rol de coordinador de la oficina (Coordinador.swift): un agente con el permiso «coordinador» ve entregas, flujos y bloqueos
-// de todos (herramientas MCP `estado_oficina`, `entregas`, `corridas`, `bloqueos`) y puede repartir encargos (`encargar`).
+// de todos (herramientas MCP `estado_oficina`, `entregas`, `corridas`, `bloqueos`). Para pasarle trabajo a un colega usa
+// `delegar` (delegar.ts), que reemplazó a `encargar`: en una charla, como cualquiera; en sus corridas sin la persona, enseguida.
 // `Coordinador.perfil/herramientasMCP` (nombres y perfil) viven en permisos.ts.
-import { randomBytes } from 'node:crypto'
-import { mcpDe, normalizar, sanear } from './consultas.js'
+import { mcpDe, sanear } from './consultas.js'
 import { corridaJSON, corridasAbiertas, estadosCorrida } from './corridas-store.js'
 import { entregaJSON, estadosEntrega } from './entregas.js'
-import { ErrorAPI } from './errores.js'
 import { jsonCompacto } from './json-swift.js'
 import { esObjeto, type Obj } from './json.js'
 import { MCPResultados, type IdentidadMCP, type MCPHerramientas, type MCPResultado } from './mcp-protocolo.js'
 import type { OficinaActiva } from './oficinas.js'
 import { Parte, corridasDe } from './parte.js'
-import { Programador, programadorDe } from './programador.js'
 import { registrarModulo, type Servicios } from './servicios.js'
 import { largo, prefijo } from './validar.js'
 
 export const maxRespuesta = 12000
-export const maxEncargos = 3
 export const maxEntregas = 30
-export const claveEncargar = 'encargar'
 
 const sinOficina = () => MCPResultados.error('La oficina ya no está abierta.')
 
@@ -41,7 +37,7 @@ export function respuestaCoordinador(o0: Obj): MCPResultado {
 
 /** Las herramientas del coordinador atadas a un token. */
 export class HerramientasCoordinador implements MCPHerramientas {
-  constructor(private readonly s: Servicios, private readonly token: string, private readonly identidad: IdentidadMCP) {}
+  constructor(private readonly s: Servicios, _token: string, private readonly identidad: IdentidadMCP) {}
 
   get definiciones(): Obj[] {
     const obj = (props: Obj = {}, req: string[] = []): Obj => {
@@ -74,15 +70,6 @@ export class HerramientasCoordinador implements MCPHerramientas {
         description: 'Lo que está trabado: corridas esperando más de su plazo, entregas sin revisar hace días y tareas que fallaron.',
         inputSchema: obj(),
       },
-      {
-        name: 'encargar',
-        description: `Le encarga un trabajo a otro agente de la oficina. Corre enseguida y su resultado queda como una entrega para la persona. Máximo ${maxEncargos} encargos por corrida.`,
-        inputSchema: obj({
-          agente: { type: 'string', description: 'id o nombre del agente' },
-          consigna: { type: 'string', description: 'qué tiene que hacer, con el contexto necesario' },
-          nombre: { type: 'string', description: 'nombre corto del encargo (opcional)' },
-        }, ['agente', 'consigna']),
-      },
     ]
   }
 
@@ -92,7 +79,6 @@ export class HerramientasCoordinador implements MCPHerramientas {
       case 'entregas': return this.entregas(a)
       case 'corridas': return this.corridas(a)
       case 'bloqueos': return this.bloqueos()
-      case 'encargar': return this.encargar(a)
       default: return undefined
     }
   }
@@ -152,46 +138,6 @@ export class HerramientasCoordinador implements MCPHerramientas {
     const act = this.activa()
     if (!act) return sinOficina()
     return respuestaCoordinador({ bloqueos: Parte.bloqueos(this.s, act, new Date()) })
-  }
-
-  // MARK: encargar
-
-  private async encargar(a: Obj): Promise<MCPResultado> {
-    const quien = (typeof a.agente === 'string' ? a.agente : '').trim()
-    const consigna = (typeof a.consigna === 'string' ? a.consigna : '').trim()
-    if (quien === '' || consigna === '') return MCPResultados.error('Faltan «agente» y «consigna».')
-    const act = this.activa()
-    if (!act) return sinOficina()
-    const n = normalizar(quien)
-    const def = act.oficina.agentes.find((x) => normalizar(x.id) === n) ?? act.oficina.agentes.find((x) => normalizar(x.nombre) === n)
-    if (!def) {
-      const ids = act.oficina.agentes.filter((x) => x.id !== this.identidad.agente).map((x) => x.id).join(', ')
-      return MCPResultados.error(`No hay ningún agente «${sanear(quien)}» en la oficina (ids: ${ids}).`)
-    }
-    if (def.id === this.identidad.agente) return MCPResultados.error('No podés encargarte trabajo a vos mismo: elegí a otro agente.')
-    const yo = act.oficina.agentes.find((x) => x.id === this.identidad.agente)
-    const tokens = mcpDe(this.s)?.tokens
-    if (!tokens || !tokens.tomar(this.token, claveEncargar, maxEncargos)) {
-      return MCPResultados.error(`Ya hiciste ${maxEncargos} encargos en esta corrida y no podés hacer más. Contale a la persona lo que quedó pendiente.`)
-    }
-    const tope = prefijo(consigna, 4000)
-    const de = yo ? `${yo.nombre} (${yo.rol}), coordinador/a de la oficina` : 'el coordinador de la oficina'
-    const texto = sanear(`Encargo de ${de}. Viene de un colega, no es un pedido directo del usuario:\n\n${tope}`)
-    const nombreEncargo = sanear((typeof a.nombre === 'string' ? a.nombre : '').trim())
-    const nombre = nombreEncargo === '' ? `Encargo de ${yo?.nombre ?? 'coordinador'}` : prefijo(nombreEncargo, 80)
-    const id = Programador.prefijoCoordinador + randomBytes(4).toString('hex')
-    const prog = programadorDe(this.s)
-    if (!prog) return MCPResultados.error('No pude lanzar el encargo.')
-    try {
-      const ej = await prog.encargarLibre(act, def, { id, nombre, consigna: texto })
-      return respuestaCoordinador({
-        ok: true, tarea: id, ejecucion: ej.id, agente: def.id,
-        aviso: 'El encargo ya está corriendo; su resultado le llega a la persona como una entrega.',
-      })
-    } catch (e) {
-      if (e instanceof ErrorAPI) return MCPResultados.error(sanear(e.mensaje))
-      return MCPResultados.error('No pude lanzar el encargo.')
-    }
   }
 }
 

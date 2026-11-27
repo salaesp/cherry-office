@@ -10,7 +10,8 @@ import type { APIHandler, Query } from './router.js'
 
 /** La biblioteca sube archivos en base64 dentro del JSON (25 MB → ~34 MB). */
 export const maxCuerpo = 40 * 1024 * 1024
-const estaticos = new Set(['index.html', 'logo-prospera.svg'])
+// manifest.webmanifest, sw.js e iconos/: la oficina instalable en el celular (docs/plan-celular.md)
+const estaticos = new Set(['index.html', 'logo-prospera.svg', 'manifest.webmanifest', 'sw.js'])
 const comunes = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
 
 export type OpcionesServidor = {
@@ -20,6 +21,9 @@ export type OpcionesServidor = {
   /** `oficina/vendor` (fuentes). */
   raizVendor: string
   puerto: number
+  /** Nombres extra por los que se entra (HQ_HOSTS), p. ej. `alfred.tu-red.ts.net` detrás de `tailscale serve`: se
+   *  aceptan como `Host` (con y sin el puerto) y como `Origin` por http y https. Por defecto, solo localhost. */
+  hostsExtra?: string[]
 }
 
 export class ServidorDev {
@@ -30,6 +34,15 @@ export class ServidorDev {
   constructor(private readonly op: OpcionesServidor) {
     this.hosts = new Set([`localhost:${op.puerto}`, `127.0.0.1:${op.puerto}`])
     this.origenes = new Set([...this.hosts].map((h) => `http://${h}`))
+    for (const x of op.hostsExtra ?? []) {
+      const h = x.trim().toLowerCase()
+      if (!/^[a-z0-9.-]+(:\d+)?$/.test(h)) continue
+      for (const v of h.includes(':') ? [h] : [h, `${h}:${op.puerto}`]) {
+        this.hosts.add(v)
+        this.origenes.add(`http://${v}`)
+        this.origenes.add(`https://${v}`)
+      }
+    }
   }
 
   /** Empieza a escuchar en 127.0.0.1:puerto. Rechaza si el puerto está ocupado. */
@@ -97,12 +110,12 @@ export class ServidorDev {
     return { status: 200, tipo: mime(f!), cuerpo: metodo === 'HEAD' ? Buffer.alloc(0) : datos }
   }
 
-  /** Archivo a servir para una ruta, solo de la lista blanca (index, logo, ui/, vendor/). undefined = 404. */
+  /** Archivo a servir para una ruta, solo de la lista blanca (index, logo, manifest, sw.js, ui/, iconos/, vendor/). undefined = 404. */
   archivo(ruta: string): string | undefined {
     let rel = ruta === '/' ? 'index.html' : ruta.slice(1)
     if (!ruta.startsWith('/') || rel.includes('\0') || rel.includes('\\') || rel.split('/').includes('..')) return undefined
     let base: string
-    if (estaticos.has(rel) || rel.startsWith('ui/')) base = this.op.raizUI
+    if (estaticos.has(rel) || rel.startsWith('ui/') || rel.startsWith('iconos/')) base = this.op.raizUI
     else if (rel.startsWith('vendor/')) {
       base = this.op.raizVendor
       rel = rel.slice('vendor/'.length)
@@ -174,6 +187,7 @@ export function mime(f: string): string {
     case 'js': return 'application/javascript; charset=utf-8'
     case 'css': return 'text/css; charset=utf-8'
     case 'json': return 'application/json; charset=utf-8'
+    case 'webmanifest': return 'application/manifest+json; charset=utf-8'
     case 'svg': return 'image/svg+xml; charset=utf-8'
     case 'png': return 'image/png'
     case 'jpg': case 'jpeg': return 'image/jpeg'

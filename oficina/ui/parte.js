@@ -39,8 +39,9 @@ App.Parte = (function () {
     if (!abiertoPanel()) return;
     var n = ++pedido, der = App.dom.derecho;
     if (conGiro) App.add(App.vaciar(der), cabecera(''), h('div.der-cuerpo', App.cargando('Trayendo lo que te espera…')));
-    api().get('/api/parte').then(function (p) {
-      if (n === pedido && abiertoPanel()) pintar(p);
+    var pend = api().get('/api/charlas/pendientes').catch(function () { return { tarjetas: [], acciones: [] }; });
+    Promise.all([api().get('/api/parte'), pend]).then(function (r) {
+      if (n === pedido && abiertoPanel()) pintar(r[0], r[1]);
     }).catch(function (e) {
       if (n !== pedido || !abiertoPanel()) return;
       App.add(App.vaciar(der), cabecera(''), h('div.der-cuerpo', h('div.vacio', e.message)));
@@ -140,14 +141,14 @@ App.Parte = (function () {
     var abre = b.tipo === 'espera' ? function () { var x = (esperas || {})[b.ref]; if (x) abrirEspera(x); else abrirEsperaPorId(b.ref); }
       : b.tipo === 'corrida' ? function () { if (App.Flujos && App.Flujos.verCorrida) App.Flujos.verCorrida(+b.ref); }
       : b.tipo === 'entrega' ? function () { App.Entregables.abrir(+b.ref); }
-      : b.tipo === 'tarea' ? function () { var t = b.ref && b.ref.split(':')[0]; if (App.agente(t)) App.Agente.abrir(t, 'tareas'); } : null;
+      : b.tipo === 'tarea' ? function () { App.Agente.verTarea(b.ref); } : null;   // ref = id de la tarea
     return fila(b.tipo === 'corrida' ? 'flujo' : b.tipo === 'espera' ? 'reloj' : 'cerrar', b.texto, null,
       typeof b.dias === 'number' ? h('span.insignia.aviso', diasTxt(b.dias)) : null, 'Ver', abre);
   }
 
   function filaProxima(t) {
     var ag = App.agente(t.agente);
-    return fila(ag || 'parte', t.nombre || t.tarea, (ag ? ag.nombre + ' · ' : '') + cuando(t.cuando), null, null, ag ? function () { App.Agente.abrir(t.agente, 'tareas'); } : null);
+    return fila(ag || 'parte', t.nombre || t.tarea, (ag ? ag.nombre + ' · ' : '') + cuando(t.cuando), null, null, ag ? function () { App.Agente.verTarea(t.tarea); } : null);
   }
   function cuando(iso) {
     var d = new Date(iso); if (isNaN(d)) return '';
@@ -178,7 +179,7 @@ App.Parte = (function () {
       out.push(h('div.qp-sub', 'Lo que falló'), h('div.qp-errores', errs.map(function (x) {
         var ag = x.agente && App.agente(x.agente);
         var esTarea = ag && ((App.E.oficina || {}).tareas || []).some(function (t) { return t.id === x.tarea; });
-        return h((esTarea ? 'button' : 'div') + '.qp-error', esTarea ? { type: 'button', title: 'Ver las tareas de ' + ag.nombre, onclick: function () { App.Agente.abrir(ag.id, 'tareas'); } } : null,
+        return h((esTarea ? 'button' : 'div') + '.qp-error', esTarea ? { type: 'button', title: 'Ver la tarea «' + x.nombre + '»', onclick: function () { App.Agente.verTarea(x.tarea); } } : null,
           ag ? App.retratoImg(ag, 'retrato', 48) : h('span.qp-ico', App.icono('alerta')),
           h('div.qp-txt', h('b', x.nombre), h('span', (ag ? ag.nombre + ' · ' : '') + x.error)),
           h('span.qp-cuando', App.hace(x.cuando)));
@@ -202,17 +203,32 @@ App.Parte = (function () {
   }
 
   /* ---------------- panel ---------------- */
-  function pintar(p) {
+  function pintar(p, pend) {
     var der = App.dom.derecho, cuerpo = h('div.der-cuerpo'), pie = h('div.der-pie');
     var necesita = p.teNecesita || [], rev = p.paraRevisar || { total: 0, entregas: [] }, flujos = p.flujos || [],
         bloq = p.bloqueos || [], esperas = p.esperas || [], prox = p.proximas || [], narrado = p.narrado && p.narrado.texto ? p.narrado : null;
-    var entregas = (rev.entregas || []).slice(0, 5);
-    var vacio = !(App.Permisos && App.Permisos.cuantos()) && !necesita.length && !entregas.length && !flujos.length && !esperas.length && !bloq.length && !prox.length && !narrado;
+    /* lo que te preguntaron o te propusieron en las charlas (docs/plan-recados.md, U3); las propuestas de acción van acá y
+       no se repiten en «Para revisar» */
+    pend = pend || {};
+    var esperan = (pend.tarjetas || []), accionesP = (pend.acciones || []), cambiosP = (pend.cambios || []);
+    var enEsperan = {};
+    accionesP.forEach(function (a) { if (a.entrega) enEsperan[a.entrega] = true; });
+    var entregas = (rev.entregas || []).filter(function (e) { return !enEsperan[e.id]; }).slice(0, 5);
+    var vacio = !esperan.length && !accionesP.length && !cambiosP.length && !(App.Permisos && App.Permisos.cuantos()) && !necesita.length && !entregas.length && !flujos.length && !esperas.length && !bloq.length && !prox.length && !narrado;
     var desde = p.desde ? App.hace(p.desde) : '';
     App.add(App.vaciar(der), cabecera('Lo que te espera y lo que pasó' + (desde ? (desde === 'recién' ? ' desde recién' : ' desde ' + desde) : '')), cuerpo, pie);
+    /* en el celular, una vez: instalar la app o prender los avisos (push.js) */
+    var tjPush = App.Push && App.Push.tarjeta ? App.Push.tarjeta(function () { cargar(false); }) : null;
+    if (tjPush) App.add(cuerpo, tjPush);
     /* primero lo urgente: los permisos que piden los agentes, con sus botones acá mismo */
     var perms = App.Permisos && App.Permisos.pendientes ? App.Permisos.pendientes() : [];
     if (perms.length) App.add(cuerpo, seccion('Te piden permiso', h('div.permisos-lista.en-hoy', perms.map(App.Permisos.tarjeta))));
+    if (esperan.length || accionesP.length || cambiosP.length) {
+      var op = { enBandeja: true, alCambiar: function () { cargar(false); } };
+      App.add(cuerpo, seccion('Te esperan', [].concat(esperan.map(function (t) { return App.Tarjetas.de(t, op); }), accionesP.map(function (a) { return App.Tarjetas.accion(a, op); }),
+        /* cambios en la oficina que propuso la secretaría, uno por charla (docs/plan-secretaria-creadora.md) */
+        cambiosP.map(function (g) { return App.Tarjetas.cambios(g.tarjetas, { enBandeja: true, agente: g.agente, session: g.session, alCambiar: op.alCambiar }); }))));
+    }
 
     var coord = coordinador();
     if (narrado) {
@@ -228,7 +244,7 @@ App.Parte = (function () {
       App.add(cuerpo, h('div.nav-vacio', App.icono('ok'), h('b', 'Todo en orden'), h('p', 'No hay nada que te espere. Cuando un agente te entregue algo o te pida permiso, aparece acá.'),
         h('div.acciones', { style: { justifyContent: 'center' } },
           h('button.btn', { onclick: function (ev) { App.Nav.elegirAgente(ev.currentTarget, function (id) { App.Agente.nueva(id); }); } }, App.icono('charla'), 'Charlar con alguien'),
-          h('button.btn', { onclick: function () { App.Reunion.nueva(); } }, App.icono('reunion'), 'Llamar a reunión'))));
+          h('button.btn.solo-compu', { onclick: function () { App.Reunion.nueva(); } }, App.icono('reunion'), 'Llamar a reunión'))));
     } else {
       if (necesita.length) App.add(cuerpo, seccion('Te necesita', h('div.parte-filas', necesita.map(filaAviso))));
       if (entregas.length) {

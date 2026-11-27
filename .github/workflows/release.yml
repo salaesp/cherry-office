@@ -3,7 +3,8 @@
 # - Al subir una etiqueta vX.Y.Z: corre los tests, arma el .dmg (Mac) y el instalador .exe (Windows) y los adjunta
 #   a la release de esa etiqueta.
 #   Si la release ya existe (notas escritas a mano), solo sube o reemplaza el instalador, sin tocar las notas.
-#   Si no existe, la crea como borrador para completar las notas antes de publicarla.
+#   Si no existe, la crea como borrador con las notas de docs/releases/vX.Y.Z.md (o un texto para completar a mano) y
+#   queda para revisarla y publicarla.
 # - A mano (Actions → Release → Run workflow): arma los instaladores y los deja como artefactos del run, sin release.
 #
 # Las dos plataformas salen de la carcasa Electron (desktop/) con el backend TypeScript (backend/).
@@ -175,8 +176,14 @@ jobs:
         run: |
           # el job de Windows corre en paralelo: si el otro ya creó la release, solo se suben los archivos
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --draft --title "Oficina $VERSION" \
-              --notes "Borrador generado por el build automático. Completar las notas antes de publicar." || true
+            # las notas salen de docs/releases/<etiqueta>.md si existe; si no, un texto para completar a mano
+            NOTAS="docs/releases/$TAG.md"
+            if [ -f "$NOTAS" ]; then
+              gh release create "$TAG" --draft --title "Oficina $VERSION" --notes-file "$NOTAS" || true
+            else
+              gh release create "$TAG" --draft --title "Oficina $VERSION" \
+                --notes "Borrador generado por el build automático. Completar las notas antes de publicar." || true
+            fi
           fi
           gh release upload "$TAG" "$FILE" "$ZIP" desktop/release/appcast.xml --clobber
 
@@ -261,8 +268,14 @@ jobs:
           FILE: desktop/release/${{ steps.exe.outputs.name }}
         run: |
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --draft --title "Oficina $VERSION" \
-              --notes "Borrador generado por el build automático. Completar las notas antes de publicar." || true
+            # las notas salen de docs/releases/<etiqueta>.md si existe; si no, un texto para completar a mano
+            NOTAS="docs/releases/$TAG.md"
+            if [ -f "$NOTAS" ]; then
+              gh release create "$TAG" --draft --title "Oficina $VERSION" --notes-file "$NOTAS" || true
+            else
+              gh release create "$TAG" --draft --title "Oficina $VERSION" \
+                --notes "Borrador generado por el build automático. Completar las notas antes de publicar." || true
+            fi
           fi
           # latest.yml y el .blockmap: los lee electron-updater en las apps instaladas
           gh release upload "$TAG" "$FILE" "$FILE.blockmap" desktop/release/latest.yml --clobber

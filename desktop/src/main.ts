@@ -15,6 +15,7 @@ import { createBackend, type Backend } from '../../backend/src/backend.js'
 import { Config } from '../../backend/src/config.js'
 import { ejecutable, resolver } from './abrir.js'
 import * as actualizaciones from './actualizaciones.js'
+import { AccesoCelular } from './celular.js'
 import { archivo, mime, raices } from './estaticos.js'
 import { hostWhatsApp } from './whatsapp.js'
 import onboardingHTML from './onboarding.html'
@@ -41,6 +42,7 @@ let ventana: BrowserWindow | undefined
 let bandeja: Tray | undefined
 let saliendo = false
 let refrescarBandeja: (() => Promise<void>) | undefined
+let celular: AccesoCelular | undefined
 
 // MARK: - arranque
 
@@ -75,6 +77,12 @@ async function arrancar() {
   })
 
   ipcMain.handle('hq', mensaje)
+  // acceso desde el celular (Ajustes › Celular): si quedó prendido, se vuelve a levantar
+  celular = new AccesoCelular({
+    router: backend.router, raices: r, carpeta: app.getPath('userData'),
+    alCambiar: () => ejecutarEnPagina('window.App && App.Celular && App.Celular.refrescar && App.Celular.refrescar()'),
+  })
+  celular.iniciar()
   backend.avisos.on('aviso', notificar)
   armarMenu()
   armarBandeja()
@@ -91,7 +99,7 @@ async function arrancar() {
     if (saliendo) return
     e.preventDefault()
     saliendo = true
-    void backend.shutdown().finally(() => {
+    void Promise.resolve(celular?.cerrar()).catch(() => {}).then(() => backend.shutdown()).finally(() => {
       // con una actualización bajada, electron-updater lanza el instalador y cierra la app; por las dudas, salida forzada
       if (actualizaciones.instalarAlSalir()) setTimeout(() => app.exit(0), 5_000)
       else app.exit(0)
@@ -209,6 +217,12 @@ async function mensaje(ev: IpcMainInvokeEvent, m: unknown): Promise<unknown> {
     case 'login':
       await login()
       return null
+    case 'celular':
+      if (!celular) return null
+      if (o.hacer === 'prender') return celular.prender()
+      if (o.hacer === 'apagar') return celular.apagar()
+      if (o.hacer === 'probar') return celular.probar()
+      return celular.estado()
     case 'elegirCarpeta': {
       const r = await dialog.showOpenDialog(ventana, {
         title: typeof o.titulo === 'string' ? o.titulo : 'Elegí una carpeta',
@@ -395,8 +409,16 @@ function devTools(): MenuItemConstructorOptions[] {
   return app.isPackaged ? [] : [{ type: 'separator' }, { role: 'reload', label: 'Recargar' }, { role: 'toggleDevTools', label: 'Herramientas de desarrollo' }]
 }
 
+/** El edificio de 16×16 dibujado para la bandeja (con @2x para retina); el ícono grande achicado queda borroso. */
+function iconoBandeja(): Electron.NativeImage {
+  const nombre = esMac ? 'bandeja-mac.png' : 'bandeja.png'
+  const f = app.isPackaged ? path.join(process.resourcesPath, 'bandeja', nombre) : path.resolve(__dirname, '../build', nombre)
+  const img = nativeImage.createFromPath(f)
+  return img.isEmpty() ? icono(esMac ? 18 : 16) : img
+}
+
 function armarBandeja() {
-  const img = esMac ? icono(18) : icono(16)
+  const img = iconoBandeja()
   if (img.isEmpty()) return
   if (esMac) img.setTemplateImage(false)
   bandeja = new Tray(img)
@@ -429,9 +451,9 @@ async function menuBandeja(): Promise<Menu> {
   }
   const sec = await api('/api/secretaria')
   if (sec.config && sec.agente) {
-    items.push({ label: `Dejarle un recado a ${sec.agente.nombre}…`, click: () => {
+    items.push({ label: `Hablarle a ${sec.agente.nombre}…`, click: () => {
       mostrar()
-      ejecutarEnPagina("window.App && App.Nav && App.Nav.ir('#/recados')")
+      ejecutarEnPagina('window.App && App.Microfono && App.Microfono.grabar()')
     } })
     items.push({ label: sec.corriendo ? `${sec.agente.nombre} está revisando…` : `Revisar ahora (${sec.agente.nombre})`, enabled: !sec.corriendo, click: () => {
       void backend.router.handle('POST', '/api/secretaria/revisar', {}, Buffer.from('{}')).then((r) => {

@@ -123,6 +123,8 @@
 .rep-prop > svg { flex: none; color: var(--tenue); }
 .rep-prop.evento > svg { color: var(--cal); } .rep-prop.mail > svg { color: var(--mail); }
 .rep-prop .sub { color: var(--suave); font-size: 12px; }
+.rep-prop.hacer.cerrado { opacity: .62; }
+.rep-prop.hacer.cerrado > svg { color: var(--ok); }
 .rep-item { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: start; }
 .rep-ini { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: #fff; background: var(--tenue); }
 .rep-ini.wa { background: var(--wa); } .rep-ini.mail { background: var(--mail); } .rep-ini.cal { background: var(--cal); }

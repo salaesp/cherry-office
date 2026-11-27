@@ -587,11 +587,12 @@ export class MemoriaSecretaria {
 
   // ---- la consigna de la revisión
 
-  /** La sección de memoria de la consigna: temas abiertos, fichas de quienes aparecen en lo nuevo, lo anotado hoy, lo
-   *  que hay que consolidar y las instrucciones. `material`: el texto de las fuentes de esta revisión. */
-  /** La memoria en la consigna de una revisión. `modo` 'revision' (las revisiones silenciosas que dejan notas): el
-   *  seguimiento de los temas trabados no va acá sino en el reporte. Sin modo, como antes (revisión que deja reporte). */
-  seccionConsigna(carpeta: string, material: string, p: { persona: string; puedeActuar: boolean; modo?: 'revision' }, hoy = new Date()): string[] {
+  /** La memoria en la revisión, en dos partes: `datos` (lo que ya sabía: temas abiertos, fichas de quienes aparecen en lo
+   *  nuevo, lo anotado hoy) va en el mensaje junto con lo nuevo; `reglas` (qué anotar al terminar y lo que hay que
+   *  consolidar) va con las demás instrucciones, como mensaje de sistema. `material`: el texto de las fuentes de esta
+   *  revisión. `modo` 'revision' (las revisiones silenciosas que dejan notas): el seguimiento de los temas trabados no va
+   *  acá sino en el reporte. Sin modo, como antes (revisión que deja reporte). */
+  seccionConsigna(carpeta: string, material: string, p: { persona: string; puedeActuar: boolean; modo?: 'revision' }, hoy = new Date()): { datos: string[]; reglas: string[] } {
     const temas = this.temas(carpeta, { estado: 'abiertos' }, hoy)
     const fichas = this.fichasDe(carpeta, material)
     const x = this.leerDia(carpeta, diaLocal(hoy))
@@ -616,8 +617,9 @@ export class MemoriaSecretaria {
         partes.push(limpiar(l))
       }
     }
-    partes.push('</memoria_secretaria>', '', 'Memoria, después de revisar:')
-    partes.push(
+    partes.push('</memoria_secretaria>')
+    const reglas: string[] = ['## Memoria, después de revisar']
+    reglas.push(
       '- Actualizá tu memoria con las herramientas memoria_*: (1) memoria_diario_anotar para lo relevante de cada fuente, con su origen (por ejemplo «WhatsApp · Mamá», «Gmail · Colegio», «Calendario»); (2) memoria_tema para lo que quede en seguimiento (un turno, un trámite, un pedido): estado abierto, esperando, resuelto o descartado, fecha, próximo paso y una nota; (3) memoria_ficha para datos estables de una persona o cosa (con quién se atiende, cuándo vencen las cuotas). Antes de crear un tema o ficha mirá los que ya hay (memoria_temas, memoria_ficha_leer): no los dupliques.',
       '- Anotá hechos cortos y útiles. No guardes contraseñas, números de tarjeta ni claves, ni conversaciones enteras.',
       `- Las decisiones de ${p.persona} sobre tus propuestas (aprobadas o descartadas, más arriba) también mueven la memoria: si aprobó agendar algo, el tema pasa a esperando o resuelto con su fecha; si la descartó, cerralo como descartado o anotá por qué.`,
@@ -634,11 +636,11 @@ export class MemoriaSecretaria {
       for (const t of trabados.slice(0, L.consignaTemas)) partes.push(`- ${limpiar(t.titulo)}: ${motivoTrabado(t, hoy)}`)
     }
     if (pend.dia || pend.semana) {
-      partes.push('', 'Consolidaciones pendientes (hacelas después de lo demás):')
-      if (pend.dia) partes.push(`- Resumí el día ${pend.dia}: leelo con memoria_diario_leer {dia: "${pend.dia}"} y guardá un resumen de pocas líneas con memoria_dia_resumir.`)
-      if (pend.semana) partes.push(`- Condensá la semana ${pend.semana.semana} (del ${pend.semana.desde} al ${pend.semana.hasta}, ${pend.semana.dias} días guardados, ya vieja): leela con memoria_diario_leer {desde: "${pend.semana.desde}", hasta: "${pend.semana.hasta}"} y guardá el resumen con memoria_semana_resumir {semana: "${pend.semana.semana}", resumen}. Eso borra los días de esa semana. Solo esa semana en esta revisión.`)
+      reglas.push('', 'Consolidaciones pendientes (hacelas después de lo demás):')
+      if (pend.dia) reglas.push(`- Resumí el día ${pend.dia}: leelo con memoria_diario_leer {dia: "${pend.dia}"} y guardá un resumen de pocas líneas con memoria_dia_resumir.`)
+      if (pend.semana) reglas.push(`- Condensá la semana ${pend.semana.semana} (del ${pend.semana.desde} al ${pend.semana.hasta}, ${pend.semana.dias} días guardados, ya vieja): leela con memoria_diario_leer {desde: "${pend.semana.desde}", hasta: "${pend.semana.hasta}"} y guardá el resumen con memoria_semana_resumir {semana: "${pend.semana.semana}", resumen}. Eso borra los días de esa semana. Solo esa semana en esta revisión.`)
     }
-    return partes
+    return { datos: partes, reglas }
   }
 
   /** La memoria en la consigna del reporte: los temas abiertos y cuáles parecen trabados, para «Seguimiento». */
@@ -992,13 +994,19 @@ export class MemoriaSecretariaRouter implements SubRouter {
       const b = objeto(body)
       const persona = act.oficina.duenio === '' ? 'Vos' : act.oficina.duenio
       const slug = typeof b.slug === 'string' ? b.slug : ''
-      const t = this.m.leerTema(c, slug)
-      if (!t) throw new ErrorSec('No encontré ese tema.', 404)
+      // sin slug y con título: lo anota la persona (desde un «Para hacer» del reporte); si ya hay uno parecido, es ese
+      let titulo: string
+      if (slug === '' && typeof b.titulo === 'string') titulo = b.titulo
+      else {
+        const t = this.m.leerTema(c, slug)
+        if (!t) throw new ErrorSec('No encontré ese tema.', 404)
+        titulo = t.titulo
+      }
       const r = this.m.guardarTema(c, {
-        tema: t.titulo, ...(typeof b.estado === 'string' ? { estado: b.estado } : {}), ...(typeof b.fecha === 'string' ? { fecha: b.fecha } : {}),
+        tema: titulo, ...(typeof b.estado === 'string' ? { estado: b.estado } : {}), ...(typeof b.fecha === 'string' ? { fecha: b.fecha } : {}),
         ...(typeof b.proximo === 'string' ? { proximo: b.proximo } : {}), ...(typeof b.nota === 'string' ? { nota: b.nota } : {}), origen: persona,
       })
-      return [200, { slug: r.slug, estado: r.estado }]
+      return [200, { slug: r.slug, titulo: r.titulo, estado: r.estado, nuevo: r.nuevo }]
     }
     if (sub === '/compartir') {
       if (method !== 'POST') return no405

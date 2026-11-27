@@ -103,7 +103,7 @@ async function decodificar(datos: Buffer): Promise<Float32Array> {
   }
 }
 
-/** WAV PCM de 16 bits (los recados, que la interfaz graba y convierte) a 16 kHz mono. */
+/** WAV PCM de 16 bits (los audios de la persona, que la interfaz graba y convierte; audio.ts) a 16 kHz mono. */
 function decodificarWav(b: Buffer): Float32Array {
   if (b.length < 44 || b.toString('ascii', 0, 4) !== 'RIFF' || b.toString('ascii', 8, 12) !== 'WAVE') throw new Error('no es un WAV')
   let i = 12, canales = 0, frecuencia = 0, bits = 0, formato = 0

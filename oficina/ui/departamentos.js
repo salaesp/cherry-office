@@ -37,7 +37,12 @@
       function pintar() {
         var o = App.E.oficina;
         App.vaciar(lista);
-        if (!o.departamentos.length) lista.appendChild(h('div.vacio', 'Todavía no hay departamentos. Creá el primero con «Nuevo departamento».'));
+        if (!o.departamentos.length) {
+          /* en una oficina recién creada, lo natural es pedirle a la secretaría que arme el equipo (docs/plan-secretaria-creadora.md) */
+          var pista = App.pistaSecretaria ? App.pistaSecretaria('Contale cómo trabajás y te propone departamentos y equipo.') : null;
+          if (pista) lista.appendChild(pista);
+          lista.appendChild(h('div.vacio', 'Todavía no hay departamentos. Creá el primero con «Nuevo departamento».'));
+        }
         o.departamentos.forEach(function (d) {
           var n = o.agentes.filter(function (a) { return a.departamento === d.id; }).length;
           var muestra = h('button.muestra', { style: { background: d.color }, title: 'Cambiar color', onclick: function () {

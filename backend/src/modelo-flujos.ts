@@ -36,7 +36,14 @@ export type FlujoDef = {
   /** Id de otro flujo: al terminar una corrida de este (último paso aprobado), arranca una corrida de ese con la última
    *  entrega como contexto. Se lee de la oficina al momento de arrancar, así que los cambios de ese flujo valen para los dos usos. */
   siguiente?: string
+  /** Frases con las que la persona nombra el flujo en una charla («presupuesto», «cotización»): si su mensaje usa una, la
+   *  secretaría (o cualquier agente) lo puede arrancar sin pedir ok (charla-flujos.ts). */
+  disparadores?: string[]
+  /** Lo que necesita para arrancar (`obligatorio`: sin eso no arranca y el agente lo tiene que preguntar). */
+  datos?: DatoFlujo[]
 }
+
+export type DatoFlujo = { nombre: string; obligatorio?: boolean }
 
 export type Regla = { id: string; texto: string; origen?: string }
 
@@ -74,6 +81,15 @@ export function decodificarFlujo(v: unknown): FlujoDef {
     id: str(o.id), nombre: str(o.nombre), descripcion: optStr(o.descripcion), pasos,
     activo: o.activo === undefined || o.activo === null ? true : typeof o.activo === 'boolean' ? o.activo : falla(),
     creado: optStr(o.creado), origen: optStr(o.origen), siguiente: optStr(o.siguiente),
+    disparadores: optStrs(o.disparadores), datos: o.datos === undefined || o.datos === null ? undefined : Array.isArray(o.datos) ? o.datos.map(decodificarDato) : falla(),
+  })
+}
+
+function decodificarDato(v: unknown): DatoFlujo {
+  const o = obj(v)
+  return sinUndefined({
+    nombre: str(o.nombre),
+    obligatorio: o.obligatorio === undefined || o.obligatorio === null ? undefined : typeof o.obligatorio === 'boolean' ? o.obligatorio : falla(),
   })
 }
 
@@ -170,9 +186,28 @@ export function flujoDesde(d: Obj, idsUsados: Set<string>): FlujoDef {
     creado: LecturaAPI.texto(d.creado, 'creado', 40),
     origen: LecturaAPI.texto(d.origen, 'origen', 600),
     siguiente: LecturaAPI.texto(d.siguiente, 'siguiente', 41),
+    disparadores: listaVacia(LecturaAPI.lista(d.disparadores, 'disparadores')),
+    datos: listaVacia(datosDesde(d.datos)),
   })
   ValidarFlujos.validarFlujo(f)
   return f
+}
+
+const listaVacia = <T>(l: T[] | undefined): T[] | undefined => (l === undefined || l.length === 0 ? undefined : l)
+
+/** `datos` desde la API: lista de `{nombre, obligatorio?}` (o de textos: «cliente*» es obligatorio). */
+function datosDesde(v: unknown): DatoFlujo[] | undefined {
+  if (v === undefined || v === null) return undefined
+  if (!Array.isArray(v)) throw new ErrorAPI(400, '«datos» tiene que ser una lista.')
+  const out: DatoFlujo[] = []
+  for (const x of v) {
+    let nombre: string, obligatorio = false
+    if (typeof x === 'string') { nombre = x.trim(); if (nombre.endsWith('*')) { obligatorio = true; nombre = nombre.slice(0, -1).trim() } }
+    else if (esObjeto(x) && typeof x.nombre === 'string') { nombre = x.nombre.trim(); obligatorio = x.obligatorio === true }
+    else throw new ErrorAPI(400, 'Cada dato del flujo tiene que tener un nombre.')
+    if (nombre !== '') out.push(obligatorio ? { nombre, obligatorio } : { nombre })
+  }
+  return out
 }
 
 export function reglaDesde(d: Obj, idsUsados: Set<string>): Regla {
@@ -198,6 +233,10 @@ export const ValidarFlujos = {
   maxConsigna: 4000,
   /** `recibe`, `entrega` y `descripcion`. */
   maxCorto: 600,
+  maxDisparadores: 12,
+  maxDatos: 12,
+  /** Una frase que nombra el flujo o el nombre de un dato. */
+  maxFrase: 60,
 
   /** Un flujo suelto: topes, ids slug únicos, `quien` bien formado y `recibeDe` solo hacia pasos anteriores.
    *  Que el agente de un paso no exista NO es error: la oficina tiene que seguir abriendo después de despedir a alguien. */
@@ -212,6 +251,18 @@ export const ValidarFlujos = {
     if (f.siguiente !== undefined) {
       if (!Slug.valido(f.siguiente)) throw new ErrorAPI(400, `El flujo ${f.id} sigue con un flujo de id inválido: ${f.siguiente}.`)
       if (f.siguiente === f.id) throw new ErrorAPI(400, `El flujo ${f.id} no puede seguir con él mismo.`)
+    }
+    if ((f.disparadores?.length ?? 0) > this.maxDisparadores) throw new ErrorAPI(400, `El flujo ${f.id} tiene más de ${this.maxDisparadores} frases que lo nombran.`)
+    for (const d of f.disparadores ?? []) {
+      if (d.trim() === '' || largo(d) > this.maxFrase) throw new ErrorAPI(400, `Las frases que nombran el flujo ${f.id} tienen que tener entre 1 y ${this.maxFrase} caracteres.`)
+    }
+    if ((f.datos?.length ?? 0) > this.maxDatos) throw new ErrorAPI(400, `El flujo ${f.id} pide más de ${this.maxDatos} datos para arrancar.`)
+    const nombresDatos = new Set<string>()
+    for (const d of f.datos ?? []) {
+      const n = d.nombre.trim()
+      if (n === '' || largo(n) > this.maxFrase) throw new ErrorAPI(400, `Los datos del flujo ${f.id} tienen que tener un nombre de hasta ${this.maxFrase} caracteres.`)
+      if (nombresDatos.has(n.toLowerCase())) throw new ErrorAPI(400, `El flujo ${f.id} pide dos veces el dato «${n}».`)
+      nombresDatos.add(n.toLowerCase())
     }
     const anteriores = new Set<string>()
     for (const p of f.pasos) {
