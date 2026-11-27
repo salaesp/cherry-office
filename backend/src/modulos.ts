@@ -22,6 +22,7 @@ import './whatsapp.js' // [whatsapp]
 import './secretaria.js' // [secretaria]
 import './secretaria-memoria.js' // [secretaria-memoria]
 import './secretaria-importar.js' // [secretaria-importar]
-import './recados.js' // [recados]
+import './audio.js' // [audio]
+import './delegar.js' // [delegar]
 import './rutas-skills.js' // [skills-propias]
 export {}

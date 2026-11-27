@@ -1,4 +1,5 @@
 // Rutas del núcleo para el chat (Router.swift): historial, chat, actividad, avisos y costos.
+import type { GanchosCharla } from './delegar.js'
 import { SkillsPropias } from './skills-propias.js'
 import { Adjuntos, type Adjunto } from './adjuntos.js'
 import type { Avisos } from './avisos.js'
@@ -59,6 +60,8 @@ export type DepsChat = {
   corridas?: (oficina: string) => Obj[]
   /** Versión del Creador para /api/actividad. */
   creadorVersion?: (oficina: string) => number
+  /** Delegar y preguntar en la charla (delegar.ts): instrucciones, cuándo existen las herramientas y lo que espera a la persona. */
+  charla?: () => GanchosCharla | undefined
 }
 
 /** `claude auth status` cacheado unos segundos (la UI de onboarding consulta /api/estado seguido). */
@@ -238,6 +241,10 @@ export function rutasChat(d: DepsChat): RutaNucleo {
     // la persona está en el chat: lo que el agente no tiene permitido se le pregunta (tarjeta en la oficina)
     ctx.preguntar = true
     aplicarEleccion(ctx, eleccion)
+    // pasar trabajo a un colega y preguntarle a la persona: instrucciones como mensaje de sistema, con las demás
+    const ganchos = d.charla?.()
+    const extra = ganchos?.instrucciones(act.oficina, def)
+    if (extra) ctx.instrucciones = ctx.instrucciones ? `${ctx.instrucciones}\n\n${extra}` : extra
 
     let resultado: Resp
     try {
@@ -248,6 +255,7 @@ export function rutasChat(d: DepsChat): RutaNucleo {
         try {
           store.asegurarSesion(sid, agente, carpeta)
           store.agregar(sid, 'u', mensaje)
+          ganchos?.empezar(carpeta, agente, sid)
           const activa = store.estaActiva(sid)
           // el cartel: fijo arriba («Respondiéndote») y abajo lo que va haciendo en vivo (sin IA)
           const texto = await runner.actividad.seguir({ oficina: carpeta, agente, origen: 'chat', tarea: 'Respondiéndote', extra: caja.observador(escritos.observador(uso.observador(enVivo.observador()))) },
@@ -301,6 +309,7 @@ export function rutasChat(d: DepsChat): RutaNucleo {
           try { store.agregar(sid, 'a', 'No pude responder: ' + t, true) } catch {}
           return [500, { error: t }]
         } finally {
+          ganchos?.terminar(carpeta, agente, sid)
           const k = claveVivo(carpeta, agente)
           if (vivos.get(k)?.caja === enVivo) vivos.delete(k)
           const tok = envExtra[variableTokenMCP]
@@ -410,6 +419,7 @@ export function rutasChat(d: DepsChat): RutaNucleo {
       r.entregasSinRevisar = entregas.sinRevisar(act.carpeta)
       r.corridas = d.corridas?.(act.carpeta) ?? []
       r.creadorVersion = d.creadorVersion?.(act.carpeta) ?? 0
+      r.teEsperan = d.charla?.()?.teEsperan(act.carpeta) ?? 0
       r.permisos = [...(d.mcp?.()?.permisos?.pendientes(act.carpeta) ?? []).map(pedidoJSON), ...(d.permisosTareas?.()?.pendientes(act.carpeta) ?? [])]
       return [200, r]
     }

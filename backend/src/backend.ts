@@ -72,6 +72,7 @@ export function createBackend({ config, claudePath, env = process.env, whatsapp 
     config, store, runner, oficinas, avisos, entregas, log,
     mcp: () => s.mcp?.(), permisosTareas: () => s.permisosTareas?.(), catalogo: () => s.catalogo?.(),
     corridas: (o) => s.corridas?.(o) ?? [], creadorVersion: (o) => s.creadorVersion?.(o) ?? 0,
+    charla: () => s.charla?.(),
   }))
 
   for (const m of modulosRegistrados()) m.instalar(s)

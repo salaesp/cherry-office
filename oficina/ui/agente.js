@@ -98,6 +98,7 @@
     }).then(function () { return cargarConsultas(id); }).then(function () {
       delete vivos[id]; delete cancelando[id];
       ocupado(id, false);
+      if (m.alResponder) { try { m.alResponder(); } catch (e) {} }
       if (actual === id && pestana === 'chat') pintar();   // si no, el aviso llega por /api/actividad (banner y faro)
       if (App.Nav) App.Nav.refrescar();                    // la lista de charlas: título, último mensaje y orden
       seguirCola(id);
@@ -149,17 +150,49 @@
 
   /* Consultas a colegas (Fase 4): /api/consultas?session= trae lo que el agente consultó en esa conversación; cada una trae
      `pos` = índice, en el historial, de la respuesta del agente que la hizo. Se cuelgan de esa respuesta como `m.consultas`. */
+  /* las tarjetas de lo que hizo el agente en la charla (delegaciones, preguntas, propuestas): cada una va debajo de la
+     respuesta de su turno; las que todavía no tienen respuesta (o se pasan del historial) van al final */
+  var sueltas = {};         // id -> tarjetas sin respuesta todavía
+  var sondeoTj = null;
+  function cargarTarjetas(id) {
+    var sid = sesiones[id];
+    if (!sid) return Promise.resolve();
+    return api.get('/api/charlas/tarjetas', { session: sid }).then(function (r) {
+      if (sesiones[id] !== sid) return;
+      var msgs = chats[id] || [];
+      msgs.forEach(function (m) { delete m.tarjetas; });
+      var resto = [];
+      (r.tarjetas || []).map(function (t) { return { t: t }; }).concat((r.acciones || []).map(function (a) { return { a: a, turno: a.turno }; })).forEach(function (x) {
+        var turno = x.t ? x.t.turno : x.turno, m = msgs[turno];
+        if (m && m.r === 'a') (m.tarjetas = m.tarjetas || []).push(x); else resto.push(x);
+      });
+      sueltas[id] = resto;
+    }).catch(function () { /* sin tarjetas: el chat se ve igual */ });
+  }
+  function tarjetasEl(lista, id) {
+    return lista.map(function (x) {
+      var op = { alCambiar: function () { cargarTarjetas(id).then(function () { repintar(id); }); } };
+      return x.a ? App.Tarjetas.accion(x.a, op) : App.Tarjetas.de(x.t, op);
+    });
+  }
+  function hayVivas(id) {
+    var todas = [].concat(sueltas[id] || []);
+    (chats[id] || []).forEach(function (m) { if (m.tarjetas) todas = todas.concat(m.tarjetas); });
+    return todas.some(function (x) { return x.t && (x.t.estado === 'esperando' || x.t.estado === 'corriendo'); });
+  }
+
   function cargarConsultas(id) {
     var sid = sesiones[id];
     if (!sid) return Promise.resolve();
-    return api.get('/api/consultas', { session: sid }).then(function (r) {
+    var pT = cargarTarjetas(id);
+    return Promise.all([pT, api.get('/api/consultas', { session: sid }).then(function (r) {
       var msgs = chats[id] || [];
       msgs.forEach(function (m) { delete m.consultas; });
       (r.consultas || []).forEach(function (c) {
         var m = msgs[c.pos];
         if (m && m.r === 'a') (m.consultas = m.consultas || []).push(c);
       });
-    }).catch(function () { /* sin consultas: el chat se ve igual */ });
+    }).catch(function () { /* sin consultas: el chat se ve igual */ })]);
   }
 
   /* «Consultó a Patricia» plegable, con la pregunta y la respuesta de cada consulta */
@@ -438,7 +471,26 @@
     var claveEleccion = function () { return sesiones[a.id] || 'nueva:' + a.id; };
     var selector = App.SelectorCharla({ modelo: a.modelo, esfuerzo: a.esfuerzo, valor: eleccionDe(claveEleccion()),
       alCambiar: function (v) { guardarEleccion(claveEleccion(), v); } });
-    App.add(pie, adj.lista, adj.error, adj.input, h('div.redactar', adj.boton, txt, parar, enviar),
+    var mic = App.Grabadora.puede() ? h('button.btn.icono.btn-mic', { title: 'Grabar un audio para ' + a.nombre, onclick: grabar }, App.Grabadora.icono()) : null;
+    var redactar = h('div.redactar', adj.boton, mic, txt, parar, enviar);
+    /* grabar: la franja reemplaza al campo; al mandar, se transcribe en la compu y sale como «(nota de voz) …» */
+    function grabar() {
+      var franja, g = App.Grabadora.crear({ alTiempo: function (sg) { franja.tiempo(sg); }, alTope: terminar });
+      function volver() { franja.el.replaceWith(redactar); }
+      function terminar() {
+        var wav = g.terminar();
+        if (!wav) { volver(); App.aviso('El audio quedó vacío.', true); return; }
+        franja.transcribiendo();
+        App.Grabadora.transcribir(wav).then(function (t) {
+          volver();
+          txt.value = App.Grabadora.MARCA + t;
+          mandar();
+        }).catch(function (e) { volver(); App.aviso(e.message, true); });
+      }
+      franja = App.Grabadora.franja({ para: 'Para ' + a.nombre, alCancelar: function () { g.cancelar(); volver(); }, alMandar: terminar });
+      g.empezar().then(function () { redactar.replaceWith(franja.el); }).catch(function (e) { App.aviso(e.message, true); });
+    }
+    App.add(pie, adj.lista, adj.error, adj.input, redactar,
       h('div.pie-charla', selector, h('div.ayuda', 'Enter para enviar (con ' + a.nombre + ' trabajando, queda en cola) · Mayús+Enter para otra línea · arrastrá o pegá archivos')));
 
     function render() {
@@ -454,7 +506,8 @@
           var sp = App.Adjuntos.separar(m.t);
           var chipsAdj = sp.rutas.length ? App.Adjuntos.chips(sp.rutas)
             : (m.adj && m.adj.length ? h('div.adjuntos', m.adj.map(function (n) { return h('div.adjunto', App.icono('clip'), h('span', n)); })) : null);
-          lista.appendChild(h('div.msg.u', sp.texto, chipsAdj)).dataset.texto = sp.texto;
+          var vz = App.Grabadora.partir(sp.texto);
+          lista.appendChild(h('div.msg.u', vz.voz ? h('div.voz-chip', App.Grabadora.icono(), 'Nota de voz') : null, vz.voz ? h('div', vz.texto) : sp.texto, chipsAdj)).dataset.texto = sp.texto;
         }
         else {
           var plegados = m.pasos ? App.ChatRico.pasosPlegados(m.pasos) : null;
@@ -465,8 +518,12 @@
           if (arch) burbuja.appendChild(arch);
           lista.appendChild(burbuja);
           if (m.consultas && m.consultas.length) lista.appendChild(bloqueConsultas(m.consultas));
+          if (m.tarjetas && m.tarjetas.length) App.add(lista, tarjetasEl(m.tarjetas, a.id));
         }
       });
+      if ((sueltas[a.id] || []).length) App.add(lista, tarjetasEl(sueltas[a.id], a.id));
+      clearTimeout(sondeoTj);
+      if (hayVivas(a.id)) sondeoTj = setTimeout(function () { if (lista.isConnected && actual === a.id) cargarTarjetas(a.id).then(function () { repintar(a.id); }); }, 3000);
       refrescarVivo = null;
       if (enCurso[a.id]) {
         var vivoEl = lista.appendChild(App.ChatRico.burbujaVivo(vivos[a.id], a.nombre));
@@ -1099,15 +1156,46 @@
   }
 
   /* abre la conversación de una ejecución en la pestaña de chat (se puede seguir escribiendo en esa sesión) */
-  function abrirSesion(a, sid) {
+  function abrirSesion(a, sid, despues) {
     api.get('/api/historial', { agent: a.id, session: sid }).then(function (r) {
       sesiones[a.id] = sid; soltarCola(a.id);
       chats[a.id] = (r.msgs || []).map(function (m) { return { r: m.r, t: m.t, e: !!m.e }; });
       App.ChipContexto.fijar(a.id, r.contexto);
       pestana = 'chat';
-      pintar();
-      if (App.Nav) App.Nav.pintarLista();
+      return cargarConsultas(a.id).then(function () {
+        pintar();
+        if (App.Nav) App.Nav.pintarLista();
+        if (despues) despues();
+      });
     }).catch(App.fallo);
+  }
+
+  /* manda `texto` en una charla concreta (p. ej. la opción que elegiste de una pregunta, desde la Bandeja): la abre si hace
+     falta y, si el agente está respondiendo, lo deja en la cola */
+  function enviarEn(id, sid, texto) {
+    var a = App.agente(id); if (!a) return;
+    var m = { t: texto, nombres: [], archivos: [], eleccion: eleccionDe(sid), sesion: sid };
+    function ya() { if (enCurso[id]) { (colas[id] = colas[id] || []).push(m); repintar(id); } else enviarMensaje(id, m); }
+    if (actual === id && sesiones[id] === sid && App.modoDerecho() === 'agente') { pestana = 'chat'; ya(); return; }
+    actual = id; sesionFija = sid; pestana = 'chat'; App.Oficina.elegir(id); App.abrirDerecho('agente'); App.marcarEstados();
+    abrirSesion(a, sid, ya);
+  }
+
+  /* una charla nueva con `texto` (el micrófono flotante de la secretaría): no la abre; `alResponder(sid)` cuando contesta.
+     Si el agente está respondiendo otra cosa, espera a que termine. */
+  function hablarNueva(id, texto, alResponder) {
+    var a = App.agente(id); if (!a) return null;
+    var sid = App.uuid();
+    function intentar() {
+      if (!App.agente(id)) return;
+      if (enCurso[id]) { setTimeout(intentar, 1000); return; }
+      var viendo = actual === id && App.modoDerecho() === 'agente';
+      sesiones[id] = sid; soltarCola(id); chats[id] = []; sueltas[id] = [];
+      if (viendo) { sesionFija = sid; pestana = 'chat'; pintar(); }
+      enviarMensaje(id, { t: texto, nombres: [], archivos: [], eleccion: {}, sesion: sid, alResponder: function () { if (alResponder) alResponder(sid); } });
+    }
+    intentar();
+    return sid;
   }
 
   /* hoja para crear (t = null) o editar una tarea. `a` puede ser null al crear: arriba se elige para quién es. */
@@ -1262,7 +1350,8 @@
       var a = App.agente(id); if (!a) return;
       actual = id; sesionFija = sid; pestana = 'chat'; App.Oficina.elegir(id); App.abrirDerecho('agente'); abrirSesion(a, sid); App.marcarEstados();
     },
-    nueva: nueva,
+    nueva: nueva, enviarEn: enviarEn, hablarNueva: hablarNueva,
+    ocupado: function (id) { return !!enCurso[id]; },
     sesion: function (id) { return sesiones[id] || null; },
     sesionFija: function () { return sesionFija; },
     pestana: function () { return actual ? pestana : 'chat'; },

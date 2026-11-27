@@ -18,7 +18,6 @@ App.Nav = (function () {
   var SECCIONES = [
     { id: 'bandeja', texto: 'Bandeja', icono: 'bandeja', ruta: '#/bandeja', movil: true },
     { id: 'oficina', texto: 'Oficina', icono: 'edificio', ruta: '#/oficina' },
-    { id: 'recados', texto: 'Recados', icono: 'charla', ruta: '#/recados', movil: true },
     { id: 'equipo', texto: 'Equipo', icono: 'personas', ruta: '#/equipo', movil: true },
     { id: 'archivos', texto: 'Archivos', icono: 'carpeta', ruta: '#/archivos', movil: true },
     { id: 'trabajo', texto: 'Trabajo', icono: 'reloj', ruta: '#/trabajo' }
@@ -34,7 +33,6 @@ App.Nav = (function () {
   };
   function lugarDe(modo) {
     if (modo === 'agente') return ['equipo'];
-    if (modo === 'recados') return ['recados', App.Recados.filtro()];
     return LUGAR[modo];
   }
   var seccion = null, sub = null;
@@ -208,10 +206,6 @@ App.Nav = (function () {
           else if (esPest) { if (!(m === 'agente' && App.Agente.actual() === r.a && App.Agente.lado() === r.b)) App.Agente.abrir(r.a, r.b); }
           else if (!(enChat && App.Agente.actual() === r.a)) App.Agente.abrir(r.a, 'chat');
         } else vacio();
-      } else if (r.sec === 'recados') {
-        var fr = App.Recados.FILTROS.some(function (f) { return f.id === r.a; }) ? r.a : 'todo';
-        ponerSeccion('recados', fr);
-        if (m !== 'recados') App.Recados.abrir(fr); else if (App.Recados.filtro() !== fr) App.Recados.ponerFiltro(fr);
       } else if (r.sec === 'reuniones') {
         ponerSeccion('equipo', 'reuniones');
         if (r.a) { if (!(m === 'reunion' && App.Reunion.abierta() === r.a)) App.Reunion.ver(r.a); }
@@ -247,7 +241,6 @@ App.Nav = (function () {
       if (p !== 'chat') return '#/equipo/' + encodeURIComponent(id || '') + '/' + p;
       return '#/equipo/' + encodeURIComponent(id || '') + (sid ? '/' + sid : '');
     }
-    if (modo === 'recados') { var f = App.Recados.filtro(); return '#/recados' + (f && f !== 'todo' ? '/' + f : ''); }
     if (modo === 'reunion') return '#/reuniones/' + encodeURIComponent((App.Reunion.abierta && App.Reunion.abierta()) || '');
     if (modo === 'entregables') { var e = App.Entregables.abierta(); return '#/bandeja/revisar' + (e ? '/' + e : ''); }
     if (modo === 'permisos') return '#/bandeja/permisos';
@@ -301,7 +294,6 @@ App.Nav = (function () {
     else if (seccion === 'equipo') pintarEquipo(col);
     else if (seccion === 'archivos') pintarArchivos(col);
     else if (seccion === 'trabajo') pintarTrabajo(col);
-    else if (seccion === 'recados') pintarRecados(col);
     else App.vaciar(col);
   }
   function cabecera(titulo, boton) { return h('div.lista-cab', h('h2', titulo), boton || null); }
@@ -346,6 +338,8 @@ App.Nav = (function () {
   }
   function titulo(s) {
     var t = App.Adjuntos && App.Adjuntos.separar ? App.Adjuntos.separar(s.titulo || '').texto : s.titulo;
+    var vz = App.Grabadora ? App.Grabadora.partir(t) : { voz: false, texto: t };
+    if (vz.voz) return 'Nota de voz: ' + vz.texto.trim();
     return (t || '').trim() || 'Charla con archivos';
   }
   function corto(ts) {
@@ -482,16 +476,6 @@ App.Nav = (function () {
     App.add(App.vaciar(col), cabecera('Trabajo'), h('div.lista-cuerpo',
       filtroFila('reloj', 'Tareas', sub === 'tareas', function () { ir('#/trabajo/tareas'); }, d.navTar && d.navTar.textContent ? h('span.insignia', d.navTar.textContent) : null),
       filtroFila('flujo', 'Flujos', sub === 'flujos', function () { ir('#/trabajo/flujos'); }, d.navFlu)));
-  }
-
-  function pintarRecados(col) {
-    var R = App.Recados;
-    App.add(App.vaciar(col), cabecera('Recados'), h('div.lista-cuerpo',
-      R.FILTROS.map(function (f) {
-        var n = f.id === 'esperan' ? R.cuenta('esperan') : 0;
-        return filtroFila(f.icono, f.texto, sub === f.id, function () { ir('#/recados' + (f.id === 'todo' ? '' : '/' + f.id)); }, n ? h('span.insignia.aviso', String(n)) : null);
-      }),
-      h('p.lista-nota', 'Dejale a la secretaría lo que necesites, por texto o audio: te contesta, propone acciones y le pasa trabajo al equipo.')));
   }
 
   /* --- «Detalles»: la columna a la derecha de la charla (en la compu). Sus charlas arriba de todo, y sus tareas,

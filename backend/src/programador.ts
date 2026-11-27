@@ -228,8 +228,8 @@ export class Programador implements ProgramadorEntregas {
   static readonly prefijoSecretaria = 'secretaria:'
   /** Una tanda de la importación de notas a la memoria de la secretaría: `secretaria-importar:<importación>:<tanda>`. */
   static readonly prefijoImportar = 'secretaria-importar:'
-  /** Algo que la secretaría delegó desde un recado: `recado:<recado>:<resultado>` (recados.ts). */
-  static readonly prefijoRecado = 'recado:'
+  /** Algo que un agente le pasó a un colega desde una charla (o el coordinador en una corrida): `delegar:<tarjeta>` (delegar.ts). */
+  static readonly prefijoDelegar = 'delegar:'
 
   readonly ejecuciones: Ejecuciones
   /** Pedidos de permiso de las corridas que esperan a la persona (permisos-tareas.ts). */
@@ -525,7 +525,7 @@ export class Programador implements ProgramadorEntregas {
 
   /** Origen de la entrega, la actividad y el costo de una corrida, según el prefijo de su id de tarea. */
   static origenEntrega(id: string): string {
-    if (id.startsWith(Programador.prefijoEncargo) || id.startsWith(Programador.prefijoCoordinador)) return 'encargo'
+    if (id.startsWith(Programador.prefijoEncargo) || id.startsWith(Programador.prefijoCoordinador) || id.startsWith(Programador.prefijoDelegar)) return 'encargo'
     if (id.startsWith(Programador.prefijoFlujo)) return 'flujo'
     if (id.startsWith(Programador.prefijoAccion)) return 'accion'
     if (id.startsWith(Programador.prefijoParte)) return 'parte'
@@ -533,7 +533,6 @@ export class Programador implements ProgramadorEntregas {
     if (id.startsWith(Programador.prefijoEspera)) return 'espera'
     if (id.startsWith(Programador.prefijoSecretaria)) return 'secretaria'
     if (id.startsWith(Programador.prefijoImportar)) return 'importacion'
-    if (id.startsWith(Programador.prefijoRecado)) return 'recado'
     return 'tarea'
   }
 
@@ -785,7 +784,7 @@ export function nombreCorrida(id: string): string {
   if (/^secretaria:r\d+$/.test(id)) return 'Reporte de la secretaría'
   if (id.startsWith(Programador.prefijoSecretaria)) return 'Revisión de la secretaría'
   if (id.startsWith(Programador.prefijoImportar)) return 'Importación a la memoria de la secretaría'
-  if (id.startsWith(Programador.prefijoRecado)) return 'Encargo de un recado'
+  if (id.startsWith(Programador.prefijoDelegar)) return 'Encargo desde una charla'
   return id
 }
 

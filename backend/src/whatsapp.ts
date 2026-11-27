@@ -497,7 +497,7 @@ export class ServicioWhatsApp {
   get cifrado() { return !!this.clave() }
   private clave() { const c = hostWhatsApp(this.s)?.clave?.(); return c && /^[0-9a-f]{64}$/i.test(c) ? c : undefined }
 
-  /** La clave con la que se cifran los medios (hex), si hay: los audios de los recados se guardan igual. */
+  /** La clave con la que se cifran los medios (hex), si hay: los audios de la persona (audio.ts) se guardan igual mientras se transcriben. */
   claveMedios(): string | undefined { return this.clave() }
 
   /** Al arrancar la app: si quedó vinculado, reconecta. */
@@ -585,10 +585,10 @@ export class ServicioWhatsApp {
     if (!si && this.sueltos.size === 0) this.detenerTranscriptor()
   }
 
-  /** Audios sueltos (los de los recados, recados.ts) que esperan su texto: id -> promesa. */
+  /** Audios sueltos (los de la persona, audio.ts) que esperan su texto: id -> promesa. */
   private sueltos = new Map<string, { archivo: string; ok: (t: string) => void; mal: (e: Error) => void }>()
   private contadorSueltos = 0
-  static readonly chatSuelto = 'recado'
+  static readonly chatSuelto = 'suelto'
 
   /** Transcribe un archivo WAV (cifrado con la clave de los medios, si hay) con el mismo transcriptor, aunque la
    *  transcripción de WhatsApp esté apagada: lo pidió la persona al mandar el audio. */

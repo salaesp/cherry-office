@@ -29,8 +29,10 @@ App.Entregables = (function () {
   function abiertoPanel() { return App.modoDerecho && App.modoDerecho() === 'entregables'; }
 
   /* ---------------- contador (con cada /api/actividad) ---------------- */
+  var teEsperan = 0;   // preguntas y delegaciones propuestas de las charlas (las propuestas de acción ya son entregas)
   function alActividad(r) {
-    var n = r.entregasSinRevisar | 0;
+    var n = r.entregasSinRevisar | 0, te = r.teEsperan | 0;
+    if (te !== teEsperan) { teEsperan = te; pintarContador(); }
     if (n === sinRevisar && firma !== null) return;
     sinRevisar = n;
     refrescarUltimas();
@@ -47,7 +49,8 @@ App.Entregables = (function () {
 
   function pintarContador() {
     var b = App.dom && App.dom.navEnt;
-    if (b) { b.textContent = sinRevisar; b.classList.toggle('oculto', !sinRevisar); }
+    var total = sinRevisar + teEsperan;
+    if (b) { b.textContent = total; b.classList.toggle('oculto', !total); }
     if (App.Oficina && App.Oficina.muro) App.Oficina.muro(ultimas, sinRevisar);
     if (App.Avisos && App.Avisos.insignia) App.Avisos.insignia();
     if (App.Yo && App.Yo.refrescar) App.Yo.refrescar();

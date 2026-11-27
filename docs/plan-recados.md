@@ -245,6 +245,21 @@ de la secretaría) y [recados.html](../bocetos/secretaria/recados.html) (las tar
     procesarlo), la app abre esa charla para seguir desde ahí.
 11. **La próxima versión sale cuando esté todo esto.**
 
+**Hecho (U1–U5).** Como se describe en «Pasar trabajo, preguntar y hablar por audio en la charla» de
+[backend/API.md](../backend/API.md). Lo que hay que saber:
+- `recados.ts` y la sección Recados se fueron; sus tablas (`sec_recados*`) quedan sin uso en las bases viejas y los hilos
+  de recados siguen legibles como charlas de la secretaría. Lo de delegar y preguntar vive en `delegar.ts` (tarjetas por
+  charla, `charla_res`) y la transcripción suelta en `audio.ts` (`POST /api/audio/transcribir`).
+- En R0, `delegar` y `preguntar` no estaban en `--allowedTools`: con el claude de verdad habrían pedido permiso. Ahora van
+  permitidas para todos los agentes (el servidor solo las ofrece cuando corresponde).
+- El coordinador delega (sin preguntar) en todas sus corridas sin la persona, como hacía con `encargar`, no solo en sus
+  tareas programadas: el servidor MCP no distingue una tarea de un encargo o un paso de flujo.
+- Elegir una opción (en la charla o en la Bandeja) manda «Elijo: …» en esa charla; desde la Bandeja, la abre.
+- El micrófono flotante no aparece si el navegador no deja grabar; en el celular se esconde con un panel abierto y sube
+  cuando hay un aviso abajo. El atajo de teclado para grabar (tipo walkie-talkie) quedó afuera.
+- **Sin probar todavía:** con el claude de verdad (si separa bien qué delegar, cuándo pregunta y si respeta `explicito`) y
+  la grabación dentro de la app de escritorio empaquetada (macOS pide el permiso del micrófono la primera vez).
+
 **Orden**
 - **U1.** Micrófono en el campo de escribir de todas las charlas (transcripción con el mismo transcriptor; el texto
   transcripto se ve en el mensaje).

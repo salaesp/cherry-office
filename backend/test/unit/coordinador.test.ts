@@ -5,7 +5,7 @@ import { HerramientasCoordinador, herramientasCoordinador, maxRespuesta, respues
 import { mcpDe } from '../../src/consultas.js'
 import { corridasDe } from '../../src/parte.js'
 import type { MCPHerramientas } from '../../src/mcp-protocolo.js'
-import { Coordinador, Dependencias, HerramientasMCPAgente, Seguimiento, contexto, herramientaProponerSkill, herramientasMCP } from '../../src/permisos.js'
+import { Coordinador, Dependencias, HerramientasMCPAgente, Seguimiento, contexto, herramientaProponerSkill, herramientasDelegar, herramientasMCP } from '../../src/permisos.js'
 import { OficinaStore, type AgenteDef, type Oficina } from '../../src/oficina.js'
 import { Sandbox, U, esperar } from '../support/sandbox.js'
 import { arrancar, oficina } from '../support/en-proceso.js'
@@ -36,9 +36,9 @@ describe('Coordinador', () => {
     expect(Coordinador.perfil(o, marce)).toBe('agente')
     expect(Coordinador.perfil(o, coordi)).toBe('coordinador')
     expect(Coordinador.herramientasMCP(o, marce)).toEqual([])
-    expect(Coordinador.herramientasMCP(o, coordi)).toEqual(['mcp__hq__estado_oficina', 'mcp__hq__entregas', 'mcp__hq__corridas', 'mcp__hq__bloqueos', 'mcp__hq__encargar'])
-    expect(HerramientasMCPAgente.lista(o, coordi)).toEqual([...herramientasMCP, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, coordi), ...Seguimiento.herramientasMCP(o, coordi), herramientaProponerSkill])
-    expect(HerramientasMCPAgente.lista(o, marce)).toEqual([...herramientasMCP, ...Dependencias.herramientasMCP(), ...Seguimiento.herramientasMCP(o, marce), herramientaProponerSkill])
+    expect(Coordinador.herramientasMCP(o, coordi)).toEqual(['mcp__hq__estado_oficina', 'mcp__hq__entregas', 'mcp__hq__corridas', 'mcp__hq__bloqueos'])
+    expect(HerramientasMCPAgente.lista(o, coordi)).toEqual([...herramientasMCP, ...herramientasDelegar, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, coordi), ...Seguimiento.herramientasMCP(o, coordi), herramientaProponerSkill])
+    expect(HerramientasMCPAgente.lista(o, marce)).toEqual([...herramientasMCP, ...herramientasDelegar, ...Dependencias.herramientasMCP(), ...Seguimiento.herramientasMCP(o, marce), herramientaProponerSkill])
   })
 
   test('el perfil agente no ve las herramientas del coordinador, ni siquiera llamándolas por nombre', async () => {
@@ -47,7 +47,7 @@ describe('Coordinador', () => {
     expect(nombres(h)).toEqual(['colegas', 'consultar', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'pedir', 'quedo_esperando', 'cancelar_espera', 'proponer_skill'])
     for (const n of Coordinador.nombresMCP) expect(await h.llamar(n, {})).toBeUndefined()
     const c = tools('coordi', 'coordinador')
-    expect(nombres(c)).toEqual(['colegas', 'consultar', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'estado_oficina', 'entregas', 'corridas', 'bloqueos', 'encargar', 'pedir', 'quedo_esperando', 'cancelar_espera', 'proponer_skill'])
+    expect(nombres(c)).toEqual(['colegas', 'consultar', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'estado_oficina', 'entregas', 'corridas', 'bloqueos', 'pedir', 'quedo_esperando', 'cancelar_espera', 'delegar', 'proponer_skill'])
     expect(herramientasCoordinador(s, 't', { oficina: carpeta, agente: 'marce', sid: U.a, perfil: 'agente' })).toBeUndefined()
   })
 
@@ -104,59 +104,59 @@ describe('Coordinador', () => {
     expect(HerramientasCoordinador).toBeDefined()
   })
 
-  test('encargar crea una corrida coord:<8 hex> del agente pedido, con la consigna saneada y de quién viene; máximo 3 por token', async () => {
+  test('delegar (sin la persona) lanza enseguida una corrida delegar:<n> del agente pedido, con la consigna saneada y de quién viene; máximo 3 por token', async () => {
     const { tools, s, sb, carpeta } = await preparar()
     const h = tools('coordi', 'coordinador')
+    expect(nombres(h)).toContain('delegar')
+    expect(nombres(h)).not.toContain('preguntar')
     const ids: string[] = []
     for (let i = 1; i <= 3; i++) {
-      const r = (await h.llamar('encargar', { agente: 'nico', consigna: `Preparame el anuncio ${i}‮\u0007`, nombre: `Anuncio ${i}` }))!
+      const r = (await h.llamar('delegar', { agente: 'nico', consigna: `Preparame el anuncio de la semana con las novedades del equipo y dejalo en un archivo ${i}‮\u0007`, nombre: `Anuncio ${i}` }))!
       expect(r.esError, r.texto).toBe(false)
       const j = objeto(r)
-      expect(j.tarea).toMatch(/^coord:[0-9a-f]{8}$/)
-      expect(j.agente).toBe('nico')
-      ids.push(j.tarea)
+      expect(j).toMatchObject({ ok: true, agente: 'nico', estado: 'esperando' })
+      ids.push(String(j.delegacion))
     }
     expect(new Set(ids).size).toBe(3)
     // cuarto: sin cupo
-    const cuarto = (await h.llamar('encargar', { agente: 'nico', consigna: 'Uno más' }))!
-    expect(cuarto.esError && cuarto.texto.includes('3 encargos')).toBe(true)
+    const cuarto = (await h.llamar('delegar', { agente: 'nico', nombre: 'Uno más', consigna: 'Preparame el anuncio de la semana con las novedades del equipo y dejalo en un archivo 4' }))!
+    expect(cuarto.esError && cuarto.texto.includes('Ya delegaste 3')).toBe(true)
     expect(await esperar(() => s.entregas.lista(carpeta, { origen: 'encargo' }).length === 3)).toBe(true)
     const es = s.entregas.lista(carpeta, { origen: 'encargo' })
-    expect(new Set(es.map((e) => e.ref))).toEqual(new Set(ids))
+    expect(new Set(es.map((e) => e.ref))).toEqual(new Set(ids.map((i) => 'delegar:' + i)))
     expect(es.every((e) => e.agente === 'nico')).toBe(true)
     expect(sb.llamadas.length).toBe(3)
-    const l = sb.llamadasConPrompt('Preparame el anuncio 1')[0]!
+    const l = sb.llamadasConPrompt('Preparame el anuncio de la semana con las novedades del equipo y dejalo en un archivo 1')[0]!
     const p = l[l.length - 1]!
-    expect(p.includes('Coordi') && p.includes('no es un pedido directo del usuario')).toBe(true)
+    expect(p.includes('Coordi') && p.includes('no es un pedido directo de Ana')).toBe(true)
     expect(p.includes('‮') || p.includes('\u0007')).toBe(false)
-    // el agente del encargo no es coordinador: no lleva las herramientas del coordinador
-    expect(Sandbox.valor(l, '--tools')?.includes('encargar')).toBe(false)
     // el cupo es por token: otro token tiene el suyo
     const h2 = tools('coordi', 'coordinador')
-    expect((await h2.llamar('encargar', { agente: 'marce', consigna: 'Hola' }))?.esError).toBe(false)
+    expect((await h2.llamar('delegar', { agente: 'marce', nombre: 'Hola', consigna: 'Preparame el anuncio de la semana con las novedades del equipo y dejalo en un archivo 5' }))?.esError).toBe(false)
   })
 
-  test('encargar: a sí mismo, agente inexistente y datos faltantes dan isError, sin lanzar claude ni gastar cupo', async () => {
+  test('delegar: a sí mismo, agente inexistente, datos faltantes y consigna corta dan isError, sin lanzar claude ni gastar cupo', async () => {
     const { tools, sb, s, carpeta } = await preparar()
     const h = tools('coordi', 'coordinador')
-    const yo = (await h.llamar('encargar', { agente: 'coordi', consigna: 'Hacelo vos' }))!
-    expect(yo.esError && yo.texto.includes('vos mismo')).toBe(true)
-    expect((await h.llamar('encargar', { agente: 'Coordi', consigna: 'Hacelo vos' }))?.esError).toBe(true)
-    const nadie = (await h.llamar('encargar', { agente: 'fantasma', consigna: 'Hola' }))!
+    const yo = (await h.llamar('delegar', { agente: 'coordi', nombre: 'X', consigna: 'Preparame el anuncio de la semana con las novedades del equipo y dejalo en un archivo' }))!
+    expect(yo.esError && yo.texto.includes('delegarte a vos')).toBe(true)
+    expect((await h.llamar('delegar', { agente: 'Coordi', nombre: 'X', consigna: 'Preparame el anuncio de la semana con las novedades del equipo y dejalo en un archivo' }))?.esError).toBe(true)
+    const nadie = (await h.llamar('delegar', { agente: 'fantasma', nombre: 'X', consigna: 'Preparame el anuncio de la semana con las novedades del equipo y dejalo en un archivo' }))!
     expect(nadie.esError && nadie.texto.includes('fantasma')).toBe(true)
-    expect((await h.llamar('encargar', { agente: 'nico' }))?.esError).toBe(true)
-    expect((await h.llamar('encargar', { consigna: 'x' }))?.esError).toBe(true)
+    expect((await h.llamar('delegar', { agente: 'nico', nombre: 'X' }))?.esError).toBe(true)
+    expect((await h.llamar('delegar', { nombre: 'X', consigna: 'Preparame el anuncio de la semana con las novedades del equipo y dejalo en un archivo' }))?.esError).toBe(true)
+    expect((await h.llamar('delegar', { agente: 'nico', nombre: 'X', consigna: 'Hola' }))?.esError).toBe(true)
     expect(sb.llamadas).toEqual([])
     // el cupo sigue intacto: se pueden hacer los 3 (por nombre también se resuelve)
-    for (const q of ['nico', 'Nico', 'marce']) expect((await h.llamar('encargar', { agente: q, consigna: 'Va' }))?.esError).toBe(false)
-    expect((await h.llamar('encargar', { agente: 'nico', consigna: 'Va' }))?.esError).toBe(true)
+    for (const q of ['nico', 'Nico', 'marce']) expect((await h.llamar('delegar', { agente: q, nombre: 'Va', consigna: 'Preparame el anuncio de la semana con las novedades del equipo y dejalo en un archivo' }))?.esError).toBe(false)
+    expect((await h.llamar('delegar', { agente: 'nico', nombre: 'Va', consigna: 'Preparame el anuncio de la semana con las novedades del equipo y dejalo en un archivo' }))?.esError).toBe(true)
     expect(await esperar(() => s.entregas.lista(carpeta, { origen: 'encargo' }).length === 3)).toBe(true)
   })
 
   test('con la oficina cerrada o cambiada las herramientas dan isError', async () => {
     const { tools, sb } = await preparar()
     const h = tools('coordi', 'coordinador', '/otra/oficina')
-    const r = (await h.llamar('encargar', { agente: 'nico', consigna: 'Hola' }))!
+    const r = (await h.llamar('delegar', { agente: 'nico', nombre: 'X', consigna: 'Preparame el anuncio de la semana con las novedades del equipo y dejalo en un archivo' }))!
     expect(r.esError && r.texto.includes('oficina')).toBe(true)
     for (const n of ['estado_oficina', 'entregas', 'corridas', 'bloqueos']) expect((await h.llamar(n, {}))?.esError, n).toBe(true)
     expect(sb.llamadas).toEqual([])

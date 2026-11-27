@@ -123,6 +123,9 @@ export type ServidorConector = { nombre: string; prefijo: string; estado: string
 /** Herramientas MCP del servidor propio (`hq`): consultar a un colega, ver quiénes son, saber quién sabe de un tema,
  *  buscar en lo que ya se sabe y marcar algo como desactualizado (estas tres las sirve conocimiento.ts). */
 export const herramientasMCP = ['mcp__hq__consultar', 'mcp__hq__colegas', 'mcp__hq__quien_sabe', 'mcp__hq__buscar', 'mcp__hq__marcar_obsoleto', 'mcp__hq__anotar']
+/** Pasar trabajo a un colega y preguntarle a la persona (delegar.ts): el servidor solo las ofrece en una charla con la
+ *  persona (y `delegar` al coordinador en sus corridas), pero van permitidas siempre para que no pidan permiso. */
+export const herramientasDelegar = ['mcp__hq__delegar', 'mcp__hq__preguntar']
 /** Variable de entorno con el token del servidor MCP (así no aparece en los argumentos del proceso). */
 export const variableTokenMCP = 'HQ_MCP_TOKEN'
 /** Lo que un agente puede pedir en un chat (además de lo que ya tiene): comandos y escribir archivos. */
@@ -133,7 +136,7 @@ export const herramientaPermiso = 'mcp__hq__pedir_permiso'
 export const esCoordinador = (a: AgenteDef) => a.permisos?.includes('coordinador') ?? false
 
 export const Coordinador = {
-  nombresMCP: ['estado_oficina', 'entregas', 'corridas', 'bloqueos', 'encargar'],
+  nombresMCP: ['estado_oficina', 'entregas', 'corridas', 'bloqueos'],
   perfil: (_o: Oficina, a: AgenteDef) => (esCoordinador(a) ? 'coordinador' : 'agente'),
   herramientasMCP: (_o: Oficina, a: AgenteDef) => (esCoordinador(a) ? Coordinador.nombresMCP.map((n) => 'mcp__hq__' + n) : []),
 }
@@ -258,7 +261,7 @@ export const herramientaProponerSkill = 'mcp__hq__proponer_skill'
 export const HerramientasMCPAgente = {
   lista(o: Oficina, a: AgenteDef): string[] {
     const out: string[] = []
-    for (const h of [...herramientasMCP, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, a), ...Acciones.herramientasMCP(o, a), ...WhatsAppAgente.herramientasMCP(o, a), ...MemoriaSecretariaAgente.herramientasMCP(o, a), ...Seguimiento.herramientasMCP(o, a), herramientaProponerSkill]) if (!out.includes(h)) out.push(h)
+    for (const h of [...herramientasMCP, ...herramientasDelegar, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, a), ...Acciones.herramientasMCP(o, a), ...WhatsAppAgente.herramientasMCP(o, a), ...MemoriaSecretariaAgente.herramientasMCP(o, a), ...Seguimiento.herramientasMCP(o, a), herramientaProponerSkill]) if (!out.includes(h)) out.push(h)
     return out
   },
 }
@@ -339,7 +342,7 @@ export const Instrucciones = {
 
     if (esCoordinador(a)) {
       secciones.push('## Sos coordinador/a de la oficina\n'
-        + 'Ves entregas, flujos y bloqueos de todos (herramientas estado_oficina, entregas, corridas, bloqueos) y podés repartir encargos (encargar). No hacés el trabajo de otros: lo pedís.')
+        + 'Ves entregas, flujos y bloqueos de todos (herramientas estado_oficina, entregas, corridas, bloqueos) y podés pasarle trabajo a un colega con delegar, también en tus tareas programadas (ahí se lanza enseguida). No hacés el trabajo de otros: lo pedís.')
     }
     if (conMCP) {
       const sec = SecretariaInstrucciones.para(o, a, jefe)

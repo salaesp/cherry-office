@@ -383,10 +383,10 @@ describe('Caso Próspera de punta a punta (en proceso)', () => {
     const ident = { oficina: carpeta, agente: 'coordi', sid: U.a, perfil: 'coordinador' }
     const h = mcp.consultas.herramientas(mcp.tokens.emitir(ident), ident)
     const nombres = (h.definiciones as O[]).map((d) => d.name)
-    expect(nombres.includes('proponer_accion') && nombres.includes('encargar')).toBe(true)
+    expect(nombres.includes('proponer_accion') && nombres.includes('delegar')).toBe(true)
     const acc = (await h.llamar('proponer_accion', { herramienta: crear, resumen: 'Crear la reunión', detalle: { titulo: 'Reunión' } }))!
     expect(acc.esError, acc.texto).toBe(false)
-    const enc = (await h.llamar('encargar', { agente: 'nico', consigna: 'Preparame el informe' }))!
+    const enc = (await h.llamar('delegar', { agente: 'nico', nombre: 'Informe', consigna: 'Preparame el informe de la semana con lo que entregó cada uno y dejalo en un archivo' }))!
     expect(enc.esError, enc.texto).toBe(false)
     expect(await esperar(() => s.entregas.lista(carpeta, { origen: 'encargo' }).length === 1, 15)).toBe(true)
     const todas = (await get('/api/entregas')).obj.entregas as O[]

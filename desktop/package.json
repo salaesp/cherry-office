@@ -66,7 +66,7 @@
       "hardenedRuntime": false,
       "extendInfo": {
         "SUPublicEDKey": "3lXavZJQZAaLrys0ULu1XQD/vj8CLcyxe4NP+QAWsx8=",
-        "NSMicrophoneUsageDescription": "Oficina usa el micrófono para grabar los recados que le dejás a la secretaría. El audio se transcribe en tu compu."
+        "NSMicrophoneUsageDescription": "Oficina usa el micrófono para que les hables a tus agentes. El audio se transcribe en tu compu."
       }
     },
     "dmg": {

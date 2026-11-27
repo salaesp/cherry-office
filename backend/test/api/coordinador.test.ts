@@ -1,5 +1,5 @@
 // Port de app/Tests/BackendTests/CoordinadorTests.swift.
-// Coordinador: perfil, herramientas MCP (`mcp__hq__estado_oficina`, `entregas`, `corridas`, `bloqueos`, `encargar`) y permisos.
+// Coordinador: perfil, herramientas MCP (`mcp__hq__estado_oficina`, `entregas`, `corridas`, `bloqueos`; `delegar` reemplazó a `encargar`) y permisos.
 // Los tests que emiten tokens MCP en proceso (b.mcp.tokens / consultas.herramientas), usan el store o llaman a Coordinador/Permisos
 // directamente quedan como test.skip (unit tests del port).
 import { describe, expect, test } from 'vitest'
@@ -16,7 +16,7 @@ async function fix(): Promise<Fix> {
   return f
 }
 
-const nombresMCP = ['estado_oficina', 'entregas', 'corridas', 'bloqueos', 'encargar']
+const nombresMCP = ['estado_oficina', 'entregas', 'corridas', 'bloqueos', 'delegar']
 
 describe('Coordinador', () => {
   // MARK: perfil y lista
@@ -60,14 +60,14 @@ describe('Coordinador', () => {
       expect(tools.includes('mcp__hq__' + n)).toBe(true)
       expect(Sandbox.reglas(l).includes('mcp__hq__' + n)).toBe(true)
     }
-    expect(Sandbox.reglas(l).includes('mcp__hq__encargar')).toBe(true)
-    expect(tools.endsWith('mcp__hq__consultar,mcp__hq__colegas,mcp__hq__quien_sabe,mcp__hq__buscar,mcp__hq__marcar_obsoleto,mcp__hq__anotar,mcp__hq__pedir,mcp__hq__quedo_esperando,mcp__hq__cancelar_espera,mcp__hq__estado_oficina,mcp__hq__entregas,mcp__hq__corridas,mcp__hq__bloqueos,mcp__hq__encargar,mcp__hq__seguimiento,mcp__hq__seguimientos,mcp__hq__seguimiento_leer,mcp__hq__ficha_anotar,mcp__hq__ficha_leer,mcp__hq__proponer_skill')).toBe(true)
+    expect(Sandbox.reglas(l).includes('mcp__hq__encargar')).toBe(false)
+    expect(tools.endsWith('mcp__hq__consultar,mcp__hq__colegas,mcp__hq__quien_sabe,mcp__hq__buscar,mcp__hq__marcar_obsoleto,mcp__hq__anotar,mcp__hq__delegar,mcp__hq__preguntar,mcp__hq__pedir,mcp__hq__quedo_esperando,mcp__hq__cancelar_espera,mcp__hq__estado_oficina,mcp__hq__entregas,mcp__hq__corridas,mcp__hq__bloqueos,mcp__hq__seguimiento,mcp__hq__seguimientos,mcp__hq__seguimiento_leer,mcp__hq__ficha_anotar,mcp__hq__ficha_leer,mcp__hq__proponer_skill')).toBe(true)
     // interno (unit test del port): b.mcp.tokens.activos == 0
 
     await chat(f.b, { agent: 'marce', message: 'hola', session: U.b })
     const m = f.sb.llamadas.at(-1)!
-    expect(Sandbox.valor(m, '--tools')?.includes('encargar')).toBe(false)
-    expect(Sandbox.reglas(m).includes('mcp__hq__encargar')).toBe(false)
+    expect(Sandbox.valor(m, '--tools')?.includes('estado_oficina')).toBe(false)
+    expect(Sandbox.reglas(m).includes('mcp__hq__estado_oficina')).toBe(false)
   })
 
   // interno: Permisos.contexto(...).perfilMCP sobre la oficina activa en proceso (por HTTP se ve en --tools: test anterior).

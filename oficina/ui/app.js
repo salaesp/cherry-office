@@ -286,7 +286,6 @@
       dom.navEnt = h('span.insignia.aviso.oculto');
       dom.navParte = h('span.insignia.oculto');
       dom.navTar = h('span.insignia.oculto');
-      dom.navRec = h('span.insignia.aviso.oculto');
       dom.navFlu = h('span.insignia.info.oculto');
       dom.navCon = h('span.insignia.oculto');
       dom.lienzo = h('div.lienzo');
@@ -310,7 +309,7 @@
       new MutationObserver(refrescarRuta).observe(dom.derecho, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'data-modo'] });
       var riel = App.Nav.riel({
         menuOficina: menuOficina, menuNuevo: menuNuevo,
-        insignias: { bandeja: dom.navEnt, recados: dom.navRec, equipo: dom.navReu, trabajo: dom.navTar },
+        insignias: { bandeja: dom.navEnt, equipo: dom.navReu, trabajo: dom.navTar },
         extra: [
           App.Uso ? App.Uso.boton() : null,
           h('button.riel-item.riel-extra', { title: 'Buscar o ir a… (' + App.atajoMod + 'K)', onclick: function () { App.Paleta.abrir(); } }, App.icono('buscar'), h('span', App.atajoMod + 'K')),
@@ -324,6 +323,7 @@
           dom.ventana));
       App.vaciar(raiz).appendChild(dom.app);
       App.dom = dom;
+      if (App.Microfono) App.Microfono.montar(dom.app);
       App.Oficina.iniciar(dom.lienzo);
       App.Oficina.alElegirAgente(function (id) { App.Agente.abrir(id); });
       App.Oficina.alElegirLugar(function (t, id) {
@@ -344,7 +344,6 @@
     App.Biblioteca.vigilarEstado();
     if (App.Conocimiento) App.Conocimiento.vigilarEstado();
     if (App.Tareas) App.Tareas.vigilar();
-    if (App.Recados) App.Recados.vigilar();
     /* la ruta (#/charlas/…) decide qué se ve; al cambiar de oficina se vuelve a la maqueta */
     if (!primera || !/^#\/\w/.test(location.hash)) history.replaceState(null, '', '#/oficina');
     App.Nav.aplicar();
@@ -479,7 +478,6 @@
     else if (m === 'entregables' && App.Entregables) App.Entregables.alCerrarPanel();
     else if (m === 'parte' && App.Parte && App.Parte.alCerrarPanel) App.Parte.alCerrarPanel();
     else if (m === 'tareas' && App.Tareas) App.Tareas.alCerrarPanel();
-    else if (m === 'recados' && App.Recados) App.Recados.alCerrarPanel();
     else if (m === 'flujos' && App.Flujos && App.Flujos.alCerrarPanel) App.Flujos.alCerrarPanel();
   };
   /* La × de cada ventana (Biblioteca, una charla, Tareas…): el riel abre ventanas de a una y la × la cierra. En la compu

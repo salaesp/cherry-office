@@ -429,9 +429,9 @@ async function menuBandeja(): Promise<Menu> {
   }
   const sec = await api('/api/secretaria')
   if (sec.config && sec.agente) {
-    items.push({ label: `Dejarle un recado a ${sec.agente.nombre}…`, click: () => {
+    items.push({ label: `Hablarle a ${sec.agente.nombre}…`, click: () => {
       mostrar()
-      ejecutarEnPagina("window.App && App.Nav && App.Nav.ir('#/recados')")
+      ejecutarEnPagina('window.App && App.Microfono && App.Microfono.grabar()')
     } })
     items.push({ label: sec.corriendo ? `${sec.agente.nombre} está revisando…` : `Revisar ahora (${sec.agente.nombre})`, enabled: !sec.corriendo, click: () => {
       void backend.router.handle('POST', '/api/secretaria/revisar', {}, Buffer.from('{}')).then((r) => {
