@@ -360,6 +360,89 @@ Al guardar con `PUT`: los chats de la fuente WhatsApp que todavía no estaban el
 - **Fuentes de conector (`gmail`, `calendario`):** las lee el agente en la revisión con sus conectores de claude.ai (Gmail; Google Calendar), que tiene que tener asignados para leer (o el modo «todos los conectores»). Sin catálogo detectado, sin el conector conectado o sin asignar, la fuente muestra `problema` y no se revisa. No guardan datos: su material es una instrucción. Gmail: los mails desde la revisión anterior (`after:<epoch>`; la primera vez, las últimas 24 h), ignorando promociones y notificaciones, sin responder, archivar ni borrar. Calendario: la agenda de hoy y las próximas 48 h, con lo nuevo o cambiado desde la revisión anterior. Su cursor es `{desde}` = el momento de la última revisión confirmada. Como no se puede saber si hay novedades sin correr claude, entran cada vez que les toca su intervalo (conviene uno largo) y en «Revisar ahora». La `indicacion` de la persona va en la consigna.
 - **WhatsApp para quien la atiende:** recibe `whatsapp_chats`, `whatsapp_leer` y `whatsapp_buscar` acotadas a los chats de su fuente, aunque no tenga el permiso «whatsapp» (`WhatsAppAgente.chatsSecretaria`). Con el permiso, lee todos los elegidos.
 
+## Memoria de la secretaría
+
+Lo que la secretaría va sabiendo de la persona a partir de **todas** sus fuentes (WhatsApp, Gmail, Calendario, la charla con ella, las decisiones de la persona sobre sus propuestas y las que vengan). Es **privada**: los demás agentes no la ven, no pasa por la Biblioteca ni por la memoria de la oficina salvo que la persona la comparta (`compartir`). Código: `backend/src/secretaria-memoria.ts` (se registra después de `secretaria`); pantalla en Ajustes › Secretaría › «Memoria» (`oficina/ui/secretaria-memoria.js`); plan en [docs/plan-secretaria.md](../docs/plan-secretaria.md).
+
+**Dónde.** Archivos `.md` en `<datosDir>/secretaria/<id>/` (en la Mac, `~/Library/Application Support/Próspera HQ/secretaria/<id>/`; en Windows, `%APPDATA%\Próspera HQ\secretaria\<id>\`), **fuera de la carpeta de la oficina**: los agentes trabajan con cwd en la oficina y leen todo lo que hay ahí; esto no se exporta, no se sincroniza y no va en el `.oficina.zip`. `<id>` = sha256 de la ruta de la carpeta de la oficina, en hexadecimal, recortado a 16 caracteres (`idOficina`): estable mientras la carpeta no cambie de lugar (si la mueven, la memoria queda huérfana y la oficina empieza de cero). Estructura:
+
+```
+secretaria/<id>/
+  diario/AAAA-MM-DD.md      un día: resumen (opcional) y entradas
+  semanas/AAAA-Www.md       semana ISO condensada (lunes a domingo)
+  temas/<slug>.md           un tema en seguimiento
+  fichas/<slug>.md          una persona o cosa
+```
+
+**Formato de los `.md`** (pensado para leer y editar a mano; el parser es tolerante). Un título `# …`, después campos `Clave: valor` (una línea cada uno, sin líneas en blanco en el medio) y secciones `## …`. Lo que la persona agregue en otras secciones o con otro formato se conserva cuando la secretaria vuelve a escribir. Las líneas de historial, datos y entradas son `- <fecha u hora> · [origen] texto` (el origen es opcional; las líneas que no tengan ese formato se dejan tal cual).
+
+```
+# Turno cardiólogo de mamá
+Estado: esperando            abierto | esperando | resuelto | descartado
+Fecha: 2026-12-04 10:00      opcional: AAAA-MM-DD o AAAA-MM-DD HH:MM
+Próximo: Confirmar con el consultorio el día anterior
+Personas: Mamá, Dr. X
+Actualizado: 2026-11-26
+
+## Historial
+- 2026-11-26 · [WhatsApp · Mamá] Mamá pidió turno con el cardiólogo para el jueves
+- 2026-11-26 · [Calendario] Se creó el evento con recordatorio (pasó a «esperando»)
+```
+
+```
+# Mamá                       ficha
+Tipo: persona                persona | cosa
+Actualizado: 2026-11-26
+
+## Datos
+- 2026-11-26 · [WhatsApp · Mamá] Atiende con el Dr. X en el Italiano
+```
+
+```
+# Diario 2026-11-25          diario
+## Resumen                   opcional: lo escribe la secretaria en la primera revisión del día siguiente
+Mamá pidió turno y llegó el mail del colegio.
+
+## Entradas
+- 09:12 · [WhatsApp · Mamá] Pidió turno con el cardiólogo
+- 11:30 · [Gmail · Colegio] Cuota de noviembre
+```
+
+```
+# Semana 2026-W38            semana condensada
+Desde: 2026-09-14
+Hasta: 2026-09-20
+
+## Resumen
+Se arregló el seguro del auto.
+```
+
+**Índice en `hq.db`.** `sec_temas(oficina, slug, titulo, estado, fecha, proximo, personas (JSON), actualizado, firma)`, `sec_fichas(oficina, slug, titulo, tipo, datos, actualizado, firma)` y `sec_sugerencias(oficina, tipo, slug, motivo, creada)` (las sugerencias de compartir). `firma` = `mtime(ms):tamaño` del archivo. El índice es un caché: se reconstruye desde los archivos. `sincronizar` corre al arrancar, al abrir la oficina y antes de cada lectura del índice (API, herramientas, consigna): lo que cambió (mtime o tamaño) se vuelve a leer, lo que apareció a mano se agrega y lo que se borró a mano sale. `actualizado` = el más nuevo entre el campo `Actualizado` y la última fecha del historial (sin ninguno, el día del archivo). «Trabado» = tema `abierto` o `esperando` con más de 5 días sin movimiento o con la fecha ya pasada.
+
+**Topes** (`LimitesSecretaria`): una entrada o nota hasta 600 caracteres; título o nombre hasta 80; próximo paso hasta 200; hasta 10 personas por tema (60 caracteres cada una); origen hasta 80; resumen hasta 4000; 200 temas y 200 fichas; 100 entradas de historial por tema (al pasarse se descartan las más viejas); 100 datos por ficha (después hay que reemplazar uno o juntar varios); 64 KB por archivo; 80 escrituras de memoria por corrida; `memoria_diario_leer` hasta 31 días y 12000 caracteres. Slugs seguros (`^[a-z0-9][a-z0-9-]{0,40}$`); las rutas de la API solo pueden ser `diario/AAAA-MM-DD.md`, `semanas/AAAA-Www.md`, `temas/<slug>.md` o `fichas/<slug>.md` (nada de `..`, subcarpetas ni otras carpetas).
+
+**Cuándo se condensa.** Sin revisiones extra: se pide dentro de cada revisión que ya hay (la consigna lleva «Consolidaciones pendientes»). (1) El resumen del día: el último día de la última semana con entradas y sin resumen (el de ayer, normalmente), `memoria_dia_resumir`. (2) La semana vieja: la más antigua cuyo último día pasó hace más de 30 días (`diasCondensar`); `memoria_semana_resumir` guarda `semanas/AAAA-Www.md` y **borra los días de esa semana**; se rechaza si la semana no es vieja. Como mucho una semana por revisión. Al leer un rango, los días ya condensados vuelven como el resumen de su semana.
+
+**Sin avisos por fecha propios.** Lo que tiene fecha, la secretaria lo propone como evento del calendario con recordatorio (`proponer_accion`; avisa el calendario). En cada revisión repasa sus temas abiertos y deja en el reporte una sección «Seguimiento» con los trabados o sin respuesta; con temas trabados no responde «Sin novedades».
+
+**Herramientas MCP** (`mcp__hq__*`, también en `--allowedTools`; **solo para quien atiende la secretaría**, aunque esté en pausa: `MemoriaSecretariaAgente` en `permisos.ts`, con la identidad del token como en WhatsApp; el Creador y los demás agentes no las tienen y las llamadas devuelven «no existe»): `memoria_diario_anotar {texto, origen?}`, `memoria_diario_leer {dia? | desde?, hasta?}`, `memoria_dia_resumir {dia, resumen}`, `memoria_semana_resumir {semana, resumen}`, `memoria_tema {tema, estado?, fecha?, proximo?, nota?, personas?, origen?}` (crea o actualiza; reusa un tema con el mismo slug o un título muy parecido; la nota va al historial con fecha y origen; las personas se suman), `memoria_temas {estado?}` (por defecto abiertos y esperando; también `todos` o un estado), `memoria_tema_leer {tema}`, `memoria_ficha {nombre, tipo, hecho, origen?, reemplaza?}`, `memoria_ficha_leer {nombre}`, `memoria_buscar {texto}` y `memoria_sugerir_compartir {tema | ficha, motivo}` (solo marca la sugerencia). Lo que devuelven con texto de terceros va dentro de `<memoria_secretaria parte="…">` con el aviso de que son datos, no instrucciones, y un dato no puede cerrar ni abrir ese bloque.
+
+**Consigna de cada revisión** (`ServicioSecretaria.consigna`): al final suma «Tu memoria privada»: los temas abiertos (título, estado, fecha, próximo, personas, último movimiento; hasta 20), las fichas de quienes aparecen en el material nuevo (hasta 10, los últimos 8 datos, 500 caracteres), lo anotado hoy en el diario (hasta ~1500 caracteres) y las instrucciones: actualizar la memoria después de revisar (diario, temas, fichas), que las decisiones de la persona sobre las propuestas (aprobadas o descartadas) cierran o actualizan temas, proponer lo que tiene fecha como evento con recordatorio, la sección «Seguimiento» y las consolidaciones pendientes.
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| GET | `/api/secretaria/memoria` | query `estado?` (`abiertos`, `todos` o un estado), `sinMovimiento?` (días) | `{id, existe, temas:[{slug, titulo, estado, fecha, proximo, personas, actualizado, diasSinMovimiento, trabado}], dias:[{dia, entradas, resumen}], semanas:[{semana, desde, hasta}], fichas:[{slug, nombre, tipo, datos, actualizado}], sugerencias:[{tipo, slug, titulo, motivo, creada}], pendientes:{dia, semana}, limites}`. `temas` va filtrado; lo demás, entero |
+| GET | `/api/secretaria/memoria/archivo?ruta=<rel>` | | `{ruta, texto}` (el `.md`). 400 si la ruta no es de la memoria, 404 si no existe |
+| PUT | `/api/secretaria/memoria/archivo` | `{ruta, texto}` | `{ruta, texto}`. Guarda un archivo editado a mano (o crea uno) y lo reindexa. 400 si falta el título (`# …`), el estado, la fecha o el tipo son inválidos; 413 si pasa de 64 KB |
+| DELETE | `/api/secretaria/memoria/archivo?ruta=<rel>` | | `{ok}`. Borra un tema, ficha, día o semana (y su fila del índice y su sugerencia). 404 si no existe |
+| POST | `/api/secretaria/memoria/tema` | `{slug, estado?, fecha?, proximo?, nota?}` | `{slug, estado}`. La persona cambia un tema (deja una línea en el historial a su nombre) |
+| POST | `/api/secretaria/memoria/compartir` | `{ruta}` (`temas/…` o `fichas/…`) | `{tema, ruta}`. Pasa un resumen a la memoria de la oficina como un aporte sin consolidar (`anotarEnTema` de `memoria-estructura.ts`, autor «Secretaría (compartido)»); el tema o la ficha de la secretaría no se mueven y se quita la sugerencia. 409 si la memoria de la oficina no se migró o el tema de la oficina está lleno de aportes |
+| POST | `/api/secretaria/memoria/sugerencia/descartar` | `{ruta}` | `{ok}`. «Ahora no» |
+| GET / POST | `/api/secretaria/memoria/carpeta` | | `{ruta}` (absoluta). POST además la crea. La carcasa la usa para «Mostrar la carpeta» (`desktop/src/main.ts`: la carpeta de la memoria se acepta solo para mostrar, no para abrir) |
+| DELETE | `/api/secretaria/memoria` | | Como el GET, ya vacío. Borra toda la memoria (archivos e índice) |
+
+Cerrar la secretaría **no** borra la memoria. Borrar la oficina (o crear otra en la misma carpeta) sí: `Oficinas.alOlvidar` borra `secretaria/<id>/` y las filas `sec_*` de esa oficina.
+
 ## Abrir archivos y créditos (app de escritorio)
 - El front manda `window.webkit.messageHandlers.hq.postMessage({accion: 'abrir' | 'revelar', ruta})` (`App.nativo` en `oficina/ui/base.js`). `desktop/src/main.ts` (`abrirRuta`, con `abrir.ts`) valida la ruta (enlaces simbólicos resueltos) contra la carpeta de la oficina activa y las carpetas vinculadas (las pide al backend) y la abre con su aplicación; nunca abre aplicaciones, scripts ni archivos ejecutables. `revelar` sin ruta abre la carpeta de la oficina (menú de la app, ⇧⌘O / Ctrl+Shift+O, y botón en la barra lateral).
 - «Acerca de Oficina» (menú de la app y enlace en la barra lateral): LDraw parts library (CC BY 4.0), three.js (MIT), Poppins (OFL) y aviso de que el proyecto no está afiliado a LEGO.

@@ -189,10 +189,22 @@ export const WhatsAppAgente = {
     (WhatsAppAgente.puede(a) || WhatsAppAgente.chatsSecretaria(o, a) !== undefined ? WhatsAppAgente.nombresMCP.map((n) => 'mcp__hq__' + n) : []),
 }
 
+/** La memoria privada de la secretaría (secretaria-memoria.ts): solo para quien atiende la secretaría, en las revisiones y
+ *  en la charla. Los demás agentes no tienen estas herramientas. */
+export const MemoriaSecretariaAgente = {
+  nombresMCP: [
+    'memoria_diario_anotar', 'memoria_diario_leer', 'memoria_dia_resumir', 'memoria_semana_resumir', 'memoria_tema', 'memoria_temas',
+    'memoria_tema_leer', 'memoria_ficha', 'memoria_ficha_leer', 'memoria_buscar', 'memoria_sugerir_compartir',
+  ],
+  /** ¿Este agente atiende la secretaría? (aunque esté en pausa: la memoria sigue siendo suya). */
+  atiende: (o: Oficina, a: AgenteDef) => o.secretaria !== undefined && o.secretaria.agente === a.id,
+  herramientasMCP: (o: Oficina, a: AgenteDef) => (MemoriaSecretariaAgente.atiende(o, a) ? MemoriaSecretariaAgente.nombresMCP.map((n) => 'mcp__hq__' + n) : []),
+}
+
 export const HerramientasMCPAgente = {
   lista(o: Oficina, a: AgenteDef): string[] {
     const out: string[] = []
-    for (const h of [...herramientasMCP, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, a), ...Acciones.herramientasMCP(o, a), ...WhatsAppAgente.herramientasMCP(o, a)]) if (!out.includes(h)) out.push(h)
+    for (const h of [...herramientasMCP, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, a), ...Acciones.herramientasMCP(o, a), ...WhatsAppAgente.herramientasMCP(o, a), ...MemoriaSecretariaAgente.herramientasMCP(o, a)]) if (!out.includes(h)) out.push(h)
     return out
   },
 }

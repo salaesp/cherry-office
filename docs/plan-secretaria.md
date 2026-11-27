@@ -300,6 +300,30 @@ permisos de WhatsApp, elegir chats en dos lugares, asignar conectores). Ahora:
   captura doble y con la lógica pura de Baileys): hay que confirmar con un número de prueba que `participantAlt` y los
   `@lid` de los integrantes llegan como se espera, y cuánto tarda en aparecer el primer mensaje propio.
 
+## Memoria de la secretaría
+Detalle (formato de los `.md`, índice, topes, herramientas y API) en la sección «Memoria de la secretaría» de
+[backend/API.md](../backend/API.md). Lo que decidió la persona y cómo quedó:
+- **Una memoria de la secretaría, no solo de WhatsApp:** junta todas sus fuentes (WhatsApp, Gmail, Calendario, la charla con
+  ella, lo que la persona decide de sus propuestas y las fuentes que vengan). Cada dato lleva su origen
+  (`[WhatsApp · Mamá]`) y su fecha.
+- **Privada:** los demás agentes no la ven; no pasa por la Biblioteca ni por la memoria de la oficina salvo que la persona
+  la comparta. Por eso vive en archivos `.md` fuera de la carpeta de la oficina (`<datosDir>/secretaria/<id>/`, con el id
+  derivado de la ruta de la oficina): los agentes trabajan con cwd en la oficina y pueden leer todo lo que hay ahí.
+  No se exporta ni se sincroniza. Las herramientas `memoria_*` son solo de quien atiende la secretaría.
+- **Tres capas:** diario (con resumen del día anterior en la primera revisión del día y condensación semanal pasados 30
+  días, que borra los días condensados), temas en seguimiento (abierto, esperando, resuelto, descartado; fecha, próximo
+  paso, personas, historial) y fichas de personas y cosas (datos estables con fecha y origen).
+- **Sin avisos por fecha propios:** lo que tiene fecha se propone como evento del calendario con recordatorio (avisa el
+  calendario). En cada revisión que ya hay, la secretaria repasa los temas abiertos y deja una sección «Seguimiento» con los
+  trabados (más de 5 días sin movimiento o con la fecha pasada). No hay revisiones extra: el resumen del día y la
+  condensación semanal (una semana por revisión) van dentro de las revisiones existentes.
+- **Editable y borrable:** la persona puede editar un `.md` a mano (el índice de `hq.db` se actualiza al leer), borrar un
+  tema, ficha o día, borrar toda la memoria, y decidir si comparte un tema o ficha con la oficina (la secretaria solo
+  lo sugiere, `memoria_sugerir_compartir`). Cerrar la secretaría no borra la memoria; borrar la oficina sí.
+- **Pantalla:** Ajustes › Secretaría › Memoria, con Seguimiento, Días y Personas y cosas.
+- **Sin probar todavía:** una semana de uso real con las revisiones de verdad (la calidad de lo que anota y qué tan bien
+  respeta los topes y las consolidaciones); lo probado es el almacén, la consigna y las herramientas con el claude falso.
+
 ## Pruebas
 - Unitarias (vitest):
   - WhatsApp: filtro por chat con `@lid` y por grupo, descartando estados y canales; mapeo de mensajes de Baileys con
