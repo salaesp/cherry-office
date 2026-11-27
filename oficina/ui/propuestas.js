@@ -194,6 +194,74 @@ App.Propuestas = (function () {
 
   function seccion(titulo, cuerpo) { return h('div.rep-sec', h('h3', titulo), cuerpo); }
 
+  /* ---------------- «Para hacer» y la memoria de la secretaría ----------------
+     La secretaría deja cada pendiente como tema de su memoria y en el reporte termina la línea con «(tema: <slug>)».
+     Desde acá se ve si lo sigue y se le contesta: «Ya lo hice» (resuelto), «No hace falta» (descartado), anotarlo si no
+     lo tenía, o dárselo a un agente. op.temas: los temas de su memoria; op.alCambiar(): volver a leerlos y repintar. */
+  function partirTema(s) {
+    var m = /\s*\(tema:\s*([a-z0-9-]+)\)\s*\.?\s*$/i.exec(s);
+    return m ? { texto: s.slice(0, m.index).trim(), slug: m[1].toLowerCase() } : { texto: s, slug: '' };
+  }
+  function plano(s) { return String(s || '').replace(/[*_`]+/g, '').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/\s+/g, ' ').trim(); }
+  function plegar(s) { return plano(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  /* el título de un tema anotado desde acá: la primera oración, hasta 80 caracteres sin cortar palabras */
+  function tituloDe(s) {
+    var t = plano(s), i = t.search(/[.;:]\s/);
+    if (i > 0) t = t.slice(0, i);
+    t = t.replace(/[.;:]+$/, '');
+    if (t.length > 80) { t = t.slice(0, 80); var j = t.lastIndexOf(' '); t = (j > 40 ? t.slice(0, j) : t.slice(0, 79)).replace(/[,\s]+$/, ''); }
+    return t;
+  }
+  function temaDe(p, temas) {
+    temas = temas || [];
+    var porSlug = p.slug && temas.filter(function (t) { return t.slug === p.slug; })[0];
+    if (porSlug) return porSlug;
+    var tit = plegar(tituloDe(p.texto));
+    return temas.filter(function (t) { return plegar(t.titulo) === tit; })[0] || null;
+  }
+  function cambiarTema(p, t, cambio, op, aviso) {
+    var cuerpo = t ? { slug: t.slug } : { titulo: tituloDe(p.texto), proximo: plano(p.texto).slice(0, 600) };
+    Object.keys(cambio).forEach(function (k) { cuerpo[k] = cambio[k]; });
+    return App.api.post('/api/secretaria/memoria/tema', cuerpo).then(function () {
+      if (aviso) App.aviso(aviso);
+      if (op.alCambiar) op.alCambiar();
+    }).catch(App.fallo);
+  }
+  function filaHacer(it, op) {
+    var p = partirTema(it), t = temaDe(p, op.temas);
+    var cerrado = t && (t.estado === 'resuelto' || t.estado === 'descartado');
+    var mas = [];
+    var estado = null, principal = null;
+    var verTema = t && op.verTema ? function () { op.verTema(t.slug, t.titulo); } : null;
+    if (cerrado) {
+      estado = h('span.insignia' + (t.estado === 'resuelto' ? '.ok' : ''), t.estado === 'resuelto' ? 'Hecho' : 'No hacía falta');
+      mas.push({ texto: 'Volver a abrir', icono: 'recargar', accion: function () { cambiarTema(p, t, { estado: 'abierto', nota: 'Lo volvió a abrir desde el reporte' }, op, 'Vuelve a estar en seguimiento.'); } });
+      if (verTema) mas.push({ texto: 'Ver el tema', icono: 'libro', accion: verTema });
+    } else if (op.temas) {
+      if (t) estado = h('button.insignia.info.insignia-link', { title: 'La secretaría lo sigue en su memoria: ver el tema', onclick: verTema }, App.icono('reloj'), t.estado === 'esperando' ? 'Esperando' : 'En seguimiento');
+      principal = h('button.btn.chico', { onclick: function (ev) {
+        ev.currentTarget.disabled = true;
+        cambiarTema(p, t, { estado: 'resuelto', nota: 'Lo marcó hecho desde el reporte' }, op, 'Listo: la secretaría lo da por resuelto.');
+      } }, 'Ya lo hice');
+      mas.push({ texto: 'No hace falta', icono: 'cerrar', accion: function () { cambiarTema(p, t, { estado: 'descartado', nota: 'Dijo que no hace falta (desde el reporte)' }, op, 'La secretaría lo deja de seguir.'); } });
+      if (!t) mas.push({ texto: 'Anotar en seguimiento', icono: 'reloj', nota: 'Para que la secretaría lo siga', accion: function () { cambiarTema(p, null, { estado: 'abierto', nota: 'Lo anotó desde el reporte' }, op, 'La secretaría lo va a seguir.'); } });
+      else if (verTema) mas.push({ texto: 'Ver el tema', icono: 'libro', accion: verTema });
+    }
+    var ags = (App.E && App.E.oficina && App.E.oficina.agentes) || [];
+    if (!cerrado && ags.length && App.Agente && App.Agente.nuevaTarea) {
+      mas.push({ titulo: 'Dárselo a un agente' });
+      ags.forEach(function (a) {
+        mas.push({ retrato: a, texto: a.nombre, nota: a.rol || '', accion: function () {
+          App.Agente.nuevaTarea(a.id, { nombre: tituloDe(p.texto), consigna: 'Pendiente del reporte de la secretaría: ' + plano(p.texto), unica: true }, function () {
+            if (op.temas) cambiarTema(p, t, { estado: 'esperando', nota: 'Se lo dio a ' + a.nombre + ' como tarea' }, op);
+          });
+        } });
+      });
+    }
+    var menu = mas.length ? h('button.btn.fantasma.icono.chico', { title: 'Más opciones', onclick: function (ev) { ev.stopPropagation(); App.menu(ev.currentTarget, mas); } }, App.icono('puntos')) : null;
+    return h('div.rep-prop.hacer' + (cerrado ? '.cerrado' : ''), App.icono(cerrado ? 'ok' : 'parte'), h('div.min', md(p.texto)), estado, principal, menu);
+  }
+
   /* el reporte armado; null si el texto no sigue el formato (se muestra el markdown de siempre) */
   function reporte(texto, acciones, op) {
     var r = parsear(texto);
@@ -227,7 +295,7 @@ App.Propuestas = (function () {
           h('div.min', h('b', a.resumen), sub ? h('div.sub', sub) : null),
           estado || (a.entrega && op.ver ? h('button.btn.chico', { onclick: function () { op.ver(a.entrega); } }, 'Ver') : null));
       });
-      hacer.forEach(function (it) { filas.push(h('div.rep-prop', App.icono('flecha'), h('div.min', md(it)))); });
+      hacer.forEach(function (it) { filas.push(filaHacer(it, op)); });
       caja.appendChild(seccion('Para hacer', h('div.rep-lista', filas)));
     }
 

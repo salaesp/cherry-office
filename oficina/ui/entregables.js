@@ -282,9 +282,18 @@ App.Entregables = (function () {
     var pintarTexto = function (accion, propuestas) {
       App.vaciar(textoCaja);
       if (e.origen === 'propuesta' && accion) return;
-      var armado = e.origen === 'secretaria' ? App.Propuestas.reporte(e.texto || '', propuestas, { ver: function (id) { App.Nav.ir('#/bandeja/revisar/' + id); } })
+      var armado = e.origen === 'secretaria' ? App.Propuestas.reporte(e.texto || '', propuestas, { ver: function (id) { App.Nav.ir('#/bandeja/revisar/' + id); },
+          temas: memoriaSec.temas, verTema: function (slug, titulo) { verMemoria('temas', slug, titulo); }, alCambiar: function () { leerMemoriaSec(accion, propuestas); } })
         : e.origen === 'importacion' ? App.Propuestas.importacion(e.texto || '', importacion) : null;
       App.add(textoCaja, armado ? h('div.entrega-texto', armado) : App.htmlSeguro(h('div.md-doc.doc-panel.entrega-texto.entrega-doc'), App.markdown(e.texto || '(sin texto)')));
+    };
+    /* un reporte de la secretaría: sus temas, para ver qué «Para hacer» sigue y contestarle desde acá */
+    var memoriaSec = { temas: null };
+    var leerMemoriaSec = function (accion, propuestas) {
+      return api().get('/api/secretaria/memoria').then(function (m) {
+        if (!abiertoPanel() || abierta !== e.id) return;
+        memoriaSec.temas = m.temas || []; pintarTexto(accion, propuestas);
+      }).catch(function () { /* sin memoria: las filas quedan sin seguimiento */ });
     };
     /* una importación: con los temas y fichas que dejó, para abrirlos desde acá */
     var importacion = { ver: verMemoria, abrirMemoria: App.SecretariaMemoria ? function () { App.SecretariaMemoria.abrir(); } : null };
@@ -309,6 +318,7 @@ App.Entregables = (function () {
       if (!abiertoPanel() || abierta !== e.id) return;
       extra.corrida = r[0]; extra.accion = r[1];
       if (e.origen === 'propuesta' || e.origen === 'secretaria') pintarTexto(r[1], r[3]);
+      if (e.origen === 'secretaria') leerMemoriaSec(r[1], r[3]);
       pintarEspera(e, r[2], bloqueEspera);
       if (extra.corrida) {
         var c = extra.corrida;
