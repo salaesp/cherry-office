@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aviso de secretaría</title>
+<style>
+  :root {
+    --fondo: #f2f0ec; --panel: #ffffff; --panel-2: #f8f7f4; --linea: #e4e1db; --linea-fuerte: #d3cfc7;
+    --texto: #1d1d1f; --suave: #6d6962; --tenue: #9a958d; --ok: #3b7a4b; --aviso: #a46a12; --sec: #b9a27a;
+    --sec-fondo: #f6f1e7; --radio: 10px; --radio-chico: 7px; color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+      --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --ok: #6cbf80; --aviso: #e0a84a; --sec-fondo: #2b2721; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+    --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --ok: #6cbf80; --aviso: #e0a84a; --sec-fondo: #2b2721; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font: 13px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif; -webkit-font-smoothing: antialiased; padding: 24px 16px 48px; }
+  h1 { font-size: 18px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .intro { color: var(--suave); max-width: 900px; margin: 0 0 24px; }
+  .opciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 24px; max-width: 940px; }
+  .opcion > h2 { font-size: 14px; margin: 0 0 2px; }
+  .opcion > p { color: var(--suave); margin: 0 0 12px; font-size: 12px; }
+  .ficha { background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); padding: 4px 16px 12px; }
+  .estado-tit { font-size: 11px; color: var(--tenue); text-transform: uppercase; letter-spacing: .04em; margin: 16px 0 6px; font-weight: 600; }
+  .seccion-tit { font-size: 11px; font-weight: 600; color: var(--tenue); text-transform: uppercase; letter-spacing: .04em; margin: 14px 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--linea); }
+  .ajuste { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 16px; padding: 12px 0; border-top: 1px solid var(--linea); align-items: start; }
+  .seccion-tit + .ajuste { border-top: 0; }
+  .ajuste-tit { font-weight: 500; }
+  .ajuste-ayuda { color: var(--suave); font-size: 12px; margin-top: 2px; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-radius: var(--radio-chico); border: 1px solid var(--linea-fuerte); background: var(--panel); font: inherit; color: inherit; cursor: pointer; white-space: nowrap; }
+  .btn.chico { height: 24px; padding: 0 9px; font-size: 12px; }
+  .btn.fantasma { border-color: transparent; background: transparent; color: var(--suave); padding: 0 6px; }
+  .btn.fantasma:hover { color: var(--texto); }
+
+  /* A: estado + fuentes */
+  .pastilla { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 11px; font-size: 12px; font-weight: 500; border: 1px solid var(--linea); background: var(--panel-2); }
+  .pastilla::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .pastilla.ok { color: var(--ok); }
+  .pastilla.pausa { color: var(--aviso); }
+  .fuentes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .fuente { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--linea); font-size: 12px; color: var(--suave); }
+  .fuente b { color: var(--texto); font-weight: 500; }
+  .fila-a { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .fila-a .tit { font-weight: 500; }
+  .mas { margin-left: auto; }
+
+  /* B: tarjeta */
+  .tarjeta { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 4px 12px; background: var(--sec-fondo); border: 1px solid var(--linea); border-left: 3px solid var(--sec); border-radius: var(--radio-chico); padding: 12px 14px; margin: 14px 0 4px; }
+  .tarjeta .icono { width: 36px; height: 36px; border-radius: 8px; background: var(--panel); border: 1px solid var(--linea); display: grid; place-items: center; grid-row: span 3; }
+  .tarjeta .icono svg { width: 18px; height: 18px; stroke: var(--sec); }
+  .tarjeta .tit { font-weight: 600; }
+  .tarjeta .det { color: var(--suave); font-size: 12px; }
+  .tarjeta .acc { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .tarjeta.pausada { border-left-color: var(--aviso); }
+  .tarjeta.pausada .icono svg { stroke: var(--aviso); }
+  .nota { font-size: 11px; color: var(--tenue); margin-top: 10px; }
+</style>
+</head>
+<body>
+  <h1>«Atiende la secretaría» en la ficha: dos bocetos</h1>
+  <p class="intro">Hoy es una fila igual a las de permisos, con un botón a la derecha donde estaría un tilde, y por eso parece algo para marcar.
+    Las dos ideas lo muestran como un estado, sin nada que se pueda marcar. Cada una aparece encendida (arriba) y en pausa (abajo).</p>
+
+  <div class="opciones">
+    <section class="opcion">
+      <h2>A · Estado y fuentes</h2>
+      <p>Sigue en la sección «Secretaría», pero en lugar del botón grande muestra una pastilla de color con el estado y una ficha por cada fuente.
+        «Configurar» pasa a ser un enlace chico. Cambia poco y se lee de un vistazo.</p>
+      <div class="ficha">
+        <div class="estado-tit">Encendida</div>
+        <div class="seccion-tit">Secretaría</div>
+        <div style="padding: 10px 0 4px">
+          <div class="fila-a">
+            <span class="tit">Atiende la secretaría</span>
+            <span class="pastilla ok">Revisa sola</span>
+            <button class="btn fantasma chico mas">Configurar ›</button>
+          </div>
+          <div class="fuentes">
+            <span class="fuente"><b>WhatsApp</b> · 2 chats</span>
+            <span class="fuente"><b>Gmail</b></span>
+            <span class="fuente"><b>Calendario</b></span>
+          </div>
+          <div class="ajuste-ayuda" style="margin-top:8px">Última revisión hace 20 min · te deja los reportes en la bandeja.</div>
+        </div>
+
+        <div class="estado-tit" style="margin-top:22px">En pausa</div>
+        <div class="seccion-tit">Secretaría</div>
+        <div style="padding: 10px 0 4px">
+          <div class="fila-a">
+            <span class="tit">Atiende la secretaría</span>
+            <span class="pastilla pausa">En pausa</span>
+            <button class="btn fantasma chico mas">Configurar ›</button>
+          </div>
+          <div class="fuentes">
+            <span class="fuente"><b>WhatsApp</b> · 2 chats</span>
+            <span class="fuente"><b>Gmail</b></span>
+          </div>
+          <div class="ajuste-ayuda" style="margin-top:8px">No revisa sola. En la charla sigue leyendo sus fuentes si le pedís algo.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="opcion">
+      <h2>B · Tarjeta arriba de la ficha</h2>
+      <p>Una tarjeta con el color de la secretaría, arriba de todo y antes del perfil. Es lo primero que se ve al abrir la ficha y deja claro que se trata de un rol.
+        Desde ahí se puede revisar o configurar.</p>
+      <div class="ficha">
+        <div class="estado-tit">Encendida</div>
+        <div class="tarjeta">
+          <div class="icono"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v12H4z"/><path d="M4 7l8 6 8-6"/><path d="M9 4h6"/></svg></div>
+          <div class="tit">Clara atiende la secretaría</div>
+          <div class="det">Revisa sola WhatsApp (2 chats), Gmail y el calendario · última revisión hace 20 min.</div>
+          <div class="acc"><button class="btn chico">Revisar ahora</button><button class="btn chico">Configurar</button></div>
+        </div>
+        <div class="seccion-tit" style="margin-top:16px">En la oficina</div>
+        <div class="ajuste"><div><div class="ajuste-tit">Coordinador/a</div><div class="ajuste-ayuda">Ve entregas, flujos y bloqueos de todos…</div></div><div style="color:var(--tenue)">☐</div></div>
+
+        <div class="estado-tit" style="margin-top:22px">En pausa</div>
+        <div class="tarjeta pausada">
+          <div class="icono"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v12H4z"/><path d="M4 7l8 6 8-6"/><path d="M9 4h6"/></svg></div>
+          <div class="tit">Clara atiende la secretaría · en pausa</div>
+          <div class="det">No revisa sola. En la charla sigue leyendo WhatsApp y Gmail si le pedís algo.</div>
+          <div class="acc"><button class="btn chico">Reanudar</button><button class="btn chico">Configurar</button></div>
+        </div>
+      </div>
+      <div class="nota">Con B, la sección «Secretaría» del final desaparece: la tarjeta ocupa su lugar.</div>
+    </section>
+  </div>
+</body>
+</html>
