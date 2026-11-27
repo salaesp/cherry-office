@@ -343,9 +343,9 @@ describe('Gobierno: instrucciones, conectores y acciones', () => {
     expect(Sandbox.reglas(l).includes(leerCal)).toBe(true)
     const msg = l.at(-1)!
     expect(msg.includes('Ana aprobó') && msg.includes('Crear la reunión del lunes') && msg.includes('2026-11-16')).toBe(true)
-    // en la lista, la entrega del resultado tiene origen «accion»
+    // el resultado queda en la propuesta: no hay una entrega aparte de origen «accion»
     const origenes = (await entregas(f)).map((x) => str(x.origen))
-    expect(origenes.includes('accion') && origenes.includes('propuesta')).toBe(true)
+    expect(origenes).toEqual(['propuesta'])
     // ya no está pendiente
     expect((await f.post(`/api/entregas/${id}/ejecutar`)).status).toBe(409)
     expect((await f.post(`/api/entregas/${id}/descartar-accion`)).status).toBe(409)

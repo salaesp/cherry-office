@@ -414,9 +414,12 @@ describe('Caso Próspera de punta a punta (en proceso)', () => {
     // la corrida del paso de flujo, en cambio, no tenía la herramienta de actuar
     const correPaso = sb.llamadasConPrompt('Paso 1 de 2')[0]!
     expect(Sandbox.reglas(correPaso)).not.toContain(crear)
+    // el resultado queda en la propia propuesta: ejecutarla no deja una entrega aparte
+    expect((await accionDe()).resultado).toBeTruthy()
     // tres cosas distintas, tres orígenes y una sola corrida abierta
     const origenes = new Set(((await get('/api/entregas')).obj.entregas as O[]).map((x) => x.origen))
-    for (const o of ['flujo', 'propuesta', 'encargo', 'accion']) expect(origenes.has(o), o).toBe(true)
+    for (const o of ['flujo', 'propuesta', 'encargo']) expect(origenes.has(o), o).toBe(true)
+    expect(origenes.has('accion')).toBe(false)
     expect(((await get('/api/actividad')).obj.corridas as O[]).length).toBe(1)
   }, 60_000)
 

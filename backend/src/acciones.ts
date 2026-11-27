@@ -208,15 +208,12 @@ export const Acciones = {
     return /^[+-]?\d+$/.test(t) ? Number(t) : undefined
   },
 
-  /** Engancha la ejecución de las acciones aprobadas al programador: al entregar, la acción queda hecha con su resultado;
-   *  si la ejecución falla, pasa a error. */
+  /** Engancha la ejecución de las acciones aprobadas al programador: al terminar bien, la acción queda hecha con su
+   *  resultado; si falla, pasa a error. No deja una entrega aparte: la persona ya la pidió al aprobar, y el resultado se
+   *  ve en la propia propuesta (y si falla, el programador deja su aviso). */
   instalar(s: Servicios, store: AccionesStore) {
     const prog = s.huecos.programador as Programador | undefined
-    prog?.alEntregar((e: Entrega, ej: Ejecucion | undefined) => {
-      const id = Acciones.deAccion(e.ref)
-      if (id === undefined || e.origen !== 'accion' || !store.una(e.oficina, id)) return
-      store.actualizar(id, 'hecha', e.texto, ej?.id)
-    })
+    prog?.sinEntregar((tarea) => tarea.startsWith(Programador.prefijoAccion))
     prog?.alTerminar((ej) => {
       const id = Acciones.deAccion(ej.tarea)
       const ac = id === undefined ? undefined : store.una(ej.oficina, id)
