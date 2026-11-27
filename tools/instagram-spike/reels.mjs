@@ -15,7 +15,8 @@ import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
-import { limpiarCuenta, metricasReel } from './mapeo.mjs'
+import { gzipSync } from 'node:zlib'
+import { limpiarCuenta, metricasReel, transcripcionTrabada } from './mapeo.mjs'
 
 const args = process.argv.slice(2)
 const opcion = (n) => { const i = args.indexOf(n); return i >= 0 ? args.splice(i, 2)[1] : undefined }
@@ -130,14 +131,23 @@ async function transcribir(audio) {
     console.log(`  cargando Whisper (${modelo}; la primera vez se baja, unos 80 MB)…`)
     asr = await t.pipeline('automatic-speech-recognition', modelo, { dtype: 'q8' })
   }
-  const r = await asr(audio, { language: 'spanish', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5, return_timestamps: true })
-  const trozos = (r.chunks ?? []).map((c) => ({ desde: c.timestamp?.[0] ?? null, hasta: c.timestamp?.[1] ?? null, texto: c.text.trim() })).filter((c) => c.texto)
-  return { texto: (r.text ?? '').trim(), trozos }
+  const pasar = async (extra) => {
+    const r = await asr(audio, { language: 'spanish', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5, return_timestamps: true, ...extra })
+    const trozos = (r.chunks ?? []).map((c) => ({ desde: c.timestamp?.[0] ?? null, hasta: c.timestamp?.[1] ?? null, texto: c.text.trim() })).filter((c) => c.texto)
+    return { texto: (r.text ?? '').trim(), trozos }
+  }
+  let t = await pasar({})
+  if (!transcripcionTrabada(t.texto, gzipSync)) return t
+  // Whisper se trabó (música o casi sin voz): otra pasada que no deja repetir frases.
+  console.log('  la transcripción salió en bucle (suele pasar con música); pruebo otra vez sin repeticiones…')
+  t = await pasar({ no_repeat_ngram_size: 4, repetition_penalty: 1.3 })
+  if (!transcripcionTrabada(t.texto, gzipSync)) return { ...t, segundoIntento: true }
+  return { texto: '', trozos: [], trabada: true }
 }
 
 // MARK: - ficha
 
-const seg = (x) => (x === null || x === undefined ? '?' : `${x.toFixed(1)} s`)
+const seg = (x) => (x === null || x === undefined ? 'fin' : `${x.toFixed(1)} s`)
 function cuando(fecha) {
   if (!fecha) return '?'
   const d = new Date(fecha)
@@ -169,8 +179,12 @@ function ficha(p, m, dur, sueltos, trans) {
   l.push('## Lo que se dice', '')
   if (!trans) l.push('_(sin transcribir)_')
   else if (trans.error) l.push(`_(no se pudo transcribir: ${trans.error})_`)
+  else if (trans.trabada) l.push('_(Whisper se trabó repitiendo frases dos veces: suele pasar cuando hay música o casi no hay voz. No hay transcripción confiable; el texto en pantalla se ve en las imágenes)_')
   else if (!trans.texto) l.push('_(no se entiende voz: puede ser solo música)_')
-  else if (trans.trozos.length) for (const c of trans.trozos) l.push(`- **${seg(c.desde)}–${seg(c.hasta)}** ${c.texto}`)
+  else if (trans.trozos.length) {
+    if (trans.segundoIntento) l.push('_(Segundo intento: la primera pasada salió en bucle, probablemente por música. Puede tener errores)_', '')
+    for (const c of trans.trozos) l.push(`- **${seg(c.desde)}–${seg(c.hasta)}** ${c.texto}`)
+  }
   else l.push(trans.texto)
   if (p.ultimosComentarios?.length) {
     l.push('', '## Últimos comentarios', '')
@@ -202,7 +216,7 @@ for (const p of elegidos) {
       try {
         const t0 = Date.now()
         trans = await transcribir(await audioDe(video))
-        console.log(`  transcripción: ${trans.texto ? `${trans.texto.split(/\s+/).length} palabras` : 'sin voz'} en ${Math.round((Date.now() - t0) / 1000)} s`)
+        console.log(`  transcripción: ${trans.trabada ? 'no confiable (Whisper se trabó)' : trans.texto ? `${trans.texto.split(/\s+/).length} palabras${trans.segundoIntento ? ' (segundo intento)' : ''}` : 'sin voz'} en ${Math.round((Date.now() - t0) / 1000)} s`)
       } catch (e) {
         trans = { error: e.message }
         console.log(`  transcripción: ${e.message}`)

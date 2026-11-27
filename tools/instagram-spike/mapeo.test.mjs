@@ -106,3 +106,14 @@ test('metricasReel: alcance aproximado e interacción sobre vistas', async () =>
     { reproducciones: 4786, alcanceAproxPct: 53.1, interaccionVistasPct: 2.3, interaccionSeguidoresPct: 1.23 })
   assert.equal(metricasReel({ likes: 5, comentarios: 0, reproducciones: null }, 100).interaccionVistasPct, null)
 })
+
+test('transcripcionTrabada reconoce el bucle de Whisper y deja pasar una transcripción normal', async () => {
+  const { transcripcionTrabada } = await import('./mapeo.mjs')
+  const { gzipSync } = await import('node:zlib')
+  const bucle = 'Y Y el que ' + 'es el que '.repeat(60) + 'no es que '.repeat(40)
+  assert.equal(transcripcionTrabada(bucle, gzipSync), true)
+  assert.equal(transcripcionTrabada(bucle), true)
+  const normal = 'Hice mi primer evento presencial en Buenos Aires y vinieron treinta mujeres desde Córdoba, Santa Fe, Neuquén y hasta Barcelona. Fueron cinco horas aprendiendo y haciendo red, y todavía no lo puedo procesar.'
+  assert.equal(transcripcionTrabada(normal, gzipSync), false)
+  assert.equal(transcripcionTrabada('hola'), false)
+})

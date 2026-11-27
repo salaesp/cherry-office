@@ -205,3 +205,23 @@ export function metricasReel(p, seguidores) {
     interaccionSeguidoresPct: seguidores ? +(100 * inter / seguidores).toFixed(2) : null,
   }
 }
+
+// MARK: - transcripción
+
+/**
+ * true si una transcripción de Whisper se trabó en un bucle ("el que es el que es…"), algo que le pasa con música o casi
+ * sin voz. Mismo criterio que Whisper (texto que comprime demasiado: razón > 2,4) más una frase corta que se repite mucho.
+ */
+export function transcripcionTrabada(texto, gzip) {
+  const t = String(texto ?? '').trim()
+  if (t.length < 40) return false
+  if (gzip && t.length / gzip(Buffer.from(t)).length > 2.4) return true
+  const palabras = t.toLowerCase().split(/\s+/)
+  const cuenta = new Map()
+  for (let i = 0; i + 3 <= palabras.length; i++) {
+    const g = palabras.slice(i, i + 3).join(' ')
+    cuenta.set(g, (cuenta.get(g) ?? 0) + 1)
+  }
+  const max = Math.max(0, ...cuenta.values())
+  return max >= 6 && max * 3 > palabras.length * 0.3
+}
