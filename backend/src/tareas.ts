@@ -4,10 +4,12 @@
 // Zonas horarias con `Intl` (sin Temporal): misma regla que Calendar de Swift: una hora que no existe ese día
 // (salto de DST hacia adelante) se corre hacia adelante; una que existe dos veces toma la primera.
 import { Adjuntos } from './adjuntos.js'
+import { esMemoriaIA, type MemoriaIA } from './config.js'
 import { ErrorAPI } from './errores.js'
 import { esObjeto, type Obj } from './json.js'
 import type { Oficina } from './oficina.js'
-import { Slug, largo, uuidValido } from './validar.js'
+import { modoSkillsDe, type ModoSkills } from './skills.js'
+import { Slug, Validar, largo, uuidValido } from './validar.js'
 
 // MARK: - modelo
 
@@ -19,6 +21,24 @@ export type OrigenTarea = OrigenReunion | OrigenChat
 
 export const deReunion = (o: OrigenTarea | undefined): OrigenReunion | undefined => (o !== undefined && 'reunion' in o ? o : undefined)
 export const deChat = (o: OrigenTarea | undefined): OrigenChat | undefined => (o !== undefined && 'chat' in o ? o : undefined)
+
+/** Modelo, esfuerzo y ahorro propios de una tarea: pisan los del agente (y los de Ajustes › Consumo de IA) solo en sus
+ *  corridas. Misma forma que la elección de una charla (agentes.ts, `EleccionCharla`); lo que falta queda como siempre. */
+export type IATarea = { modelo?: string; esfuerzo?: string; skills?: ModoSkills; memoria?: MemoriaIA; colegas?: boolean; mcpLocales?: boolean }
+
+/** Lo válido de un `ia` guardado (oficina.json se puede editar a mano: lo que no se entiende se ignora). undefined si queda vacío. */
+export function decodificarIA(v: unknown): IATarea | undefined {
+  if (!esObjeto(v)) return undefined
+  const r: IATarea = {}
+  if (typeof v.modelo === 'string' && Validar.modelos.has(v.modelo)) r.modelo = v.modelo
+  if (typeof v.esfuerzo === 'string' && Validar.esfuerzos.has(v.esfuerzo)) r.esfuerzo = v.esfuerzo
+  const sk = modoSkillsDe(v.skills)
+  if (sk) r.skills = sk
+  if (esMemoriaIA(v.memoria)) r.memoria = v.memoria
+  if (typeof v.colegas === 'boolean') r.colegas = v.colegas
+  if (typeof v.mcpLocales === 'boolean') r.mcpLocales = v.mcpLocales
+  return Object.keys(r).length > 0 ? r : undefined
+}
 
 /** Una consigna que un agente corre solo. Dos tipos:
  *  - repetida: en ciertos días (`dias`) a cierta hora, en la zona de la tarea;
@@ -46,6 +66,8 @@ export type TareaProgramada = {
   hecha?: string
   /** Archivos adjuntos (rutas relativas a la oficina, dentro de `archivos/adjuntos/`): el agente los recibe con la consigna. */
   archivos?: string[]
+  /** Modelo, esfuerzo y ahorro de sus corridas (pisan los del agente). undefined = los del agente. */
+  ia?: IATarea
   /** Solo en memoria (no va a `oficina.json`): instrucciones de esta corrida que van como mensaje de sistema, sumadas a las
    *  del agente (`--append-system-prompt`), en vez de quedar en la charla. Las arman la secretaría (revisión y reporte) y
    *  el programador (lo que entregó la vez anterior). */
@@ -92,6 +114,8 @@ export function decodificarTarea(v: unknown): TareaProgramada {
   if (fecha !== undefined) t.fecha = fecha
   if (hecha !== undefined) t.hecha = hecha
   if (o.archivos !== undefined && o.archivos !== null) t.archivos = Array.isArray(o.archivos) ? o.archivos.map(str) : falla()
+  const ia = decodificarIA(o.ia)
+  if (ia) t.ia = ia
   return t
 }
 
@@ -116,6 +140,7 @@ export function tareaJSON(t: TareaProgramada, sistema: string = zonaDelSistema()
   if (t.fecha !== undefined) o.fecha = t.fecha
   if (esUnica(t)) o.hecha = t.hecha ?? null
   if (t.archivos !== undefined && t.archivos.length > 0) o.archivos = t.archivos
+  if (t.ia !== undefined && Object.keys(t.ia).length > 0) o.ia = { ...t.ia }
   return o
 }
 
