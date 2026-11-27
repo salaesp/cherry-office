@@ -221,11 +221,11 @@ describe('Tareas programadas (API y programador)', () => {
     expect(fin.error).toBeNull()
     expect(str(fin.sid)).toBe(sid)
 
-    // el pedido y la respuesta quedaron como un chat más
+    // el pedido y la respuesta quedaron en su conversación (se abre por su id), pero no es una charla del agente
     const h = await historial(f.b, { agent: 'marce', session: sid })
     expect(msgs(h).map((m) => str(m.r))).toEqual(['u', 'a'])
     expect(msgs(h).map((m) => str(m.t))).toEqual(['Armá el informe', 'hola marce'])
-    expect(str((await historial(f.b, { agent: 'marce' })).obj.session), 'es la última sesión del agente').toBe(sid)
+    expect((await historial(f.b, { agent: 'marce' })).obj.session, 'no pasa a ser la última charla del agente').toBeNull()
     // con los permisos y la carpeta del agente
     const l = f.sb.llamadas.at(-1)!
     expect(l).toBeDefined()

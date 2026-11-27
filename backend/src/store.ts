@@ -42,12 +42,19 @@ export class Store {
   }
 
   /** v2: `sesiones.oficina` ('' = chats anteriores a las oficinas). v3: `costos`. v4: `sesiones.ctx_usados` y
-   *  `ctx_ventana` (cuánto contexto ocupa la charla, del último turno; 0 = no se sabe). */
+   *  `ctx_ventana` (cuánto contexto ocupa la charla, del último turno; 0 = no se sabe). v5: `sesiones.tarea` (1 = la
+   *  conversación de una corrida de tarea o encargo: no es una charla y no va en la lista de charlas). */
   private static migrarEsquema(db: SQLiteDB) {
     const cols = db.query('PRAGMA table_info(sesiones)').map((f) => txt(f.name))
     if (!cols.includes('oficina')) db.exec("ALTER TABLE sesiones ADD COLUMN oficina TEXT NOT NULL DEFAULT ''")
     if (!cols.includes('ctx_usados')) db.exec('ALTER TABLE sesiones ADD COLUMN ctx_usados INTEGER NOT NULL DEFAULT 0')
     if (!cols.includes('ctx_ventana')) db.exec('ALTER TABLE sesiones ADD COLUMN ctx_ventana INTEGER NOT NULL DEFAULT 0')
+    if (!cols.includes('tarea')) {
+      db.exec('ALTER TABLE sesiones ADD COLUMN tarea INTEGER NOT NULL DEFAULT 0')
+      // las corridas de antes: su sesión es la que guardó la ejecución (tabla del programador, en esta misma base)
+      if (db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ejecuciones'").length > 0)
+        db.exec("UPDATE sesiones SET tarea=1 WHERE id IN (SELECT sid FROM ejecuciones WHERE sid<>'')")
+    }
     db.exec('CREATE INDEX IF NOT EXISTS sesiones_oficina ON sesiones(oficina, agente)')
     db.exec(`
     CREATE TABLE IF NOT EXISTS costos (
@@ -143,8 +150,10 @@ export class Store {
     return f ? txt(f.oficina) : undefined
   }
 
-  asegurarSesion(sid: string, agente: string, oficina = '') {
-    this.db.run('INSERT OR IGNORE INTO sesiones(id,agente,creada,activa,oficina) VALUES(?,?,?,0,?)', [sid, agente, Date.now() / 1000, oficina])
+  /** Crea la sesión si no existe. `tarea`: es la conversación de una corrida (no se lista como charla); si la sesión ya
+   *  existía se queda como estaba. */
+  asegurarSesion(sid: string, agente: string, oficina = '', tarea = false) {
+    this.db.run('INSERT OR IGNORE INTO sesiones(id,agente,creada,activa,oficina,tarea) VALUES(?,?,?,0,?,?)', [sid, agente, Date.now() / 1000, oficina, tarea ? 1 : 0])
   }
 
   marcarActiva(sid: string) { this.db.run('UPDATE sesiones SET activa=1 WHERE id=?', [sid]) }
@@ -163,16 +172,17 @@ export class Store {
     return ventana > 0 ? { usados, ventana } : { usados }
   }
 
-  /** Sesión más reciente del agente que tenga mensajes, o undefined. */
+  /** Charla más reciente del agente que tenga mensajes (sin las de tareas), o undefined. */
   ultimaSesion(agente: string, oficina = ''): string | undefined {
     const f = this.db.query(`
-      SELECT s.id FROM sesiones s WHERE s.agente=? AND s.oficina=? AND EXISTS (SELECT 1 FROM mensajes m WHERE m.sid=s.id)
+      SELECT s.id FROM sesiones s WHERE s.agente=? AND s.oficina=? AND s.tarea=0 AND EXISTS (SELECT 1 FROM mensajes m WHERE m.sid=s.id)
       ORDER BY (SELECT MAX(id) FROM mensajes m WHERE m.sid=s.id) DESC LIMIT 1`, [agente, oficina])[0]
     return f ? txt(f.id) : undefined
   }
 
   /** Sesiones de la oficina que tienen mensajes, la más reciente primero (por el último mensaje). Para la lista de
-   *  charlas: el primer mensaje del usuario hace de título y el último de vista previa. `agente` filtra. */
+   *  charlas: el primer mensaje del usuario hace de título y el último de vista previa. `agente` filtra. Las conversaciones
+   *  de tareas y encargos no son charlas: no van. */
   sesiones(oficina: string, agente?: string, limite = 300): ResumenSesion[] {
     const p: (string | number)[] = [oficina]
     if (agente !== undefined) p.push(agente)
@@ -185,7 +195,7 @@ export class Store {
         (SELECT MAX(ts) FROM mensajes m WHERE m.sid=s.id) AS ts,
         (SELECT COUNT(*) FROM mensajes m WHERE m.sid=s.id) AS n
       FROM sesiones s
-      WHERE s.oficina=? ${agente !== undefined ? 'AND s.agente=?' : ''} AND EXISTS (SELECT 1 FROM mensajes m WHERE m.sid=s.id)
+      WHERE s.oficina=? AND s.tarea=0 ${agente !== undefined ? 'AND s.agente=?' : ''} AND EXISTS (SELECT 1 FROM mensajes m WHERE m.sid=s.id)
       ORDER BY ts DESC LIMIT ?`, p)
       .map((f) => ({ sid: txt(f.id), agente: txt(f.agente), primero: txt(f.primero), ultimo: txt(f.ultimo), rol: txt(f.rol), ts: num(f.ts), n: num(f.n) }))
   }
