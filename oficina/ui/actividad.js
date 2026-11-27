@@ -11,7 +11,10 @@ App.Actividad = (function () {
     clearTimeout(timer);
     App.api.get('/api/actividad').then(function (r) {
       errores = 0;
-      if (r.version !== version) { version = r.version; aplicar(r); }
+      /* `version` solo sube con la actividad de los agentes; los contadores (entregas sin revisar, lo que te espera, avisos,
+         permisos) bajan también por lo que hace la persona (aprobar una tarjeta, revisar), así que entran en la firma */
+      var firma = [r.version, r.entregasSinRevisar | 0, r.teEsperan | 0, (r.avisos || []).length, (r.permisos || []).length, r.creadorVersion | 0].join('|');
+      if (firma !== version) { version = firma; aplicar(r); }
     }).catch(function () { errores++; }).then(function () {
       var hay = Object.keys(datos.agentes || {}).length > 0 || Object.keys(App.E.ocupados || {}).length > 0;
       if (hay) pintarLateral();   // el «cuánto lleva» avanza aunque no cambie nada más
