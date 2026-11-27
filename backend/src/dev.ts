@@ -9,6 +9,7 @@
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { crearActualizador } from './actualizar-web.js'
 import { createBackend } from './backend.js'
 import { Config } from './config.js'
 import { ServidorDev } from './servidor-dev.js'
@@ -29,6 +30,10 @@ try {
   process.stderr.write(`oficina-dev: no pude arrancar el backend: ${e}\n`)
   process.exit(1)
 }
+
+// Solo la versión web (un clon git con actualizar.sh) se actualiza desde la interfaz; la app de escritorio usa las releases.
+const actualizador = crearActualizador({ repo, datosDir: backend.config.datosDir, env, procesosVivos: () => backend.runner.procesosVivos })
+if (actualizador) backend.servicios.router.registrarExtra(actualizador)
 
 const hostsExtra = (env.HQ_HOSTS ?? '').split(',').map((x) => x.trim()).filter((x) => x !== '')
 const servidor = new ServidorDev({ router: backend.router, raizUI: ui, raizVendor: vendor, puerto, hostsExtra })
