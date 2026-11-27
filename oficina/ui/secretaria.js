@@ -1,7 +1,9 @@
 /* Secretaría (docs/plan-secretaria.md): Ajustes › Secretaría. Se contrata en un paso (tiene su despacho al lado del tuyo, ya
    configurada con los chats elegidos de WhatsApp y, si están conectados, Gmail y el calendario) y se configura todo acá:
    qué chats revisa (de la lista completa: elegir uno acá lo elige también en Ajustes › WhatsApp), cada cuánto, Gmail y
-   Calendario (prenderlos le asigna el conector), la franja horaria y «Revisar ahora». En la ficha del agente queda un
+   Calendario (prenderlos le asigna el conector), la franja horaria y «Revisar ahora». Cada fuente es un renglón con su
+   resumen que se abre de a uno; los chats elegidos son chips; el historial de revisiones y reportes va en una hoja aparte
+   («Historial») y en la pantalla queda solo como una tira de puntos. En la ficha del agente queda un
    resumen con «Configurar». Revisar y avisar van separados: cada fuente se revisa con su intervalo (sin dejar nada en la
    bandeja, salvo lo urgente) y el reporte junta todo a las horas que elegís. Su memoria privada (bloque «Memoria») está en
    secretaria-memoria.js. API: GET/PUT /api/secretaria, POST /api/secretaria/contratar, /revisar y /reportar. */
@@ -68,23 +70,67 @@
         App.SecretariaMemoria ? App.SecretariaMemoria.bloque(false) : null);
     }
 
-    /* ---- con secretaría ---- */
+    /* ---- con secretaría ----
+       Arriba quién atiende, si revisa sola y «Revisar ahora» (lo poco usado en «⋯»); una línea con el próximo reporte y las
+       últimas revisiones como puntos («Historial» abre el detalle); las fuentes como renglones que se abren de a uno; el
+       reporte y el horario en renglones; la memoria al final. */
+    var abierta = 'whatsapp', chipsTodos = false, chatsGuardados = null;
+    var CADAS = [[15, 'minutos', '15 min'], [30, 'minutos', '30 min'], [1, 'horas', '1 h'], [4, 'horas', '4 h'], [12, 'horas', '12 h']];
+    var NOMBRES_FUENTE = { whatsapp: 'WhatsApp', gmail: 'Gmail', calendario: 'Calendario' };
+    function textoCada(c) { return c.unidad === 'minutos' ? c.valor + ' min' : c.valor + ' h'; }
+    /* cada cuánto: botones con los valores de siempre (y el guardado, si es otro) */
+    function selectorCada(cada, alCambiar) {
+      var ops = CADAS.map(function (x) { return { valor: x[0] + ' ' + x[1], titulo: x[2] }; });
+      var actual = cada.valor + ' ' + cada.unidad;
+      if (!ops.some(function (o) { return o.valor === actual; })) ops.push({ valor: actual, titulo: textoCada(cada) });
+      return App.elegir({ forma: 'segmento', etiqueta: 'Cada cuánto revisa', valor: actual, opciones: ops,
+        alCambiar: function (v) { var p = v.split(' '); alCambiar({ valor: Number(p[0]), unidad: p[1] }); } });
+    }
+    function marcaFuente(id) {
+      return h('div.renglon-marca.' + ({ whatsapp: 'wa', gmail: 'mail', calendario: 'cal' }[id] || ''), App.icono({ whatsapp: 'charla', gmail: 'mail', calendario: 'calendario' }[id] || 'enchufe'));
+    }
+    function alternar(id) { abierta = abierta === id ? null : id; dibujar(); }
+
     function dibujarConfig(cfg) {
       var ag = datos.agente;
-      var fWa = (cfg.fuentes || []).filter(function (f) { return f.id === 'whatsapp'; })[0];
-      var estadoWa = fuente('whatsapp') || {};
+      var err = h('div.error-txt');
 
-      /* quién, y si revisa sola */
-      var activa = h('input', { type: 'checkbox', checked: cfg.activa });
-      activa.addEventListener('change', function () { guardar({ activa: activa.checked }, activa.checked ? 'La secretaría vuelve a revisar.' : 'La secretaría queda en pausa.'); });
-      caja.appendChild(App.ajuste(ag.nombre + ' atiende la secretaría', 'Desde la secretaría revisa lo que llega y te deja un reporte en la bandeja. Lo que propone (por ejemplo, un evento en el calendario) no se hace hasta que lo aprobás.',
-        h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' } },
-          h('label.ajuste-check', activa, h('span', 'Revisa sola')),
-          h('button.btn.chico', { onclick: function () { if (App.Agente) App.Agente.abrir(ag.id, 'chat'); } }, App.icono('charla'), 'Charlar'))));
+      /* quién, si revisa sola, charlar, revisar ahora y «⋯» */
+      var ocupada = !!(datos.corriendo || datos.reporteCorriendo);
+      var ahora = h('button.btn.primario', { disabled: ocupada, onclick: function () {
+        ahora.disabled = true; err.textContent = '';
+        api().post('/api/secretaria/revisar', {}).then(function (r) { App.guardado(r.motivo || ag.nombre + ' está revisando.'); return cargar(); })
+          .catch(function (e) { err.textContent = e.message; ahora.disabled = false; });
+      } }, datos.corriendo ? 'Revisando…' : datos.reporteCorriendo ? 'Armando el reporte…' : 'Revisar ahora');
+      var armar = function () {
+        err.textContent = '';
+        api().post('/api/secretaria/reportar', {}).then(function (r) { App.guardado(r.motivo || ag.nombre + ' está armando el reporte.'); return cargar(); })
+          .catch(function (e) { err.textContent = e.message; });
+      };
+      var cerrarSec = function () {
+        App.confirmar('¿Cerrar la secretaría?', ag.nombre + ' deja de revisar (sigue en la oficina; si querés, despedilo desde su ficha). Los reportes que ya dejó quedan en la bandeja, y su memoria también (podés borrarla desde «Memoria»).', 'Cerrar', true).then(function (si) {
+          if (si) guardar({ agente: null }, 'La oficina ya no tiene secretaría.');
+        });
+      };
+      var mas = h('button.btn.icono', { title: 'Más opciones', onclick: function (ev) {
+        App.menu(ev.currentTarget, [
+          ocupada ? null : { texto: 'Armar el reporte ahora', icono: 'bandeja', nota: 'con lo que ya revisó', accion: armar },
+          { texto: 'Historial', icono: 'reloj', accion: verHistorial },
+          '-',
+          { texto: 'Cerrar la secretaría', icono: 'cerrar', peligro: true, accion: cerrarSec }].filter(Boolean));
+      } }, App.icono('puntos'));
+      var agFicha = App.agente ? App.agente(ag.id) : null;
+      caja.appendChild(h('div.sec-cabeza',
+        agFicha ? App.retratoImg(agFicha, 'retrato', 64) : h('div.renglon-marca', App.icono('personas')),
+        h('div.renglon-txt', h('div.sec-nombre', ag.nombre), h('div.renglon-sub', cfg.activa ? 'Revisa sola' : 'En pausa: revisa cuando se lo pedís')),
+        App.interruptor(cfg.activa, function (si) { guardar({ activa: si }, si ? 'La secretaría vuelve a revisar.' : 'La secretaría queda en pausa.'); }, 'Revisa sola'),
+        h('button.btn', { onclick: function () { if (App.Agente) App.Agente.abrir(ag.id, 'chat'); } }, App.icono('charla'), 'Charlar'),
+        ahora, mas));
+      caja.appendChild(err);
 
       /* una secretaría armada antes de que existiera su despacho: ofrecer pasarla, y sacarle el permiso que ya no usa */
       if (ag.departamento !== 'recepcion' || (ag.permisos || []).indexOf('whatsapp') >= 0) {
-        var acomodar = h('button.btn', { onclick: function () {
+        var acomodar = h('button.btn.chico', { onclick: function () {
           acomodar.disabled = true;
           var cambios = { departamento: 'recepcion' };
           if ((ag.permisos || []).indexOf('whatsapp') >= 0) cambios.permisos = ag.permisos.filter(function (x) { return x !== 'whatsapp'; });
@@ -96,207 +142,201 @@
         } }, 'Pasar a la secretaría');
         var por = [];
         if (ag.departamento !== 'recepcion') por.push('se sienta en la secretaría, al lado de tu despacho');
-        if ((ag.permisos || []).indexOf('whatsapp') >= 0) por.push('le saca «Puede leer WhatsApp», que ya no hace falta (lee los chats que elijas acá)');
-        caja.appendChild(App.ajuste('Acomodar a ' + ag.nombre, 'La secretaría ahora tiene su despacho al lado del tuyo. Con esto ' + por.join(' y ') + '.', acomodar));
+        if ((ag.permisos || []).indexOf('whatsapp') >= 0) por.push('le saca «Puede leer WhatsApp», que ya no hace falta');
+        caja.appendChild(App.renglon({ titulo: 'Acomodar a ' + ag.nombre, sub: 'Con esto ' + por.join(' y ') + '.', control: acomodar }));
       }
 
-      /* WhatsApp: elegir chats de la lista completa y cada cuánto */
-      var marcados = (fWa && fWa.chats) || [];
+      caja.appendChild(lineaEstado());
+
+      /* qué revisa */
+      var fuentesEl = [bloqueWhatsApp(cfg)];
+      (datos.fuentes || []).filter(function (f) { return f.tipo === 'conector'; }).forEach(function (f) { fuentesEl.push(bloqueConector(cfg, f)); });
+      caja.appendChild(App.seccion('Qué revisa', fuentesEl));
+
+      /* reporte y horario */
+      caja.appendChild(App.seccion('Reporte', [renglonHoras(cfg), renglonFranja(cfg),
+        App.renglon({ titulo: 'Dejarlo aunque no haya novedades', control: App.interruptor(cfg.reporteVacio, function (si) {
+          guardar({ reporteVacio: si }, si ? 'Te deja el reporte aunque no haya novedades.' : 'Sin novedades, no te deja reporte.');
+        }, 'Dejar el reporte aunque no haya novedades') })]));
+
+      /* memoria privada de la secretaría (secretaria-memoria.js) */
+      if (App.SecretariaMemoria) caja.appendChild(App.SecretariaMemoria.bloque(true, true));
+    }
+
+    /* Próximo reporte, cuántas revisiones esperan y las últimas revisiones como puntos (el detalle, en «Historial») */
+    function lineaEstado() {
+      var prox = datos.proximoReporte ? new Date(datos.proximoReporte * 1000) : null;
+      var proxTxt = prox ? (prox.toDateString() === new Date().toDateString() ? 'hoy' : 'mañana') + ' ' + prox.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
+      var espera = datos.sinReportar ? ' · ' + datos.sinReportar + (datos.sinReportar === 1 ? ' revisión esperando' : ' revisiones esperando') : '';
+      var revs = (datos.revisiones || []).slice(0, 12).reverse();
+      var puntos = revs.map(function (r) {
+        var clase = r.estado === 'corriendo' ? 'corre' : r.estado !== 'ok' ? 'falla' : r.urgente ? 'urgente' : r.vacia ? '' : 'algo';
+        var que = r.estado !== 'ok' ? (ESTADO_REV[r.estado] || r.estado) : r.vacia ? 'sin novedades' : r.urgente ? 'avisó algo urgente' : r.reporte ? 'ya en un reporte' : 'para el próximo reporte';
+        return h('i' + (clase ? '.' + clase : ''), { title: App.hace(r.creada) + ' · ' + (r.fuentes || []).map(function (f) { return NOMBRES_FUENTE[f] || f; }).join(', ') + ' · ' + que });
+      });
+      return h('div.sec-estado',
+        h('span', proxTxt ? ['Próximo reporte ', h('b', proxTxt)] : 'Sin reporte programado', espera),
+        h('span.sec-estado-esp'),
+        puntos.length ? h('span.sec-puntos', { title: 'Últimas revisiones' }, puntos) : null,
+        h('button.btn.chico.fantasma', { onclick: verHistorial }, 'Historial'));
+    }
+
+    /* Hoja con los últimos reportes y revisiones (lo que antes ocupaba la pantalla) */
+    function verHistorial() {
+      var hj2 = App.hoja({ titulo: 'Historial de la secretaría', ancho: 560 });
+      var verEntrega = function (id) { return id ? h('button.btn.chico.fantasma', { onclick: function () { hj2.cerrar(); if (App.Entregables && App.Entregables.abrir) App.Entregables.abrir(id); } }, 'Ver') : null; };
+      var ESTADO_REP = { corriendo: 'Armándolo…', ok: 'Listo', fallida: 'Falló', incierta: 'Se cortó', salteado: 'Sin nada nuevo: no te dejó nada' };
+      var linea = function (txt, boton) { return h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', borderTop: '1px solid var(--linea)' } }, h('span', { style: { flex: 1 } }, txt), boton); };
+      var reps = (datos.reportes || []).map(function (r) {
+        return linea(App.hace(r.creada) + ' · ' + (ESTADO_REP[r.estado] || r.estado) + (r.estado === 'ok' && r.vacio ? ' · sin novedades' : '') + (r.manual ? ' · a pedido' : '') + (r.error ? ' (' + r.error + ')' : ''),
+          verEntrega(r.estado === 'ok' && !r.vacio ? r.entrega : null));
+      });
+      var revs = (datos.revisiones || []).map(function (r) {
+        var que = r.estado !== 'ok' ? '' : r.vacia ? ' · sin novedades' : r.urgente ? ' · avisó algo urgente' : r.reporte ? ' · ya en un reporte' : ' · para el próximo reporte';
+        return linea(App.hace(r.creada) + ' · ' + (r.fuentes || []).map(function (f) { return NOMBRES_FUENTE[f] || f; }).join(', ') + ' · ' + (ESTADO_REV[r.estado] || r.estado) + que + (r.manual ? ' · a pedido' : '') + (r.error ? ' (' + r.error + ')' : ''),
+          verEntrega(r.urgente ? r.entrega : null));
+      });
+      App.add(hj2.cuerpo,
+        App.seccion('Reportes', reps.length ? reps : h('div.ajuste-ayuda', 'Todavía no dejó ninguno.')),
+        App.seccion('Revisiones', revs.length ? revs : h('div.ajuste-ayuda', 'Todavía no revisó nada.')));
+      App.add(hj2.pie, h('button.btn.primario', { onclick: hj2.cerrar }, 'Listo'));
+    }
+
+    /* WhatsApp: un renglón con el resumen; abierto, qué chats (chips) y cada cuánto */
+    function bloqueWhatsApp(cfg) {
+      var fWa = (cfg.fuentes || []).filter(function (f) { return f.id === 'whatsapp'; })[0];
+      var estadoWa = fuente('whatsapp') || {};
+      var vinculado = datos.whatsapp && datos.whatsapp !== 'apagado';
+      var marcados = (fWa && fWa.chats) || chatsGuardados || [];
+      var todos = datos.chatsWhatsApp || [];
+      var todosWa = !!(fWa && fWa.todos);
+      var cada = (fWa && fWa.cada) || { valor: 1, unidad: 'horas' };
       function guardarWa(cambio, texto) {
         var fuentes = (cfg.fuentes || []).filter(function (f) { return f.id !== 'whatsapp'; });
         fuentes.unshift(Object.assign({ id: 'whatsapp', cada: { valor: 1, unidad: 'horas' }, chats: marcados }, fWa || {}, cambio));
         return guardar({ fuentes: fuentes }, texto);
       }
-      var bloqueWa = h('div.ajuste', { style: { display: 'block' } }, h('div.ajuste-tit', 'WhatsApp'));
-      if (!datos.whatsapp || datos.whatsapp === 'apagado') {
-        bloqueWa.appendChild(h('div.ajuste-ayuda', 'WhatsApp no está vinculado. ',
-          h('a', { href: '#', onclick: function (ev) { ev.preventDefault(); App.Ajustes.abrir('whatsapp'); } }, 'Vinculalo en Ajustes › WhatsApp'), ' y volvé acá a elegir los chats.'));
-      } else {
-        var todos = datos.chatsWhatsApp || [];
-        var lista = h('div', { style: { maxHeight: '240px', overflowY: 'auto', marginTop: '6px' } });
-        var buscar = h('input.campo', { placeholder: 'Buscar un chat por nombre o número', value: filtro, style: { width: '100%' } });
-        buscar.addEventListener('input', function () { filtro = buscar.value; llenar(); });
-        function llenar() {
-          App.vaciar(lista);
-          var q = filtro.trim().toLowerCase();
-          var suyos = todos.filter(function (c) { return marcados.indexOf(c.jid) >= 0; });
-          var otros = todos.filter(function (c) { return marcados.indexOf(c.jid) < 0 && (!q || [c.nombre, c.numero].some(function (x) { return x && String(x).toLowerCase().indexOf(q) >= 0; })); });
-          suyos.concat(q ? otros.slice(0, 40) : []).forEach(function (c) {
-            var ck = h('input', { type: 'checkbox', checked: marcados.indexOf(c.jid) >= 0 });
-            ck.addEventListener('change', function () {
-              var nuevos = marcados.filter(function (j) { return j !== c.jid; }).concat(ck.checked ? [c.jid] : []);
-              filtro = ''; guardarWa({ chats: nuevos }, ck.checked ? 'Revisa también ' + c.nombre + ' (desde ahora).' : 'Ya no revisa ' + c.nombre + '.');
-            });
-            lista.appendChild(h('label.ajuste-check', { style: { display: 'flex', padding: '3px 0' } }, ck,
-              h('span', c.nombre + (c.grupo ? ' (grupo)' : '')), h('span.ajuste-ayuda', { style: { marginLeft: '6px' } }, c.ultimo ? App.hace(c.ultimo) : '')));
-          });
-          if (!suyos.length && !q) lista.appendChild(h('div.ajuste-ayuda', 'Todavía no revisa ningún chat: buscá a quién (por ejemplo, «mamá») y marcalo.'));
-          if (q && !otros.length) lista.appendChild(h('div.ajuste-ayuda', 'Nada con «' + filtro + '».'));
-        }
-        llenar();
-        /* revisar todos los chats que se leen (para un negocio: con «leer todos los chats individuales», también los que entran solos) */
-        var todosWa = !!(fWa && fWa.todos);
-        var ckTodos = h('input', { type: 'checkbox', checked: todosWa });
-        ckTodos.addEventListener('change', function () {
-          guardarWa({ todos: ckTodos.checked }, ckTodos.checked ? 'Revisa todos los chats que se leen.' : 'Revisa solo los chats que marques.');
-        });
-        var lineaTodos = h('div', { style: { margin: '2px 0 8px' } },
-          h('label.ajuste-check', { style: { display: 'flex' } }, ckTodos, h('span', 'Revisar todos los chats que se leen')),
-          h('div.ajuste-ayuda', datos.whatsappLeerTodos
-            ? 'Incluye los que entran solos porque en Ajustes › WhatsApp está prendido «Leer todos los chats individuales» (por ejemplo, clientes que no tenés agendados).'
-            : 'Todos los elegidos en Ajustes › WhatsApp. Si te escriben números que no tenés agendados (por ejemplo, clientes de un negocio), prendé «Leer todos los chats individuales» allá.'));
-        if (todosWa) { buscar.style.display = 'none'; lista.style.display = 'none'; }
-        var cada = (fWa && fWa.cada) || { valor: 1, unidad: 'horas' };
-        var valor = h('input.campo', { type: 'number', min: 1, value: cada.valor, style: { width: '70px' } });
-        var unidad = h('select.campo', { style: { width: 'auto' } }, h('option', { value: 'minutos', selected: cada.unidad === 'minutos' }, 'minutos'), h('option', { value: 'horas', selected: cada.unidad === 'horas' }, 'horas'));
-        var cambiarCada = function () {
-          var v = Math.floor(Number(valor.value));
-          if (!(v > 0)) { valor.value = cada.valor; return; }
-          guardarWa({ cada: { valor: v, unidad: unidad.value } }, 'Revisa WhatsApp cada ' + v + ' ' + unidad.value + '.');
-        };
-        valor.addEventListener('change', cambiarCada); unidad.addEventListener('change', cambiarCada);
-        App.add(bloqueWa,
-          h('div.ajuste-ayuda', { style: { marginBottom: '6px' } }, 'Qué chats revisa. Se leen desde que los marcás; nunca manda mensajes.'),
-          lineaTodos, buscar, lista,
-          h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', flexWrap: 'wrap' } }, h('span', 'Revisar cada'), valor, unidad,
-            h('span.ajuste-ayuda', '(si no llegó nada nuevo, no gasta)')),
-          estadoWa.problema && (marcados.length || todosWa) ? h('div.ajuste-ayuda', { style: { color: 'var(--peligro)', marginTop: '6px' } }, estadoWa.problema) : null);
+      if (!vinculado) {
+        return App.renglon({ marca: marcaFuente('whatsapp'), titulo: 'WhatsApp', sub: 'Sin vincular',
+          control: h('button.btn.chico', { onclick: function () { App.Ajustes.abrir('whatsapp'); } }, 'Vincular') });
       }
-      caja.appendChild(bloqueWa);
+      var n = todosWa ? null : marcados.length;
+      var sub = (todosWa ? 'Todos los chats que se leen' : n ? n + (n === 1 ? ' chat' : ' chats') : 'Ningún chat todavía') + ' · cada ' + textoCada(cada);
+      var problema = fWa && estadoWa.problema && (marcados.length || todosWa) ? estadoWa.problema : null;
+      var on = App.interruptor(!!fWa, function (si) {
+        if (si) guardarWa({}, 'Revisa WhatsApp.');
+        else {
+          chatsGuardados = marcados;
+          guardar({ fuentes: (cfg.fuentes || []).filter(function (f) { return f.id !== 'whatsapp'; }) }, 'Ya no revisa WhatsApp.');
+        }
+      }, 'Revisar WhatsApp');
+      var renglon = App.renglon({ marca: marcaFuente('whatsapp'), titulo: 'WhatsApp', sub: problema || sub, subError: !!problema, control: on,
+        abierto: !!fWa && abierta === 'whatsapp', alTocar: fWa ? function () { alternar('whatsapp'); } : null });
+      if (!fWa || abierta !== 'whatsapp') return renglon;
 
-      /* Gmail y Calendario */
-      (datos.fuentes || []).filter(function (f) { return f.tipo === 'conector'; }).forEach(function (f) { caja.appendChild(bloqueConector(cfg, f)); });
-
-      /* el reporte: a qué horas junta todo */
-      caja.appendChild(bloqueReporte(cfg));
-
-      /* franja para revisar */
-      var conFranja = h('input', { type: 'checkbox', checked: !!cfg.franja });
-      var desde = h('input.campo', { type: 'time', value: (cfg.franja && cfg.franja.desde) || '08:00', style: { width: 'auto' }, disabled: !cfg.franja });
-      var hasta = h('input.campo', { type: 'time', value: (cfg.franja && cfg.franja.hasta) || '22:00', style: { width: 'auto' }, disabled: !cfg.franja });
-      var cambiarFranja = function () {
-        desde.disabled = hasta.disabled = !conFranja.checked;
-        guardar({ franja: conFranja.checked ? { desde: desde.value, hasta: hasta.value } : null },
-          conFranja.checked ? 'Revisa solo entre las ' + desde.value + ' y las ' + hasta.value + '.' : 'Revisa a cualquier hora.');
-      };
-      conFranja.addEventListener('change', cambiarFranja); desde.addEventListener('change', cambiarFranja); hasta.addEventListener('change', cambiarFranja);
-      caja.appendChild(h('div.ajuste', { style: { display: 'block' } },
-        h('label.ajuste-check', conFranja, h('span', 'Revisar solo entre'), desde, h('span', 'y'), hasta),
-        h('div.ajuste-ayuda', { style: { margin: '2px 0 0' } }, 'Lo que llegue fuera de ese horario lo revisa en la primera vuelta del día. El reporte sale igual a sus horas.')));
-
-      /* revisar ahora, últimas revisiones y cerrar */
-      var err = h('div.error-txt');
-      var ahora = h('button.btn.primario', { disabled: datos.corriendo, onclick: function () {
-        ahora.disabled = true; err.textContent = '';
-        api().post('/api/secretaria/revisar', {}).then(function (r) {
-          App.guardado(r.motivo || ag.nombre + ' está revisando.');
-          return cargar();
-        }).catch(function (e) { err.textContent = e.message; ahora.disabled = false; });
-      } }, datos.corriendo ? 'Revisando…' : 'Revisar ahora');
-      ahora.disabled = !!(datos.corriendo || datos.reporteCorriendo);
-      var verEntrega = function (id) { return id ? h('button.btn.chico.fantasma', { onclick: function () { if (App.Entregables && App.Entregables.abrir) App.Entregables.abrir(id); } }, 'Ver') : null; };
-      var revs = (datos.revisiones || []).slice(0, 5).map(function (r) {
-        var nombres = { whatsapp: 'WhatsApp', gmail: 'Gmail', calendario: 'Calendario' };
-        var que = r.estado !== 'ok' ? '' : r.vacia ? ' · sin novedades' : r.urgente ? ' · avisó algo urgente' : r.reporte ? ' · ya en un reporte' : ' · para el próximo reporte';
-        var txt = (r.fuentes || []).map(function (f) { return nombres[f] || f; }).join(', ') + ' · ' + (ESTADO_REV[r.estado] || r.estado) + que + (r.manual ? ' · a pedido' : '');
-        return h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0' } },
-          h('span.ajuste-ayuda', { style: { flex: 1 } }, App.hace(r.creada) + ' · ' + txt + (r.error ? ' (' + r.error + ')' : '')), verEntrega(r.urgente ? r.entrega : null));
-      });
-      var ESTADO_REP = { corriendo: 'Armándolo…', ok: 'Listo', fallida: 'Falló', incierta: 'Se cortó', salteado: 'Sin nada nuevo: no te dejó nada' };
-      var reps = (datos.reportes || []).slice(0, 4).map(function (r) {
-        var txt = (ESTADO_REP[r.estado] || r.estado) + (r.estado === 'ok' && r.vacio ? ' · sin novedades' : '') + (r.manual ? ' · a pedido' : '');
-        return h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0' } },
-          h('span.ajuste-ayuda', { style: { flex: 1 } }, App.hace(r.creada) + ' · ' + txt + (r.error ? ' (' + r.error + ')' : '')), verEntrega(r.estado === 'ok' && !r.vacio ? r.entrega : null));
-      });
-      var armar = h('button.btn', { disabled: datos.corriendo || datos.reporteCorriendo, title: 'Arma el reporte con lo que ya revisó, sin esperar al horario', onclick: function () {
-        armar.disabled = true; err.textContent = '';
-        api().post('/api/secretaria/reportar', {}).then(function (r) {
-          App.guardado(r.motivo || ag.nombre + ' está armando el reporte.');
-          return cargar();
-        }).catch(function (e) { err.textContent = e.message; armar.disabled = false; });
-      } }, datos.reporteCorriendo ? 'Armando el reporte…' : 'Armar el reporte ahora');
-      caja.appendChild(h('div.ajuste', { style: { display: 'block' } },
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } }, ahora, armar, h('span.ajuste-ayuda', { style: { flex: 1 } }, textoNovedades(estadoWa))),
-        h('div.ajuste-ayuda', { style: { marginTop: '6px' } }, '«Revisar ahora» mira todo y enseguida te deja el reporte. ' +
-          (datos.sinReportar ? (datos.sinReportar === 1 ? 'Hay 1 revisión' : 'Hay ' + datos.sinReportar + ' revisiones') + ' esperando el próximo reporte.' : 'No hay nada esperando el próximo reporte.')),
-        err,
-        reps.length ? h('div', { style: { marginTop: '8px' } }, h('div.ajuste-tit', { style: { fontSize: '12px' } }, 'Últimos reportes'), reps) : null,
-        revs.length ? h('div', { style: { marginTop: '8px' } }, h('div.ajuste-tit', { style: { fontSize: '12px' } }, 'Últimas revisiones'), revs) : null));
-      /* memoria privada de la secretaría (secretaria-memoria.js) */
-      if (App.SecretariaMemoria) caja.appendChild(App.SecretariaMemoria.bloque(true));
-      caja.appendChild(h('div', { style: { marginTop: '16px' } }, h('button.btn.chico.fantasma', { onclick: function () {
-        App.confirmar('¿Cerrar la secretaría?', ag.nombre + ' deja de revisar (sigue en la oficina; si querés, despedilo desde su ficha). Los reportes que ya dejó quedan en la bandeja, y su memoria también (podés borrarla desde «Memoria»).', 'Cerrar', true).then(function (si) {
-          if (si) guardar({ agente: null }, 'La oficina ya no tiene secretaría.');
+      var queChats = App.elegir({ forma: 'segmento', etiqueta: 'Qué chats revisa', valor: todosWa ? 'todos' : 'elijo',
+        opciones: [{ valor: 'elijo', titulo: 'Los que elijo' }, { valor: 'todos', titulo: 'Todos los que se leen', sub: datos.whatsappLeerTodos ? 'Incluye los que entran solos con «Leer todos los chats individuales»' : 'Todos los elegidos en Ajustes › WhatsApp' }],
+        alCambiar: function (v) { guardarWa({ todos: v === 'todos' }, v === 'todos' ? 'Revisa todos los chats que se leen.' : 'Revisa solo los chats que elijas.'); } });
+      var cuerpo = [h('div.renglon-par', h('span.renglon-etq', 'Chats'), queChats)];
+      if (!todosWa) {
+        var porJid = {}; todos.forEach(function (c) { porJid[c.jid] = c; });
+        var suyos = marcados.map(function (j) { return porJid[j] || { jid: j, nombre: j.split('@')[0] }; });
+        var visibles = chipsTodos ? suyos : suyos.slice(0, 6);
+        var chips = visibles.map(function (c) {
+          return h('span.chip.chip-quitar', { title: c.grupo ? 'Grupo' : (c.numero || '') }, c.nombre,
+            h('button.chip-x', { title: 'Dejar de revisar ' + c.nombre, onclick: function () {
+              guardarWa({ chats: marcados.filter(function (j) { return j !== c.jid; }) }, 'Ya no revisa ' + c.nombre + '.');
+            } }, '×'));
         });
-      } }, 'Cerrar la secretaría')));
-    }
-
-    function textoNovedades(estadoWa) {
-      var conectores = (datos.fuentes || []).filter(function (f) { return f.tipo === 'conector' && f.activa && !f.problema; }).map(function (f) { return f.nombre; });
-      var wa = estadoWa.activa ? (estadoWa.novedades ? 'Hay mensajes de WhatsApp sin revisar.' : 'Nada nuevo en WhatsApp.') : '';
-      return (wa + (conectores.length ? ' ' + conectores.join(' y ') + (conectores.length > 1 ? ' se miran' : ' se mira') + ' siempre.' : '')).trim();
-    }
-
-    /* El reporte: a qué horas junta lo revisado (chips con las horas, agregar y sacar) y si lo deja aunque no haya nada */
-    function bloqueReporte(cfg) {
-      var horas = ((cfg.reporte && cfg.reporte.horas) || ['09:00', '19:00']).slice();
-      var guardarHoras = function (nuevas, texto) { return guardar({ reporte: { horas: nuevas } }, texto); };
-      var chips = horas.map(function (hm) {
-        return h('span.insignia', { style: { height: '28px', fontSize: '13px', gap: '6px', paddingRight: '4px' } }, hm,
-          horas.length > 1 ? h('button.btn.chico.fantasma.icono', { title: 'Sacar las ' + hm, style: { height: '20px', width: '20px', padding: 0 }, onclick: function () {
-            guardarHoras(horas.filter(function (x) { return x !== hm; }), 'Ya no te deja el reporte a las ' + hm + '.');
-          } }, App.icono('cerrar')) : null);
-      });
-      var nueva = h('input.campo', { type: 'time', value: '13:00', style: { width: 'auto' } });
-      var agregar = h('button.btn.chico', { disabled: horas.length >= 8, onclick: function () {
-        if (!nueva.value || horas.indexOf(nueva.value) >= 0) return;
-        guardarHoras(horas.concat([nueva.value]), 'También te deja el reporte a las ' + nueva.value + '.');
-      } }, App.icono('mas'), 'Agregar');
-      var vacio = h('input', { type: 'checkbox', checked: cfg.reporteVacio });
-      vacio.addEventListener('change', function () { guardar({ reporteVacio: vacio.checked }, vacio.checked ? 'Te deja el reporte aunque no haya novedades.' : 'Sin novedades, no te deja reporte.'); });
-      var prox = datos.proximoReporte ? new Date(datos.proximoReporte * 1000) : null;
-      var proxTxt = prox ? (prox.toDateString() === new Date().toDateString() ? 'hoy' : 'mañana') + ' a las ' + prox.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', hour12: false }) : '';
-      return h('div.ajuste', { style: { display: 'block' } },
-        h('div.ajuste-tit', 'Reporte'),
-        h('div.ajuste-ayuda', { style: { margin: '2px 0 8px' } }, 'Cada fuente se revisa con su intervalo, sin dejarte nada en la bandeja. A estas horas te deja un solo reporte con lo que juntó desde el anterior; si no hubo nada nuevo, no te deja nada. Lo urgente y lo que te propone hacer te llega enseguida.'),
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' } }, chips, nueva, agregar),
-        proxTxt ? h('div.ajuste-ayuda', { style: { marginTop: '6px' } }, 'Próximo reporte: ' + proxTxt + '.') : null,
-        h('label.ajuste-check', { style: { marginTop: '8px' } }, vacio, h('span', 'Dejar el reporte aunque no haya novedades')));
+        if (suyos.length > visibles.length) chips.push(h('button.chip.fijo', { onclick: function () { chipsTodos = true; dibujar(); } }, '+' + (suyos.length - visibles.length) + ' más'));
+        var agregar = h('button.chip.agregar', { onclick: function () {
+          var otros = todos.filter(function (c) { return marcados.indexOf(c.jid) < 0; });
+          if (!otros.length) { App.aviso('No hay más chats para elegir.'); return; }
+          App.menu(agregar, otros.slice(0, 300).map(function (c) {
+            return { texto: c.nombre, nota: c.grupo ? 'grupo' : c.numero || '', icono: c.grupo ? 'personas' : 'charla', accion: function () {
+              guardarWa({ chats: marcados.concat([c.jid]) }, 'Revisa también ' + c.nombre + ' (desde ahora).');
+            } };
+          }));
+        } }, App.icono('mas'), 'Agregar');
+        chips.push(agregar);
+        cuerpo.push(h('div.chips-ed', chips));
+        if (!suyos.length) cuerpo.push(h('div.nota-chica', 'Todavía no revisa ningún chat: tocá «Agregar» y buscá a quién (por ejemplo, «mamá»).'));
+      }
+      cuerpo.push(h('div.renglon-par', h('span.renglon-etq', 'Cada'),
+        selectorCada(cada, function (c) { guardarWa({ cada: c }, 'Revisa WhatsApp cada ' + textoCada(c) + '.'); }),
+        h('span.nota-chica', 'sin mensajes nuevos no gasta')));
+      return [renglon, h('div.renglon-abierto', cuerpo)];
     }
 
     /* Una fuente de conector: prenderla (le asigna el conector a quien atiende), cada cuánto y una indicación */
     function bloqueConector(cfg, f) {
       var fc = (cfg.fuentes || []).filter(function (x) { return x.id === f.id; })[0];
-      var on = h('input', { type: 'checkbox', checked: !!fc, disabled: !fc && !f.disponible });
       var cada = (fc && fc.cada) || { valor: f.id === 'calendario' ? 12 : 4, unidad: 'horas' };
-      var valor = h('input.campo', { type: 'number', min: 1, value: cada.valor, style: { width: '70px' } });
-      var unidad = h('select.campo', { style: { width: 'auto' } }, h('option', { value: 'minutos', selected: cada.unidad === 'minutos' }, 'minutos'), h('option', { value: 'horas', selected: cada.unidad === 'horas' }, 'horas'));
-      var ind = h('textarea.campo', { rows: 2, placeholder: f.id === 'gmail' ? 'Opcional. Por ejemplo: solo mails del banco, del colegio y de personas.' : 'Opcional. Por ejemplo: avisame también lo de la semana que viene.' });
-      ind.value = (fc && fc.indicacion) || '';
-      var guardarFuente = function (texto) {
+      var guardarFuente = function (cambio, texto) {
         var resto = (cfg.fuentes || []).filter(function (x) { return x.id !== f.id; });
-        if (on.checked) {
-          var v = Math.floor(Number(valor.value)); if (!(v > 0)) v = cada.valor;
-          var nueva = { id: f.id, cada: { valor: v, unidad: unidad.value } };
-          if (ind.value.trim()) nueva.indicacion = ind.value.trim();
+        if (cambio) {
+          var nueva = { id: f.id, cada: cambio.cada || cada };
+          var ind = cambio.indicacion !== undefined ? cambio.indicacion : fc && fc.indicacion;
+          if (ind && ind.trim()) nueva.indicacion = ind.trim();
           resto.push(nueva);
         }
         return guardar({ fuentes: resto }, texto);
       };
-      on.addEventListener('change', function () { guardarFuente(on.checked ? 'Revisa también ' + f.nombre + '.' : 'Ya no revisa ' + f.nombre + '.'); });
-      valor.addEventListener('change', function () { guardarFuente('Revisa ' + f.nombre + ' cada ' + valor.value + ' ' + unidad.value + '.'); });
-      unidad.addEventListener('change', function () { guardarFuente('Revisa ' + f.nombre + ' cada ' + valor.value + ' ' + unidad.value + '.'); });
-      ind.addEventListener('change', function () { guardarFuente('Indicación guardada.'); });
-      var ayuda = f.id === 'gmail' ? 'Mira los mails que llegaron desde la revisión anterior y anota lo que importa para el reporte. Cada revisión de Gmail usa Claude aunque no haya mails nuevos: conviene cada varias horas.'
-        : 'Arma la agenda de hoy y las próximas 48 horas para el reporte y puede proponerte eventos.';
-      var nota = !f.disponible ? h('div.ajuste-ayuda', { style: { marginTop: '6px' } }, 'Conectá ' + f.nombre + ' en tu cuenta de claude.ai y actualizá la lista en Ajustes › Conectores.')
-        : fc && f.problema ? h('div.ajuste-ayuda', { style: { color: 'var(--peligro)', marginTop: '6px' } }, f.problema) : null;
-      return h('div.ajuste', { style: { display: 'block' } },
-        h('label.ajuste-check', on, h('span', { style: { fontWeight: 500 } }, f.nombre)),
-        h('div.ajuste-ayuda', { style: { margin: '2px 0 6px' } }, ayuda),
-        fc ? h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' } }, h('span', 'Revisar cada'), valor, unidad) : null,
-        fc ? h('div', { style: { marginTop: '8px' } }, ind) : null,
-        nota);
+      var on = App.interruptor(!!fc, function (si) { guardarFuente(si ? {} : null, si ? 'Revisa también ' + f.nombre + '.' : 'Ya no revisa ' + f.nombre + '.'); }, 'Revisar ' + f.nombre, !fc && !f.disponible);
+      var sub = !f.disponible ? 'Conectalo en claude.ai y actualizá la lista en Ajustes › Conectores'
+        : !fc ? 'No lo revisa'
+        : 'cada ' + textoCada(cada) + (fc.indicacion ? ' · «' + fc.indicacion + '»' : f.id === 'calendario' ? ' · agenda de hoy y 48 h' : '');
+      var problema = fc && f.problema ? f.problema : null;
+      var abre = !!fc && f.disponible;
+      var renglon = App.renglon({ marca: marcaFuente(f.id), titulo: f.nombre, sub: problema || sub, subError: !!problema, control: on,
+        abierto: abre ? abierta === f.id : undefined, alTocar: abre ? function () { alternar(f.id); } : null });
+      if (!abre || abierta !== f.id) return renglon;
+      var ind = h('textarea.campo', { rows: 2, placeholder: f.id === 'gmail' ? 'Opcional. Por ejemplo: solo mails del banco, del colegio y de personas.' : 'Opcional. Por ejemplo: avisame también lo de la semana que viene.' });
+      ind.value = fc.indicacion || '';
+      ind.addEventListener('change', function () { guardarFuente({ indicacion: ind.value }, 'Indicación guardada.'); });
+      return [renglon, h('div.renglon-abierto',
+        h('div.renglon-par', h('span.renglon-etq', 'Cada'),
+          selectorCada(cada, function (c) { guardarFuente({ cada: c }, 'Revisa ' + f.nombre + ' cada ' + textoCada(c) + '.'); }),
+          f.id === 'gmail' ? h('span.nota-chica', 'usa Claude aunque no haya mails nuevos') : null),
+        h('div.renglon-par', h('span.renglon-etq', 'Indicación'), h('div', { style: { flex: 1, minWidth: '200px' } }, ind)))];
+    }
+
+    /* A qué horas deja el reporte: chips con × y «+» que pide la hora */
+    function renglonHoras(cfg) {
+      var horas = ((cfg.reporte && cfg.reporte.horas) || ['09:00', '19:00']).slice();
+      var guardarHoras = function (nuevas, texto) { return guardar({ reporte: { horas: nuevas } }, texto); };
+      var chips = horas.map(function (hm) {
+        return h('span.chip.chip-quitar', hm, horas.length > 1 ? h('button.chip-x', { title: 'Sacar las ' + hm, onclick: function () {
+          guardarHoras(horas.filter(function (x) { return x !== hm; }), 'Ya no te deja el reporte a las ' + hm + '.');
+        } }, '×') : null);
+      });
+      if (horas.length < 8) {
+        var mas = h('button.chip.agregar', { title: 'Agregar una hora', onclick: function () {
+          var hora = h('input.campo', { type: 'time', value: '13:00', style: { width: 'auto' } });
+          var e = App.emergente(mas, h('div', { style: { display: 'flex', gap: '6px', padding: '8px' } }, hora,
+            h('button.btn.chico.primario', { onclick: function () {
+              if (!hora.value || horas.indexOf(hora.value) >= 0) { e.cerrar(); return; }
+              e.cerrar(); guardarHoras(horas.concat([hora.value]), 'También te deja el reporte a las ' + hora.value + '.');
+            } }, 'Agregar')));
+          setTimeout(function () { hora.focus(); }, 0);
+        } }, App.icono('mas'));
+        chips.push(mas);
+      }
+      return App.renglon({ titulo: 'A las', control: h('div.chips-ed', chips) });
+    }
+
+    /* Franja para revisar: desde, hasta y un interruptor */
+    function renglonFranja(cfg) {
+      var desde = h('input.campo', { type: 'time', value: (cfg.franja && cfg.franja.desde) || '08:00', style: { width: 'auto' }, disabled: !cfg.franja });
+      var hasta = h('input.campo', { type: 'time', value: (cfg.franja && cfg.franja.hasta) || '22:00', style: { width: 'auto' }, disabled: !cfg.franja });
+      var prendida = !!cfg.franja;
+      var poner = function () {
+        guardar({ franja: prendida ? { desde: desde.value, hasta: hasta.value } : null },
+          prendida ? 'Revisa solo entre las ' + desde.value + ' y las ' + hasta.value + '.' : 'Revisa a cualquier hora.');
+      };
+      desde.addEventListener('change', poner); hasta.addEventListener('change', poner);
+      return App.renglon({ titulo: 'Revisar solo entre', sub: prendida ? 'Lo de afuera lo ve en la primera vuelta del día' : 'A cualquier hora',
+        control: [desde, h('span.nota-chica', '–'), hasta, App.interruptor(prendida, function (si) { prendida = si; poner(); }, 'Revisar solo en un horario')] });
     }
 
     cargar();

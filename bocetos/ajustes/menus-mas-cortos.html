@@ -1,0 +1,545 @@
+<title>Menús más cortos</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Antes y después de tres menús largos: Ajustes › Secretaría, Ajustes › WhatsApp y la pestaña Permisos de la ficha.
+   «Antes» copia lo que pintan secretaria.js, whatsapp.js y agente.js (pintarPermisos) con datos de ejemplo.
+   Ajustes al ancho real de la hoja (720 px); la ficha, al de la columna del costado (440 px). Colores de oficina/ui/estilo.css. */
+:root {
+  --fondo: #f2f0ec; --panel: #ffffff; --panel-2: #f8f7f4; --linea: #e4e1db; --linea-fuerte: #d3cfc7;
+  --texto: #1d1d1f; --suave: #6d6962; --tenue: #9a958d; --acento: #1d1d1f; --sobre-acento: #ffffff;
+  --peligro: #b3362c; --ok: #3b7a4b; --aviso: #a46a12;
+  --sombra: 0 1px 2px rgba(20,18,15,.06), 0 8px 24px rgba(20,18,15,.08);
+  --cal: #2f6db5; --cal-suave: #e8f0fa; --mail: #b3542c; --mail-suave: #fbeee7; --wa: #2e8a57; --wa-suave: #e6f4ec; --urg-suave: #fbecea;
+  --f: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --radio: 10px; --radio-chico: 7px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+  --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --acento: #f1f1f2; --sobre-acento: #1b1b1d;
+  --peligro: #e0675d; --ok: #6cbf80; --aviso: #e0a84a; --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  --cal: #7fb0ea; --cal-suave: #1f2b3a; --mail: #e79a74; --mail-suave: #3a2720; --wa: #6cc495; --wa-suave: #1c3127; --urg-suave: #3a2220; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+  --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --acento: #f1f1f2; --sobre-acento: #1b1b1d;
+  --peligro: #e0675d; --ok: #6cbf80; --aviso: #e0a84a; --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  --cal: #7fb0ea; --cal-suave: #1f2b3a; --mail: #e79a74; --mail-suave: #3a2720; --wa: #6cc495; --wa-suave: #1c3127; --urg-suave: #3a2220; color-scheme: dark }
+* { box-sizing: border-box; }
+body { background: var(--fondo); color: var(--texto); font: 13px/1.45 var(--f); margin: 0; }
+.pagina { max-width: 1500px; margin: 0 auto; padding-block: 28px 60px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font-size: 24px; margin: 0 0 6px; text-wrap: balance; }
+.intro { color: var(--suave); max-width: 72ch; margin: 0 0 18px; font-size: 14px; }
+.selector { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--fondo); padding: 8px 0; }
+.selector button { font: inherit; height: 34px; padding: 0 14px; border-radius: 17px; border: 1px solid var(--linea-fuerte); background: var(--panel); color: var(--texto); cursor: pointer; }
+.selector button[aria-pressed="true"] { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); }
+.dir-cab h2 { font-size: 19px; margin: 0 0 4px; }
+.dir-desc { color: var(--suave); max-width: 90ch; margin: 0 0 16px; font-size: 14px; }
+.fila { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+.marco { flex: 0 1 720px; width: 720px; max-width: 100%; min-width: 0; }
+.marco.angosto { flex-basis: 440px; width: 440px; }
+.marco-titulo { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--tenue); margin: 0 0 6px 2px; display: flex; gap: 8px; align-items: center; }
+.marco-titulo .tag { font-size: 10px; padding: 1px 7px; border-radius: 8px; background: var(--panel); border: 1px solid var(--linea-fuerte); color: var(--suave); letter-spacing: .04em; }
+.marco-titulo .tag.nuevo { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); }
+.medida { font-size: 11px; color: var(--tenue); margin: 6px 2px 0; }
+.panel { background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); box-shadow: var(--sombra); overflow: hidden; }
+.hoja-cab { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--linea); }
+.hoja-cab .t { font-weight: 600; font-size: 15px; flex: 1; }
+.hoja-cuerpo { padding: 4px 18px 18px; }
+.cambios { margin-top: 18px; font-size: 13px; color: var(--suave); max-width: 100ch; border-top: 1px dashed var(--linea-fuerte); padding-top: 10px; }
+.cambios b { color: var(--texto); }
+.cambios ul { margin: 6px 0 0; padding-left: 18px; }
+.cambios li { margin: 3px 0; }
+
+/* piezas comunes */
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: var(--radio-chico); border: 1px solid var(--linea-fuerte); background: var(--panel); color: var(--texto); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.btn.primario { background: var(--acento); border-color: var(--acento); color: var(--sobre-acento); }
+.btn.fantasma { border-color: transparent; background: transparent; color: var(--suave); }
+.btn.peligro { color: var(--peligro); }
+.btn.ico { width: 28px; padding: 0; justify-content: center; }
+.insignia { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 10px; font-size: 11px; font-weight: 500; background: var(--panel-2); border: 1px solid var(--linea); color: var(--suave); white-space: nowrap; }
+.insignia.ok { color: var(--ok); }
+.campo { height: 30px; border: 1px solid var(--linea-fuerte); border-radius: var(--radio-chico); background: var(--panel); color: var(--tenue); padding: 0 9px; display: inline-flex; align-items: center; font-size: 12.5px; }
+.campo.largo { width: 100%; }
+.campo.area { height: 46px; align-items: flex-start; padding-top: 6px; width: 100%; }
+.campo.valor { color: var(--texto); }
+.ck { width: 14px; height: 14px; border: 1.5px solid var(--linea-fuerte); border-radius: 3px; display: inline-grid; place-items: center; flex: none; font-size: 10px; line-height: 1; }
+.ck.si { background: var(--acento); border-color: var(--acento); color: var(--sobre-acento); }
+.ck.si::after { content: "✓"; }
+.ck.radio { border-radius: 50%; }
+.ck.radio.si::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--sobre-acento); }
+.chk { display: inline-flex; align-items: center; gap: 7px; }
+.tit { font-weight: 500; }
+.ay { color: var(--suave); font-size: 12px; margin-top: 2px; }
+.ay.rojo { color: var(--peligro); }
+.sec { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--tenue); margin: 16px 0 4px; display: flex; align-items: center; gap: 8px; min-height: 22px; }
+.sec .n { color: var(--suave); }
+.sec .acc { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+/* «antes»: el .ajuste de estilo.css (título y ayuda a la izquierda, control a la derecha) */
+.aj { display: grid; grid-template-columns: minmax(150px, 210px) minmax(0, 1fr); gap: 6px 16px; padding: 11px 0; border-top: 1px solid var(--linea); align-items: start; }
+.aj.bloque { display: block; }
+.aj.sin-borde { border-top: 0; }
+.aj .ctl { justify-self: end; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+.angosto .aj { grid-template-columns: 1fr; }
+.angosto .aj .ctl { justify-self: start; align-items: flex-start; }
+.lista-ck { display: grid; gap: 2px; margin-top: 6px; }
+.lista-ck .chk { padding: 2px 0; }
+.lista-ck .h { color: var(--suave); font-size: 12px; margin-left: 4px; }
+.linea-hist { color: var(--suave); font-size: 12px; padding: 3px 0; display: flex; gap: 8px; align-items: center; }
+.linea-hist span { flex: 1; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid var(--linea-fuerte); background: var(--panel); font-size: 12.5px; white-space: nowrap; }
+.chip .x { color: var(--tenue); font-size: 14px; line-height: 1; }
+.chip.fijo { background: var(--panel-2); color: var(--suave); }
+.chip.mas { border-style: dashed; color: var(--suave); }
+.op-lista { display: grid; gap: 6px; margin-top: 4px; }
+.op-lista .op { border: 1px solid var(--linea); border-radius: var(--radio-chico); padding: 8px 10px; display: flex; gap: 9px; align-items: flex-start; }
+.op-lista .op.sel { border-color: var(--acento); }
+.op-lista .op .s { color: var(--suave); font-size: 12px; }
+.fila-chat { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--linea); }
+.fila-chat .n { flex: 1; min-width: 0; }
+.fila-chat .n b { font-weight: 500; display: block; }
+.etq { font-size: 12px; font-weight: 500; margin: 10px 0 4px; display: block; }
+
+/* «después» */
+.sw { width: 34px; height: 20px; border-radius: 10px; background: var(--linea-fuerte); position: relative; flex: none; }
+.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--panel); box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.sw.si { background: var(--ok); }
+.sw.si::after { left: 16px; }
+.seg { display: inline-flex; border: 1px solid var(--linea-fuerte); border-radius: var(--radio-chico); overflow: hidden; flex: none; }
+.seg span { padding: 0 10px; height: 26px; display: inline-flex; align-items: center; font-size: 12px; color: var(--suave); border-left: 1px solid var(--linea-fuerte); white-space: nowrap; }
+.seg span:first-child { border-left: 0; }
+.seg span.sel { background: var(--acento); color: var(--sobre-acento); font-weight: 500; }
+.seg.ancho { display: flex; }
+.seg.ancho span { flex: 1; justify-content: center; }
+.renglon { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--linea); min-height: 46px; }
+.renglon:first-child { border-top: 0; }
+.renglon .txt { flex: 1; min-width: 0; }
+.renglon .txt .s { color: var(--suave); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.renglon .chev { color: var(--tenue); font-size: 15px; }
+.marca { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: none; }
+.marca.wa { color: var(--wa); background: var(--wa-suave); } .marca.mail { color: var(--mail); background: var(--mail-suave); } .marca.cal { color: var(--cal); background: var(--cal-suave); }
+.marca.gris { color: var(--suave); background: var(--panel-2); border: 1px solid var(--linea); }
+.av { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; color: #fff; background: linear-gradient(160deg, #d18b4a, #8a5a2c); flex: none; }
+.av.chico { width: 26px; height: 26px; border-radius: 7px; font-size: 11px; }
+.av.p1 { background: linear-gradient(160deg, #6a9fd8, #3d6aa0); } .av.p2 { background: linear-gradient(160deg, #6cbf80, #3b7a4b); } .av.p3 { background: linear-gradient(160deg, #b9a0d8, #6e5296); } .av.p4 { background: linear-gradient(160deg, #e0a84a, #a46a12); }
+.cabeza { display: flex; align-items: center; gap: 12px; padding: 14px 0 12px; }
+.cabeza .txt { flex: 1; min-width: 0; }
+.cabeza .txt b { font-size: 15px; display: block; }
+.cabeza .txt .s { color: var(--suave); font-size: 12px; }
+.estado { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radio-chico); background: var(--panel-2); border: 1px solid var(--linea); font-size: 12px; color: var(--suave); flex-wrap: wrap; }
+.estado b { color: var(--texto); font-weight: 600; }
+.estado .sp { flex: 1; }
+.puntos { display: inline-flex; gap: 3px; align-items: center; }
+.puntos i { width: 7px; height: 7px; border-radius: 50%; background: var(--linea-fuerte); display: block; }
+.puntos i.n { background: var(--ok); } .puntos i.u { background: var(--peligro); } .puntos i.r { background: var(--acento); }
+.abierto { margin: 0 0 4px 42px; padding: 10px 12px; border-radius: var(--radio-chico); background: var(--panel-2); border: 1px solid var(--linea); display: grid; gap: 10px; }
+.abierto .par { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.abierto .par > span:first-child { color: var(--suave); font-size: 12px; width: 52px; flex: none; }
+.punto-on { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+.buscador { display: flex; align-items: center; gap: 8px; height: 34px; border: 1px solid var(--linea-fuerte); border-radius: var(--radio-chico); padding: 0 10px; color: var(--tenue); font-size: 12.5px; }
+.buscador .lupa { font-size: 13px; }
+.chat-c { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--linea); }
+.chat-c:first-child { border-top: 0; }
+.chat-c .n { flex: 1; min-width: 0; }
+.chat-c .n b { font-weight: 500; }
+.chat-c .n .s { color: var(--suave); font-size: 12px; }
+.chat-c .h { color: var(--tenue); font-size: 11.5px; }
+.desliz { flex: 1; min-width: 200px; max-width: 320px; }
+.desliz .barra { position: relative; height: 4px; border-radius: 2px; background: var(--linea-fuerte); margin: 8px 16.66% 6px; }
+.desliz .barra .lleno { position: absolute; left: 0; top: 0; bottom: 0; width: 50%; background: var(--acento); border-radius: 2px; }
+.desliz .barra .bola { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--panel); border: 2px solid var(--acento); }
+.desliz .nombres { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; font-size: 12px; color: var(--suave); }
+.desliz .nombres .sel { color: var(--texto); font-weight: 600; }
+.pista { color: var(--tenue); font-size: 11.5px; }
+.menu-pop { position: absolute; right: 0; top: 32px; background: var(--panel); border: 1px solid var(--linea-fuerte); border-radius: var(--radio-chico); box-shadow: var(--sombra); padding: 4px; min-width: 190px; z-index: 2; }
+.menu-pop div { padding: 6px 10px; border-radius: 5px; font-size: 12.5px; white-space: nowrap; }
+.menu-pop div.peligro { color: var(--peligro); }
+.menu-pop hr { border: 0; border-top: 1px solid var(--linea); margin: 4px 0; }
+.rel { position: relative; }
+.pestanas { display: flex; gap: 2px; padding: 8px 12px 0; border-bottom: 1px solid var(--linea); }
+.pestanas span { padding: 7px 10px; font-size: 12.5px; color: var(--suave); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.pestanas span.sel { color: var(--texto); font-weight: 600; border-color: var(--acento); }
+.pestanas span.nueva::after { content: "nueva"; font-size: 9.5px; margin-left: 5px; padding: 1px 5px; border-radius: 6px; background: var(--wa-suave); color: var(--wa); font-weight: 600; vertical-align: 1px; }
+.grupo-tit { font-size: 12px; color: var(--suave); margin: 2px 0 6px; }
+.resumen { color: var(--suave); font-size: 12px; padding: 10px 12px; background: var(--panel-2); border-radius: var(--radio-chico); margin-top: 12px; }
+@media (max-width: 760px) { .aj { grid-template-columns: 1fr; } .aj .ctl { justify-self: start; align-items: flex-start; } .abierto { margin-left: 0; } }
+</style>
+
+<main class="pagina">
+  <h1>Menús más cortos</h1>
+  <p class="intro">Antes y después de los tres menús que se hicieron largos. «Antes» copia lo que pinta hoy la app, con datos de ejemplo; «después» deja lo mismo a mano, pero plegado, en controles más compactos y con textos de una línea.</p>
+
+  <nav class="selector" aria-label="Elegir menú">
+    <button type="button" data-ir="secretaria" aria-pressed="true">Secretaría</button>
+    <button type="button" data-ir="whatsapp" aria-pressed="false">Ajustes › WhatsApp</button>
+    <button type="button" data-ir="permisos" aria-pressed="false">Permisos del agente</button>
+  </nav>
+
+  <!-- ====================================================== SECRETARÍA -->
+  <section data-dir="secretaria">
+    <div class="dir-cab"><h2>Ajustes › Secretaría</h2></div>
+    <p class="dir-desc">Hoy cada chat elegido es una fila con su checkbox, cada fuente trae un párrafo y cada revisión y cada reporte ocupan un renglón. Después: las fuentes son renglones que se abren de a uno, los chats son chips y el historial es una tira de puntos.</p>
+    <div class="fila">
+
+      <!-- ANTES -->
+      <div class="marco"><div class="marco-titulo"><span class="tag">Antes</span> Ajustes › Secretaría</div>
+        <div class="panel"><div class="hoja-cab"><span class="t">Secretaría</span><button class="btn ico fantasma">✕</button></div>
+          <div class="hoja-cuerpo">
+            <div class="aj sin-borde"><div><div class="tit">Clara atiende la secretaría</div><div class="ay">Desde la secretaría revisa lo que llega y te deja un reporte en la bandeja. Lo que propone (por ejemplo, un evento en el calendario) no se hace hasta que lo aprobás.</div></div>
+              <div class="ctl"><span class="chk"><span class="ck si"></span>Revisa sola</span><button class="btn">💬 Charlar</button></div></div>
+
+            <div class="aj bloque"><div class="tit">WhatsApp</div>
+              <div class="ay" style="margin-bottom:6px">Qué chats revisa. Se leen desde que los marcás; nunca manda mensajes.</div>
+              <span class="chk"><span class="ck"></span>Revisar todos los chats que se leen</span>
+              <div class="ay">Todos los elegidos en Ajustes › WhatsApp. Si te escriben números que no tenés agendados (por ejemplo, clientes de un negocio), prendé «Leer todos los chats individuales» allá.</div>
+              <div class="campo largo" style="margin-top:8px">Buscar un chat por nombre o número</div>
+              <div class="lista-ck">
+                <span class="chk"><span class="ck si"></span>Mamá<span class="h">hace 12 min</span></span>
+                <span class="chk"><span class="ck si"></span>Papá<span class="h">hace 2 h</span></span>
+                <span class="chk"><span class="ck si"></span>Familia (grupo)<span class="h">hace 20 min</span></span>
+                <span class="chk"><span class="ck si"></span>Dr. Pérez<span class="h">ayer</span></span>
+                <span class="chk"><span class="ck si"></span>Colegio Sofi – 3°B (grupo)<span class="h">hace 1 h</span></span>
+                <span class="chk"><span class="ck si"></span>Consorcio Gascón (grupo)<span class="h">hace 3 h</span></span>
+                <span class="chk"><span class="ck si"></span>Abuela Marta<span class="h">hace 2 d</span></span>
+                <span class="chk"><span class="ck si"></span>Fede plomero<span class="h">hace 4 d</span></span>
+              </div>
+              <div class="chk" style="margin-top:10px;gap:8px">Revisar cada <span class="campo valor" style="width:60px">1</span><span class="campo valor">horas ▾</span><span class="ay">(si no llegó nada nuevo, no gasta)</span></div>
+            </div>
+
+            <div class="aj bloque"><span class="chk"><span class="ck si"></span><b style="font-weight:500">Gmail</b></span>
+              <div class="ay" style="margin:2px 0 6px">Mira los mails que llegaron desde la revisión anterior y anota lo que importa para el reporte. Cada revisión de Gmail usa Claude aunque no haya mails nuevos: conviene cada varias horas.</div>
+              <div class="chk" style="gap:8px">Revisar cada <span class="campo valor" style="width:60px">4</span><span class="campo valor">horas ▾</span></div>
+              <div class="campo area" style="margin-top:8px">Opcional. Por ejemplo: solo mails del banco, del colegio y de personas.</div>
+            </div>
+
+            <div class="aj bloque"><span class="chk"><span class="ck si"></span><b style="font-weight:500">Calendario</b></span>
+              <div class="ay" style="margin:2px 0 6px">Arma la agenda de hoy y las próximas 48 horas para el reporte y puede proponerte eventos.</div>
+              <div class="chk" style="gap:8px">Revisar cada <span class="campo valor" style="width:60px">12</span><span class="campo valor">horas ▾</span></div>
+              <div class="campo area" style="margin-top:8px">Opcional. Por ejemplo: avisame también lo de la semana que viene.</div>
+            </div>
+
+            <div class="aj bloque"><div class="tit">Reporte</div>
+              <div class="ay" style="margin:2px 0 8px">Cada fuente se revisa con su intervalo, sin dejarte nada en la bandeja. A estas horas te deja un solo reporte con lo que juntó desde el anterior; si no hubo nada nuevo, no te deja nada. Lo urgente y lo que te propone hacer te llega enseguida.</div>
+              <div class="chips"><span class="chip">09:00 <span class="x">×</span></span><span class="chip">19:00 <span class="x">×</span></span><span class="campo valor">13:00</span><button class="btn">＋ Agregar</button></div>
+              <div class="ay" style="margin-top:6px">Próximo reporte: hoy a las 19:00.</div>
+              <span class="chk" style="margin-top:8px"><span class="ck"></span>Dejar el reporte aunque no haya novedades</span>
+            </div>
+
+            <div class="aj bloque"><span class="chk" style="gap:8px"><span class="ck si"></span>Revisar solo entre <span class="campo valor">08:00</span> y <span class="campo valor">22:00</span></span>
+              <div class="ay">Lo que llegue fuera de ese horario lo revisa en la primera vuelta del día. El reporte sale igual a sus horas.</div></div>
+
+            <div class="aj bloque">
+              <div class="chk" style="gap:8px;flex-wrap:wrap"><button class="btn primario">Revisar ahora</button><button class="btn">Armar el reporte ahora</button><span class="ay">Hay mensajes de WhatsApp sin revisar. Gmail y Calendario se miran siempre.</span></div>
+              <div class="ay" style="margin-top:6px">«Revisar ahora» mira todo y enseguida te deja el reporte. Hay 2 revisiones esperando el próximo reporte.</div>
+              <div class="tit" style="font-size:12px;margin-top:8px">Últimos reportes</div>
+              <div class="linea-hist"><span>hace 4 h · Listo</span><button class="btn fantasma">Ver</button></div>
+              <div class="linea-hist"><span>ayer · Listo</span><button class="btn fantasma">Ver</button></div>
+              <div class="linea-hist"><span>ayer · Sin nada nuevo: no te dejó nada</span></div>
+              <div class="linea-hist"><span>hace 2 d · Listo · a pedido</span><button class="btn fantasma">Ver</button></div>
+              <div class="tit" style="font-size:12px;margin-top:8px">Últimas revisiones</div>
+              <div class="linea-hist"><span>hace 12 min · WhatsApp · Lista · para el próximo reporte</span></div>
+              <div class="linea-hist"><span>hace 1 h · WhatsApp · Lista · sin novedades</span></div>
+              <div class="linea-hist"><span>hace 2 h · WhatsApp, Gmail · Lista · avisó algo urgente</span><button class="btn fantasma">Ver</button></div>
+              <div class="linea-hist"><span>hace 3 h · WhatsApp · Lista · para el próximo reporte</span></div>
+              <div class="linea-hist"><span>hace 4 h · WhatsApp · Lista · ya en un reporte</span></div>
+            </div>
+
+            <div class="sec">Memoria <span class="n">14</span></div>
+            <div class="ay">Lo que Clara fue aprendiendo de tu casa y tu familia para revisar mejor. Solo la usa la secretaría.</div>
+            <div class="linea-hist"><span>Mamá toma Valsartán; la receta vence cada 30 días.</span></div>
+            <div class="linea-hist"><span>El 3°B tiene acto el último viernes de cada mes.</span></div>
+            <div class="linea-hist"><span>Fede es el plomero; espera el presupuesto aprobado.</span></div>
+            <button class="btn fantasma" style="margin-top:4px">Ver toda la memoria</button>
+            <div style="margin-top:16px"><button class="btn fantasma">Cerrar la secretaría</button></div>
+          </div></div>
+        <div class="medida">≈ 1 800 px de alto con 8 chats · 9 renglones de historial · 6 párrafos de ayuda</div>
+      </div>
+
+      <!-- DESPUÉS -->
+      <div class="marco"><div class="marco-titulo"><span class="tag nuevo">Después</span> Ajustes › Secretaría</div>
+        <div class="panel"><div class="hoja-cab"><span class="t">Secretaría</span><button class="btn ico fantasma">✕</button></div>
+          <div class="hoja-cuerpo">
+            <div class="cabeza">
+              <div class="av">C</div>
+              <div class="txt"><b>Clara</b><div class="s">Revisa sola y te deja el reporte en la bandeja</div></div>
+              <span class="sw si" title="Revisa sola"></span>
+              <button class="btn">💬 Charlar</button>
+              <button class="btn primario">Revisar ahora</button>
+              <span class="rel"><button class="btn ico">⋯</button>
+              </span>
+            </div>
+
+            <div class="estado">
+              <span>Próximo reporte <b>hoy 19:00</b> · 2 revisiones esperando</span>
+              <span class="sp"></span>
+              <span class="puntos" title="Últimas 12 revisiones: gris sin novedades, verde anotó algo, rojo urgente, negro reporte">
+                <i class="n"></i><i></i><i class="r"></i><i></i><i class="n"></i><i></i><i></i><i class="u"></i><i class="n"></i><i class="r"></i><i></i><i class="n"></i>
+              </span>
+              <a class="pista" href="#" onclick="return false">Historial ›</a>
+            </div>
+
+            <div class="sec">Qué revisa</div>
+            <div class="renglon"><div class="marca wa">WA</div>
+              <div class="txt"><div class="tit">WhatsApp</div><div class="s">8 chats · cada 1 h</div></div>
+              <span class="sw si"></span><span class="chev">⌃</span></div>
+            <div class="abierto">
+              <div class="par"><span>Chats</span><span class="seg"><span class="sel">Los que elijo</span><span>Todos los que se leen</span></span></div>
+              <div class="chips">
+                <span class="chip">Mamá <span class="x">×</span></span><span class="chip">Papá <span class="x">×</span></span><span class="chip">Familia <span class="x">×</span></span><span class="chip">Dr. Pérez <span class="x">×</span></span><span class="chip">Colegio 3°B <span class="x">×</span></span><span class="chip fijo">+3 más</span><span class="chip mas">＋ Agregar</span>
+              </div>
+              <div class="par"><span>Cada</span><span class="seg"><span>15 min</span><span>30 min</span><span class="sel">1 h</span><span>4 h</span><span>12 h</span></span><span class="pista">sin mensajes nuevos no gasta</span></div>
+            </div>
+            <div class="renglon"><div class="marca mail">GM</div>
+              <div class="txt"><div class="tit">Gmail</div><div class="s">cada 4 h · «solo banco, colegio y personas»</div></div>
+              <span class="sw si"></span><span class="chev">⌄</span></div>
+            <div class="renglon"><div class="marca cal">CAL</div>
+              <div class="txt"><div class="tit">Calendario</div><div class="s">cada 12 h · agenda de hoy y 48 h</div></div>
+              <span class="sw si"></span><span class="chev">⌄</span></div>
+
+            <div class="sec">Reporte</div>
+            <div class="renglon"><div class="txt"><div class="tit">A las</div></div>
+              <div class="chips"><span class="chip">09:00 <span class="x">×</span></span><span class="chip">19:00 <span class="x">×</span></span><span class="chip mas">＋</span></div></div>
+            <div class="renglon"><div class="txt"><div class="tit">Revisar solo entre</div></div>
+              <span class="campo valor">08:00</span><span class="pista">–</span><span class="campo valor">22:00</span><span class="sw si"></span></div>
+            <div class="renglon"><div class="txt"><div class="tit">Avisar aunque no haya novedades</div></div><span class="sw"></span></div>
+          </div></div>
+        <div class="medida">≈ 710 px de alto · los mismos ajustes</div>
+      </div>
+    </div>
+    <div class="cambios"><b>Qué cambia.</b>
+      <ul>
+        <li><b>Fuentes plegadas.</b> WhatsApp, Gmail y Calendario son un renglón cada una con su resumen («8 chats · cada 1 h») y su interruptor; se abre una a la vez. La indicación de Gmail se escribe al abrirlo y queda citada en el resumen.</li>
+        <li><b>Chats como chips.</b> En lugar de la lista entera con checkboxes, chips que se sacan con ×; «＋ Agregar» abre el buscador. Más de 5 se pliegan en «+3 más». «Revisar todos los que se leen» pasa a ser una de dos opciones.</li>
+        <li><b>Intervalo con botones.</b> 15 min · 30 min · 1 h · 4 h · 12 h en lugar de número + unidad.</li>
+        <li><b>Historial en una tira.</b> Las últimas 12 revisiones son puntos de color (con el detalle al pasar el mouse); los 9 renglones de reportes y revisiones se van a «Historial ›», en una hoja aparte.</li>
+        <li><b>Lo poco usado al menú ⋯.</b> Armar el reporte ahora, la memoria y cerrar la secretaría. Los párrafos de ayuda salen: lo que hacen se ve en el resumen de cada renglón.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ====================================================== WHATSAPP -->
+  <section data-dir="whatsapp" hidden>
+    <div class="dir-cab"><h2>Ajustes › WhatsApp</h2></div>
+    <p class="dir-desc">Hoy hay dos listas de chats (los que se leen y los 200 que podrías elegir), un formulario aparte para agregar por número, el modelo de transcripción como tres tarjetas una abajo de la otra y un párrafo debajo de cada cosa. Después: una sola lista, un solo buscador que también agrega números, y las notas de voz en un renglón con deslizador.</p>
+    <div class="fila">
+
+      <!-- ANTES -->
+      <div class="marco"><div class="marco-titulo"><span class="tag">Antes</span> Ajustes › WhatsApp</div>
+        <div class="panel"><div class="hoja-cab"><span class="t">WhatsApp</span><button class="btn">↻ Actualizar</button><button class="btn ico fantasma">✕</button></div>
+          <div class="hoja-cuerpo">
+            <div class="aj sin-borde"><div><div class="tit">Conectado con +54 9 11 5555-1234</div><div class="ay">Se guarda lo que llega a los chats elegidos, desde que los elegís, y se borra a los 30 días.</div></div><div class="ctl"><span class="insignia ok">En línea</span></div></div>
+            <div class="ay" style="margin:4px 0 10px">El teléfono se vio por última vez hace 2 h (es una estimación: se mira tu última actividad en WhatsApp).</div>
+
+            <div class="sec">Chats que se leen <span class="n">4</span></div>
+            <div class="ay" style="margin-bottom:4px">Para que un agente los lea, activá «Puede leer WhatsApp» en su ficha.</div>
+            <div class="aj bloque"><div class="chk" style="width:100%"><div style="flex:1"><div class="tit">Mamá</div><div class="ay">+54 9 11 4444-0000 · hace 12 min</div></div><button class="btn">✎ Editar</button><button class="btn fantasma">🗑</button></div><div class="ay" style="font-style:italic">Nota: tiene turnos médicos seguido y me avisa por acá.</div></div>
+            <div class="aj bloque"><div class="chk" style="width:100%"><div style="flex:1"><div class="tit">Familia</div><div class="ay">Grupo · 9 participantes · se lee a 3 personas · hace 20 min</div></div><button class="btn">✎ Editar</button><button class="btn fantasma">🗑</button></div></div>
+            <div class="aj bloque"><div class="chk" style="width:100%"><div style="flex:1"><div class="tit">Dr. Pérez</div><div class="ay">+54 9 11 3333-2222 · ayer</div></div><button class="btn">✎ Editar</button><button class="btn fantasma">🗑</button></div></div>
+            <div class="aj bloque"><div class="chk" style="width:100%"><div style="flex:1"><div class="tit">Colegio Sofi – 3°B</div><div class="ay">Grupo · 31 participantes · hace 1 h</div></div><button class="btn">✎ Editar</button><button class="btn fantasma">🗑</button></div></div>
+
+            <div class="sec">Todos los mensajes que llegan</div>
+            <div class="aj sin-borde"><div><div class="tit">Leer todos los chats individuales</div><div class="ay">Para un negocio al que le escriben números que no tenés agendados (por ejemplo, clientes por WhatsApp Business). Cada chat individual se empieza a leer solo desde el primer mensaje que te mandan; no se leen los mensajes de antes. Los grupos se siguen eligiendo a mano.</div></div><div class="ctl"><span class="chk"><span class="ck"></span>Leer todos</span></div></div>
+
+            <div class="sec">Notas de voz e imágenes</div>
+            <div class="aj sin-borde"><div><div class="tit">Transcribir las notas de voz</div><div class="ay">En tu compu, sin mandar el audio a ningún lado. La primera vez baja el modelo; mientras transcribe usa bastante memoria y después se apaga sola. Así los agentes entienden lo que dicen los audios.</div></div><div class="ctl"><span class="chk"><span class="ck si"></span>Transcribir</span></div></div>
+            <div class="ay" style="margin:-4px 0 8px">Lista para transcribir.</div>
+            <span class="etq">Modelo</span>
+            <div class="op-lista">
+              <div class="op"><span class="ck radio"></span><div><div>Rápido</div><div class="s">Más liviano, se equivoca más. Descarga de unos 40 MB la primera vez.</div></div></div>
+              <div class="op sel"><span class="ck radio si"></span><div><div>Normal</div><div class="s">Lo habitual. Descarga de unos 80 MB la primera vez.</div></div></div>
+              <div class="op"><span class="ck radio"></span><div><div>Mejor</div><div class="s">Entiende mejor, tarda más y usa más memoria. Descarga de unos 250 MB la primera vez.</div></div></div>
+            </div>
+            <span class="etq">Idioma de los audios</span>
+            <div class="chips"><span class="chip" style="background:var(--acento);color:var(--sobre-acento);border-color:var(--acento)">Español</span><span class="chip">Detectar automáticamente</span></div>
+            <div class="ay" style="margin-top:4px">Si te hablan en otros idiomas, «Detectar automáticamente» adivina el de cada audio (se puede equivocar en los muy cortos).</div>
+            <div class="ay">Las imágenes de los chats elegidos se guardan cifradas y los agentes las pueden mirar (por ejemplo, la foto de una orden médica).</div>
+
+            <div class="sec">Agregar por número</div>
+            <div class="ay" style="margin-bottom:6px">Para alguien que todavía no aparece en la lista. Con el código de país.</div>
+            <div class="chk" style="gap:8px;width:100%"><span class="campo" style="flex:1">+54 9 11 5555-1234</span><span class="campo" style="flex:1">Nombre (p. ej. Mamá)</span><button class="btn">＋ Agregar</button></div>
+
+            <div class="sec">Elegir de tus chats</div>
+            <div class="campo largo" style="margin-bottom:6px">Buscar por nombre o número</div>
+            <div class="fila-chat"><div class="n"><b>Papá</b><span class="ay">+54 9 11 4444-1111 · hace 2 h</span></div><button class="btn">Elegir</button></div>
+            <div class="fila-chat"><div class="n"><b>Consorcio Gascón</b><span class="ay">Grupo · 22 participantes · hace 3 h</span></div><button class="btn">Elegir</button></div>
+            <div class="fila-chat"><div class="n"><b>Abuela Marta</b><span class="ay">+54 9 11 4444-2222 · hace 2 d</span></div><button class="btn">Elegir</button></div>
+            <div class="fila-chat"><div class="n"><b>Fede plomero</b><span class="ay">+54 9 11 6666-0000 · hace 4 d</span></div><button class="btn">Elegir</button></div>
+            <div class="fila-chat"><div class="n"><b>Fútbol jueves</b><span class="ay">Grupo · 14 participantes · hace 5 d</span></div><button class="btn">Elegir</button></div>
+            <div class="fila-chat"><div class="n"><b>Juli</b><span class="ay">+54 9 11 7777-1234 · hace 6 d</span></div><button class="btn">Elegir</button></div>
+            <div class="ay" style="margin-top:6px">Y 208 más: buscá para encontrarlos.</div>
+
+            <div style="margin-top:20px;padding-top:12px;border-top:1px solid var(--linea)"><button class="btn peligro">Desvincular y borrar todo</button>
+              <div class="ay" style="margin-top:6px">Cierra la sesión (el dispositivo desaparece de tu teléfono) y borra la sesión, la lista de chats y todos los mensajes guardados.</div></div>
+          </div></div>
+        <div class="medida">≈ 1 900 px de alto (con 60 chats sin elegir a la vista, más todavía)</div>
+      </div>
+
+      <!-- DESPUÉS -->
+      <div class="marco"><div class="marco-titulo"><span class="tag nuevo">Después</span> Ajustes › WhatsApp</div>
+        <div class="panel"><div class="hoja-cab"><span class="t">WhatsApp</span><button class="btn ico fantasma">✕</button></div>
+          <div class="hoja-cuerpo">
+            <div class="cabeza">
+              <span class="punto-on"></span>
+              <div class="txt"><b style="font-size:14px">+54 9 11 5555-1234</b><div class="s">En línea · teléfono visto hace 2 h · guarda 30 días</div></div>
+              <span class="rel"><button class="btn ico">⋯</button>
+              </span>
+            </div>
+
+            <div class="sec">Qué se lee</div>
+            <div class="seg ancho"><span class="sel">Solo los chats que elijo</span><span>Todos los individuales</span></div>
+            <div class="pista" style="margin-top:5px">Los grupos siempre se eligen a mano.</div>
+
+            <div class="sec">Chats <span class="n">4</span></div>
+            <div class="buscador"><span class="lupa">⌕</span>Buscar en tus chats o escribir un número…</div>
+            <div style="margin-top:6px">
+              <div class="chat-c"><div class="av chico p1">M</div><div class="n"><b>Mamá</b> <span class="s">· «tiene turnos médicos seguido»</span></div><span class="h">12 min</span><button class="btn ico fantasma">⋯</button></div>
+              <div class="chat-c"><div class="av chico p2">F</div><div class="n"><b>Familia</b> <span class="s">· grupo · 3 de 9 personas</span></div><span class="h">20 min</span><button class="btn ico fantasma">⋯</button></div>
+              <div class="chat-c"><div class="av chico p3">D</div><div class="n"><b>Dr. Pérez</b></div><span class="h">ayer</span><button class="btn ico fantasma">⋯</button></div>
+              <div class="chat-c"><div class="av chico p4">C</div><div class="n"><b>Colegio Sofi – 3°B</b> <span class="s">· grupo</span></div><span class="h">1 h</span><button class="btn ico fantasma">⋯</button></div>
+            </div>
+
+            <div class="sec">Notas de voz</div>
+            <div class="renglon" style="border-top:0"><div class="txt"><div class="tit">Transcribirlas en tu compu</div><div class="s">El audio no sale de la compu · lista</div></div><span class="sw si"></span></div>
+            <div class="renglon"><div class="txt" style="flex:0 0 auto;width:72px"><div class="tit">Modelo</div></div>
+              <div class="desliz"><div class="barra"><div class="lleno"></div><div class="bola"></div></div><div class="nombres"><span>Rápido</span><span class="sel">Normal</span><span>Mejor</span></div></div>
+              <span class="pista" style="margin-left:auto">80 MB</span></div>
+            <div class="renglon"><div class="txt"><div class="tit">Detectar el idioma</div><div class="s">Apagado: todo en español</div></div><span class="sw"></span></div>
+          </div></div>
+        <div class="medida">≈ 700 px de alto · los mismos ajustes</div>
+
+        <div class="marco-titulo" style="margin-top:18px"><span class="tag nuevo">Después</span> Al escribir en el buscador</div>
+        <div class="panel"><div class="hoja-cuerpo" style="padding-top:14px">
+          <div class="buscador" style="color:var(--texto);border-color:var(--acento)"><span class="lupa">⌕</span>fe</div>
+          <div style="margin-top:6px">
+            <div class="chat-c"><div class="av chico p4">F</div><div class="n"><b>Fede plomero</b> <span class="s">· +54 9 11 6666-0000</span></div><span class="h">4 d</span><button class="btn">Leer</button></div>
+            <div class="chat-c"><div class="av chico p1">F</div><div class="n"><b>Fernanda</b> <span class="s">· +54 9 11 8888-4321</span></div><span class="h">2 sem</span><button class="btn">Leer</button></div>
+            <div class="chat-c"><div class="marca gris" style="width:26px;height:26px;font-size:14px">＋</div><div class="n"><b>Agregar un número</b> <span class="s">· si no está en la lista</span></div></div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <div class="cambios"><b>Qué cambia.</b>
+      <ul>
+        <li><b>Una sola lista.</b> Se ven solo los chats que se leen. Los otros 200 aparecen recién al buscar, con «Leer» al lado; si escribís un número que no está, el mismo buscador ofrece agregarlo. Desaparecen «Agregar por número» y «Elegir de tus chats».</li>
+        <li><b>«Leer todos» como dos opciones.</b> El checkbox con su párrafo pasa a un selector de dos opciones arriba. Con «Todos los individuales», los que entran solos van a la misma lista con una marca «entró solo».</li>
+        <li><b>Editar y dejar de leer en ⋯.</b> El nombre, la nota y a quiénes se lee en un grupo siguen en la misma hoja de hoy; la nota se ve citada en la fila.</li>
+        <li><b>Modelo con deslizador.</b> Rápido · Normal · Mejor en un deslizador (como el de la charla), con lo que baja al costado. El idioma son dos opciones, así que alcanza con un interruptor «Detectar el idioma».</li>
+        <li><b>Fuera de la vista.</b> Desvincular y Actualizar van al menú ⋯ (Desvincular sigue preguntando). Los avisos de las imágenes, del teléfono y de «Puede leer WhatsApp» quedan solo cuando hacen falta (por ejemplo, el del teléfono recién a los 12 días).</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ====================================================== PERMISOS -->
+  <section data-dir="permisos" hidden>
+    <div class="dir-cab"><h2>Ficha del agente › Permisos</h2></div>
+    <p class="dir-desc">Hoy «Permisos» mezcla lo que el agente puede hacer con lo que sabe hacer: skills propias, skills de Claude Code y servidores MCP. Y al revés, «Puede leer WhatsApp» y «Coordinador/a», que sí son permisos, están en Perfil. Después: una pestaña nueva, «Habilidades», y Permisos queda con lo que puede hacer, agrupado por cuánto te consulta.</p>
+    <div class="fila">
+
+      <!-- ANTES -->
+      <div class="marco angosto"><div class="marco-titulo"><span class="tag">Antes</span> Ficha › Permisos</div>
+        <div class="panel">
+          <div class="pestanas"><span>Perfil y apariencia</span><span class="sel">Permisos</span></div>
+          <div class="hoja-cuerpo" style="padding:4px 14px 14px">
+            <div class="resumen" style="margin-top:10px">Marta escribe en sus notas y sus entregables · puede correr 3 comandos sin preguntar · conectores: Gmail, Google Drive</div>
+            <div class="aj"><div><div class="tit">Puede escribir en</div><div class="ay">Solo ahí y en lo que le permitiste. El resto de la oficina lo puede leer, pero no tocar.</div></div><div class="ctl"><div class="chips"><span class="chip fijo">🔒 Sus notas</span><span class="chip fijo">🔒 Sus entregables</span></div></div></div>
+            <div class="aj"><div><div class="tit">Puede correr sin preguntar</div><div class="ay">Los comandos a los que le dijiste «Siempre» cuando te pidió permiso. Si quiere correr otro, te pregunta.</div></div><div class="ctl"><div class="chips"><span class="chip">git pull <span class="x">×</span></span><span class="chip">npm test <span class="x">×</span></span><span class="chip">ls <span class="x">×</span></span></div></div></div>
+            <div class="aj"><div><div class="tit">Hace solo</div><div class="ay">Lo que resuelve sin consultarte.</div></div><div class="ctl"><div class="chips"><span class="chip">Ordenar los gastos <span class="x">×</span></span><span class="chip mas">＋</span></div></div></div>
+            <div class="aj"><div><div class="tit">Te consulta antes</div><div class="ay">Mail, publicar o gastar siempre quedan como propuesta, aunque no figure acá.</div></div><div class="ctl"><div class="chips"><span class="chip">Pagar servicios <span class="x">×</span></span><span class="chip mas">＋</span></div></div></div>
+
+            <div class="sec">Skills propias <span class="n">2</span></div>
+            <div class="ay" style="margin:-2px 0 6px">Instrucciones que Marta lee cuando le piden algo parecido: un procedimiento, un formato, criterios. Son solo suyas y las usa aunque la oficina acote las demás. También puede proponerte una, o la sacás de una charla con «Convertir en skill».</div>
+            <div class="fila-chat"><div class="n"><b>📖 resumen-semanal</b><span class="ay">Cómo arma el resumen de gastos de los viernes</span></div><button class="btn">Editar</button></div>
+            <div class="fila-chat"><div class="n"><b>📖 conciliar-tarjeta</b><span class="ay">Pasos para cruzar el resumen con los gastos</span></div><button class="btn">Editar</button></div>
+            <button class="btn fantasma" style="margin-top:4px">＋ Nueva skill</button>
+
+            <div class="sec">Skills y MCP</div>
+            <div class="ay" style="margin:-2px 0 6px">Lo que la oficina no habilita no aparece acá.</div>
+            <div class="aj sin-borde"><div><div class="tit">Skills</div><div class="ay">Las skills de Claude Code que recibe en cada paso. Menos skills, menos tokens.</div></div>
+              <div class="ctl" style="width:100%"><div class="op-lista" style="width:100%"><div class="op sel"><span class="ck radio si"></span><div><div>Hereda de la oficina</div><div class="s">Usa los 12 que habilita la oficina</div></div></div><div class="op"><span class="ck radio"></span><div><div>Solo los que elijas</div><div class="s">Dentro de lo que habilita la oficina</div></div></div></div></div></div>
+            <div class="aj"><div><div class="tit">Servidores MCP</div><div class="ay">Los MCP de tu Claude Code que puede usar.</div></div>
+              <div class="ctl" style="width:100%"><div class="op-lista" style="width:100%"><div class="op sel"><span class="ck radio si"></span><div><div>Hereda de la oficina</div><div class="s">Usa los 3 que habilita la oficina</div></div></div><div class="op"><span class="ck radio"></span><div><div>Solo los que elijas</div><div class="s">Dentro de lo que habilita la oficina</div></div></div></div></div></div>
+            <button class="btn fantasma">✦ Lo que habilita la oficina</button>
+
+            <div class="sec">Conectores</div>
+            <div class="ay" style="margin:-2px 0 6px">Actuar es hacer algo afuera (mandar, publicar, crear) y siempre queda como propuesta que aprobás vos.</div>
+            <div class="aj sin-borde"><div class="tit">Gmail</div><div class="ctl" style="width:100%"><div class="desliz" style="max-width:none;width:100%"><div class="barra"><div class="lleno"></div><div class="bola"></div></div><div class="nombres"><span>No</span><span class="sel">Leer</span><span>Leer y actuar</span></div></div></div></div>
+            <div class="aj"><div class="tit">Google Calendar</div><div class="ctl" style="width:100%"><div class="desliz" style="max-width:none;width:100%"><div class="barra"><div class="lleno" style="width:0"></div><div class="bola" style="left:0"></div></div><div class="nombres"><span class="sel">No</span><span>Leer</span><span>Leer y actuar</span></div></div></div></div>
+            <div class="aj"><div class="tit">Google Drive</div><div class="ctl" style="width:100%"><div class="desliz" style="max-width:none;width:100%"><div class="barra"><div class="lleno" style="width:100%"></div><div class="bola" style="left:100%"></div></div><div class="nombres"><span>No</span><span>Leer</span><span class="sel">Leer y actuar</span></div></div></div></div>
+            <button class="btn fantasma">🔌 Ver todos los conectores</button>
+          </div></div>
+        <div class="medida">≈ 1 640 px de alto en la columna</div>
+      </div>
+
+      <!-- DESPUÉS: PERMISOS -->
+      <div class="marco angosto"><div class="marco-titulo"><span class="tag nuevo">Después</span> Ficha › Permisos</div>
+        <div class="panel">
+          <div class="pestanas"><span>Perfil</span><span class="sel">Permisos</span><span class="nueva">Habilidades</span></div>
+          <div class="hoja-cuerpo" style="padding:4px 14px 14px">
+            <div class="sec" style="margin-top:12px">En la oficina</div>
+            <div class="renglon" style="border-top:0"><div class="txt"><div class="tit">Coordinador/a</div><div class="s">Ve el trabajo de todos y reparte encargos</div></div><span class="sw"></span></div>
+            <div class="renglon"><div class="txt"><div class="tit">Leer WhatsApp</div><div class="s">Los chats elegidos en Ajustes › WhatsApp</div></div><span class="sw si"></span></div>
+
+            <div class="sec">Sin preguntarte</div>
+            <div class="grupo-tit">Escribe en</div>
+            <div class="chips"><span class="chip fijo">🔒 Sus notas</span><span class="chip fijo">🔒 Sus entregables</span></div>
+            <div class="grupo-tit" style="margin-top:10px">Corre</div>
+            <div class="chips"><span class="chip">git pull <span class="x">×</span></span><span class="chip">npm test <span class="x">×</span></span><span class="chip">ls <span class="x">×</span></span></div>
+            <div class="grupo-tit" style="margin-top:10px">Hace</div>
+            <div class="chips"><span class="chip">Ordenar los gastos <span class="x">×</span></span><span class="chip mas">＋</span></div>
+
+            <div class="sec">Te consulta antes</div>
+            <div class="chips"><span class="chip">Pagar servicios <span class="x">×</span></span><span class="chip fijo">Mandar mails</span><span class="chip fijo">Publicar</span><span class="chip fijo">Gastar</span><span class="chip mas">＋</span></div>
+
+            <div class="sec">Conectores <a class="acc pista" href="#" onclick="return false">Todos ›</a></div>
+            <div class="renglon" style="border-top:0"><div class="marca mail" style="width:26px;height:26px;font-size:10px">GM</div><div class="txt"><div class="tit">Gmail</div></div><span class="seg"><span>No</span><span class="sel">Leer</span><span>Actuar</span></span></div>
+            <div class="renglon"><div class="marca cal" style="width:26px;height:26px;font-size:10px">CAL</div><div class="txt"><div class="tit">Calendar</div></div><span class="seg"><span class="sel">No</span><span>Leer</span><span>Actuar</span></span></div>
+            <div class="renglon"><div class="marca gris" style="width:26px;height:26px;font-size:10px">DR</div><div class="txt"><div class="tit">Drive</div></div><span class="seg"><span>No</span><span>Leer</span><span class="sel">Actuar</span></span></div>
+            <div class="pista" style="margin-top:4px">Actuar siempre queda como propuesta que aprobás vos.</div>
+          </div></div>
+        <div class="medida">≈ 730 px de alto</div>
+      </div>
+
+      <!-- DESPUÉS: HABILIDADES -->
+      <div class="marco angosto"><div class="marco-titulo"><span class="tag nuevo">Después</span> Ficha › Habilidades</div>
+        <div class="panel">
+          <div class="pestanas"><span>Perfil</span><span>Permisos</span><span class="sel">Habilidades</span></div>
+          <div class="hoja-cuerpo" style="padding:4px 14px 14px">
+            <div class="sec" style="margin-top:12px">Sus skills <span class="n">2</span><a class="acc pista" href="#" onclick="return false">＋ Nueva</a></div>
+            <div class="chat-c"><div class="marca gris" style="width:26px;height:26px">📖</div><div class="n"><b>resumen-semanal</b><div class="s">El resumen de gastos de los viernes</div></div><button class="btn ico fantasma">⋯</button></div>
+            <div class="chat-c"><div class="marca gris" style="width:26px;height:26px">📖</div><div class="n"><b>conciliar-tarjeta</b><div class="s">Cruzar el resumen con los gastos</div></div><button class="btn ico fantasma">⋯</button></div>
+            <div class="chat-c" style="background:var(--wa-suave);border-radius:var(--radio-chico);padding:7px 8px;margin-top:4px;border-top:0"><div class="marca wa" style="width:26px;height:26px;background:transparent">✦</div><div class="n"><b>Propone «pagar-expensas»</b><div class="s">Lo armó de la charla de ayer</div></div><button class="btn primario">Revisar</button></div>
+
+            <div class="sec">De Claude Code</div>
+            <div class="renglon" style="border-top:0"><div class="txt"><div class="tit">Skills</div><div class="s">Menos skills, menos tokens</div></div><span class="campo valor">Las 12 de la oficina ▾</span></div>
+            <div class="renglon"><div class="txt"><div class="tit">Servidores MCP</div></div><span class="campo valor">Los 3 de la oficina ▾</span></div>
+            <div class="pista" style="margin-top:4px">Lo que la oficina no habilita no aparece. <a href="#" onclick="return false" class="pista" style="text-decoration:underline">Cambiarlo</a></div>
+          </div></div>
+        <div class="medida">≈ 430 px de alto</div>
+      </div>
+    </div>
+    <div class="cambios"><b>Qué cambia.</b>
+      <ul>
+        <li><b>Pestaña nueva, «Habilidades».</b> Ahí van las skills propias (con sus propuestas arriba, para revisarlas), las skills de Claude Code y los servidores MCP. No son permisos: son lo que sabe y las herramientas que tiene.</li>
+        <li><b>Permisos agrupado por cuánto te consulta.</b> «Sin preguntarte» junta dónde escribe, qué comandos corre y qué hace solo; «Te consulta antes» muestra fijos mail, publicar y gastar (hoy eso está escondido en una ayuda). Desaparece la línea de resumen: ya se lee en los grupos.</li>
+        <li><b>Coordinador/a y Leer WhatsApp pasan de Perfil a Permisos</b>, como interruptores. Perfil queda con nombre, rol y apariencia.</li>
+        <li><b>Conectores en una línea cada uno</b>: botones No · Leer · Actuar en lugar del deslizador de ancho completo con su etiqueta arriba.</li>
+        <li><b>Hereda / Solo los que elijas</b> pasa de dos tarjetas a un desplegable que dice cuántos usa; elegir cuáles abre la lista de hoy.</li>
+      </ul>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var botones = document.querySelectorAll('[data-ir]'), secciones = document.querySelectorAll('[data-dir]');
+  function mostrar(id) {
+    var hay = false;
+    secciones.forEach(function (s) { var es = s.getAttribute('data-dir') === id; s.hidden = !es; if (es) hay = true; });
+    if (!hay) return mostrar('secretaria');
+    botones.forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-ir') === id)); });
+  }
+  botones.forEach(function (b) { b.addEventListener('click', function () { var id = b.getAttribute('data-ir'); try { history.replaceState(null, '', '#' + id); } catch (e) {} mostrar(id); }); });
+  window.addEventListener('hashchange', function () { mostrar(location.hash.slice(1)); });
+  mostrar(location.hash.slice(1) || 'secretaria');
+})();
+</script>

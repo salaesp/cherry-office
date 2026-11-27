@@ -44,7 +44,7 @@ App.SkillsPropias = (function () {
         filas.length ? filas : h('div.ayuda', a.nombre + ' todavía no tiene skills propias.'),
         h('button.btn.chico.fantasma', { onclick: function () { editor(a, null, { alGuardar: pintar }); } }, App.icono('mas'), 'Nueva skill')],
         { cuenta: skills.length ? String(skills.length) : null,
-          ayuda: 'Instrucciones que ' + a.nombre + ' lee cuando le piden algo parecido: un procedimiento, un formato, criterios. Son solo suyas y las usa aunque la oficina acote las demás. También puede proponerte una, o la sacás de una charla con «Convertir en skill».' }));
+          ayuda: 'Lo que ' + a.nombre + ' lee cuando le piden algo parecido. También salen de una charla con «Convertir en skill».' }));
     }
     function oyente(id) {
       if (!zona.isConnected) { oyentes.splice(oyentes.indexOf(oyente), 1); return; }

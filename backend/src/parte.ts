@@ -11,12 +11,12 @@ import { jsonCompacto } from './json-swift.js'
 import type { Obj } from './json.js'
 import type { Oficina } from './oficina.js'
 import type { OficinaActiva } from './oficinas.js'
-import { programadorDe, ejecucionJSON, Programador, type Ejecucion } from './programador.js'
+import { programadorDe, ejecucionJSON, nombreCorrida, Programador, type Ejecucion } from './programador.js'
 import { esCoordinador } from './permisos.js'
 import { dependenciasDe, esperasVencidas, type EsperaVencida } from './dependencias.js'
 import { atrapar, no405, type Query, type Resp, type SubRouter } from './router.js'
 import { registrarModulo, type Servicios } from './servicios.js'
-import { num } from './sqlite.js'
+import { num, txt } from './sqlite.js'
 import { Programacion } from './tareas.js'
 import { largo, prefijo } from './validar.js'
 
@@ -37,6 +37,20 @@ export function ejecucionesDesde(s: Servicios, oficina: string, desde: number, e
     return num(s.store.db.query("SELECT COUNT(*) AS n FROM ejecuciones WHERE oficina=? AND estado=? AND inicio>=? AND tarea NOT LIKE 'parte:%'", [oficina, estado, desde])[0]?.n)
   } catch {
     return 0
+  }
+}
+
+/** Las últimas corridas que fallaron desde `desde` (sin las del parte), con su nombre en palabras. */
+export function erroresDesde(s: Servicios, oficina: string, desde: number, tareas: { id: string; nombre: string }[], limite = 5): Obj[] {
+  try {
+    return s.store.db.query("SELECT id, tarea, agente, error, inicio FROM ejecuciones WHERE oficina=? AND estado='error' AND inicio>=? AND tarea NOT LIKE 'parte:%' ORDER BY id DESC LIMIT ?", [oficina, desde, limite])
+      .map((f) => {
+        const tarea = txt(f.tarea)
+        const t = tareas.find((x) => x.id === tarea)
+        return { id: num(f.id), tarea, nombre: t ? t.nombre : nombreCorrida(tarea), agente: txt(f.agente), error: txt(f.error) || 'Falló sin decir por qué.', cuando: iso(num(f.inicio)) }
+      })
+  } catch {
+    return []
   }
 }
 
@@ -193,6 +207,8 @@ export const Parte = {
       reunionesCerradas: reunionesCerradasDesde(s, carpeta, d),
       pasosTerminados: corridasDe(s).pasosTerminadosDesde(carpeta, d),
       costo: s.store.costos(carpeta, d).total,
+      costoAgentes: s.store.costos(carpeta, d).agentes,
+      errores: erroresDesde(s, carpeta, d, act.oficina.tareas ?? []),
     }
 
     const sistema = programadorDe(s)?.sistema

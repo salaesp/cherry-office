@@ -393,7 +393,8 @@
 
   /* ---------------- bloque para Ajustes › Secretaría ---------------- */
   /* `siempre`: mostrarlo aunque todavía no haya nada (con secretaría). Sin eso, solo si hay memoria guardada. */
-  function bloque(siempre) {
+  /* `compacto`: un renglón (Ajustes › Secretaría con secretaría): el resumen como bajada, «Ver» e «Importar notas…» en «⋯» */
+  function bloque(siempre, compacto) {
     var caja = h('div'), estadoImp = h('div.ajuste-ayuda', { style: { marginTop: '6px' } });
     function cargar() {
       api().get(base).then(function (r) {
@@ -405,6 +406,15 @@
         var resumen = vacia ? 'Todavía no anotó nada: empieza en la próxima revisión.'
           : abiertos + (abiertos === 1 ? ' tema abierto' : ' temas abiertos') + (trabados ? ' (' + trabados + (trabados === 1 ? ' trabado' : ' trabados') + ')' : '') + ' · ' + r.fichas.length + (r.fichas.length === 1 ? ' ficha' : ' fichas') + ' · ' + r.dias.length + (r.dias.length === 1 ? ' día' : ' días') + ' en el diario'
           + (r.sugerencias.length ? ' · ' + r.sugerencias.length + (r.sugerencias.length === 1 ? ' sugerencia para compartir' : ' sugerencias para compartir') : '');
+        if (compacto) {
+          caja.appendChild(App.seccion('Memoria', [App.renglon({ marca: h('div.renglon-marca', App.icono('libro')), titulo: 'Lo que fue sabiendo', sub: resumen,
+            alTocar: function () { abrir({ alCerrar: cargar }); },
+            control: [h('button.btn.chico', { onclick: function () { abrir({ alCerrar: cargar }); } }, 'Ver'),
+              h('button.btn.chico.fantasma.icono', { title: 'Más opciones', onclick: function (ev) {
+                App.menu(ev.currentTarget, [{ texto: 'Importar notas…', icono: 'abrir', accion: function () { importar(cargar); } }]);
+              } }, App.icono('puntos'))] }), estadoImp]));
+          return;
+        }
         caja.appendChild(h('div.ajuste', { style: { display: 'block' } },
           h('div.ajuste-tit', 'Memoria'),
           h('div.ajuste-ayuda', { style: { margin: '2px 0 8px' } }, 'Lo que la secretaría va sabiendo de vos, de WhatsApp, Gmail, el calendario y lo que charlan: un diario, los temas en seguimiento y fichas de personas y cosas. Es privada: no la ven los demás agentes ni pasa por la Biblioteca.'),

@@ -5,7 +5,10 @@
   'use strict';
   var h = App.h, api = App.api;
   var actual = null, pestana = 'chat';
-  var PESTANAS = ['perfil', 'permisos', 'notas', 'tareas', 'archivos'];
+  var PESTANAS = ['perfil', 'permisos', 'habilidades', 'notas', 'tareas', 'archivos'];
+  /* las pestañas de la ficha que también se abren en la columna del costado (desde el lápiz) */
+  var FICHA_LADO = [['perfil', 'Perfil'], ['permisos', 'Permisos'], ['habilidades', 'Habilidades']];
+  function esFicha(l) { return l === 'perfil' || l === 'permisos' || l === 'habilidades'; }
   var lado = 'detalles', ladoFiltro = '';   // la columna al costado de la charla (compu)
   var ladoMovil = false;   // celular: la columna de detalles abierta encima de la charla
   /* un archivo abierto al costado de la charla, en vez de en una hoja flotante: {caja, obj}. Si entra va como tercera
@@ -189,7 +192,7 @@
 
   /* Dos caras: la charla (limpia, sin pestañas; en Charlas) y la ficha del agente (en Equipo, con su ruta por pestaña).
      Desde la charla se llega a la ficha de una sola forma: tocando la cara, como en una app de mensajes. */
-  var FICHA = [['perfil', 'Perfil y apariencia'], ['permisos', 'Permisos'], ['notas', 'Notas'], ['tareas', 'Tareas'], ['archivos', 'Archivos']];
+  var FICHA = FICHA_LADO.concat([['notas', 'Notas'], ['tareas', 'Tareas'], ['archivos', 'Archivos']]);
   /* cambia de cara o de pestaña: primero la sección y la ruta (Charlas o Equipo), después el panel */
   function irPestana(p) {
     if (esCompu() && p !== 'chat') { verLado(lado === p ? 'detalles' : p); return; }
@@ -235,7 +238,7 @@
     if (esCompu() ? !der.querySelector(':scope > aside.relacionado') : !(ladoMovil && pestana === 'chat')) return;
     ponerColumnas(a);
     if (App.Nav && App.Nav.acomodar) App.Nav.acomodar();   // cambió el ancho: ¿sigue flotando? y la cámara recentra
-    var lp = der.querySelector('.agente-lapiz-btn'); if (lp) lp.setAttribute('aria-pressed', String(lado === 'perfil' || lado === 'permisos'));
+    var lp = der.querySelector('.agente-lapiz-btn'); if (lp) lp.setAttribute('aria-pressed', String(esFicha(lado)));
   }
   /* las columnas al costado de la charla: la de detalles y, si hay un archivo abierto, el visor (al lado o en su lugar) */
   function ponerColumnas(a) {
@@ -271,11 +274,11 @@
     }
     var volver = h('button.btn.fantasma.icono', { title: 'Volver a los detalles', onclick: function () { verLado('detalles'); } }, App.icono('atras'));
     var cuerpo = h('div.der-cuerpo'), pie = h('div.der-pie');
-    if (lado === 'perfil' || lado === 'permisos') {
-      App.add(caja, latCab(volver, h('div.pestanas.lat-pest', [['perfil', 'Perfil y apariencia'], ['permisos', 'Permisos']].map(function (p) {
+    if (esFicha(lado)) {
+      App.add(caja, latCab(volver, h('div.pestanas.lat-pest', FICHA_LADO.map(function (p) {
         return h('button.pestana' + (lado === p[0] ? '.activa' : ''), { onclick: function () { if (lado !== p[0]) verLado(p[0]); } }, p[1]);
       }))), cuerpo, pie);
-      if (lado === 'perfil') pintarPerfil(a, cuerpo, pie); else pintarPermisos(a, cuerpo, pie);
+      if (lado === 'perfil') pintarPerfil(a, cuerpo, pie); else if (lado === 'permisos') pintarPermisos(a, cuerpo, pie); else pintarHabilidades(a, cuerpo, pie);
       return caja;
     }
     var TIT = { charlas: 'Charlas', tareas: 'Tareas', archivos: 'Archivos', notas: 'Notas' };
@@ -352,8 +355,8 @@
           App.retratoImg(a, 'retrato', 120),
           h('div.der-tit', h('h2', a.nombre), sub),
           h('div.der-acciones.agente-herr',
-            h('button.btn.fantasma.icono.agente-lapiz-btn', { title: 'Perfil, apariencia y permisos de ' + a.nombre, 'aria-pressed': String(lado === 'perfil' || lado === 'permisos'),
-              onclick: function () { verLado(lado === 'perfil' || lado === 'permisos' ? 'detalles' : 'perfil'); } }, App.icono('lapiz')),
+            h('button.btn.fantasma.icono.agente-lapiz-btn', { title: 'Perfil, apariencia y permisos de ' + a.nombre, 'aria-pressed': String(esFicha(lado)),
+              onclick: function () { verLado(esFicha(lado) ? 'detalles' : 'perfil'); } }, App.icono('lapiz')),
             h('button.btn.fantasma.icono', { title: 'Ver dónde está ' + a.nombre + ' en la oficina', onclick: function () {
               if (App.Oficina.marcar) App.Oficina.marcar(a.id); else if (App.Oficina.enfocarAgente) App.Oficina.enfocarAgente(a.id); } }, App.icono('pin')),
             /* cerrar no va acá: queda arriba a la derecha del todo, en la cabecera de la columna del costado */)),
@@ -413,6 +416,7 @@
     if (pestana === 'chat') { pintarChat(a, cuerpo, pie); if (ladoMovil) ponerColumnas(a); }
     else if (pestana === 'perfil') pintarPerfil(a, cuerpo, pie);
     else if (pestana === 'permisos') pintarPermisos(a, cuerpo, pie);
+    else if (pestana === 'habilidades') pintarHabilidades(a, cuerpo, pie);
     else if (pestana === 'tareas') pintarTareas(a, cuerpo, pie);
     else if (pestana === 'archivos') pintarArchivos(a, cuerpo, pie);
     else pintarNotas(a, cuerpo, pie);
@@ -548,7 +552,7 @@
       ed.el.style.gridTemplateColumns = '1fr';
       ed.el.querySelector('.grande').style.cssText = 'width:160px;height:160px';
       var err = h('div.error-txt');
-      App.add(App.vaciar(cont), ed.el, filaCoordinador(a), App.Secretaria ? App.Secretaria.seccion(a) : null, err);
+      App.add(App.vaciar(cont), ed.el, App.Secretaria ? App.Secretaria.seccion(a) : null, err);
       var guardar = h('button.btn.primario', {
         onclick: function () {
           var m = ed.validar(); if (m) { err.textContent = m; return; }
@@ -565,29 +569,28 @@
     }).catch(function (e) { App.vaciar(cont).appendChild(h('div.vacio', e.message)); });
   }
 
-  /* «Coordinador/a» es un permiso del agente que se enciende y apaga acá, y se guarda al tocarlo */
-  function filaCoordinador(a) {
+  /* «En la oficina»: permisos que se prenden y apagan (coordinador/a, leer WhatsApp). Cada uno conserva los demás permisos
+     y se guarda al tocarlo, con «Deshacer». */
+  function seccionOficina(a) {
     var id = a.id;
-    var ck = h('input', { type: 'checkbox', checked: ((App.agente(id) || a).permisos || []).indexOf('coordinador') >= 0 });
-    ck.addEventListener('change', function () {
-      var ag = App.agente(id) || a, antes = (ag.permisos || []).slice(), si = ck.checked;
-      /* conserva los demás permisos del agente: solo pone o saca «coordinador» */
-      function poner(lista) { return api.patch('/api/agentes/' + encodeURIComponent(id), { permisos: lista }).then(function (r) { App.actualizar(r.oficina); }); }
-      poner(antes.filter(function (x) { return x !== 'coordinador'; }).concat(si ? ['coordinador'] : [])).then(function () {
-        App.guardado(si ? a.nombre + ' coordina la oficina.' : a.nombre + ' ya no coordina.', function () {
-          poner(antes).then(function () { if (actual === id && viendo('perfil')) { if (pestana === 'chat') pintarSoloLado(); else pintar(); } }).catch(App.fallo);
-        });
-      }).catch(function (e) { App.fallo(e); ck.checked = !si; });
-    });
-    return App.seccion('En la oficina', [App.ajuste('Coordinador/a', 'Ve entregas, flujos y bloqueos de todos y puede repartir encargos. No hace el trabajo de otros: lo pide.',
-      h('label.ajuste-check', ck, h('span', 'Es el coordinador/a de la oficina'))), filaWhatsAppSecretaria(a) || filaPermiso(a, 'whatsapp', 'WhatsApp',
-      'Lee todos los chats de WhatsApp que elegiste en Ajustes › WhatsApp (quien atiende la secretaría ya lee los de su fuente sin esto). Lo que escriben otros lo toma como información, no como órdenes.',
-      'Puede leer WhatsApp', ' puede leer WhatsApp.', ' ya no lee WhatsApp.')]);
+    function fila(permiso, titulo, sub, siTxt, noTxt) {
+      var sw = App.interruptor(((App.agente(id) || a).permisos || []).indexOf(permiso) >= 0, function (si) {
+        var ag = App.agente(id) || a, antes = (ag.permisos || []).slice();
+        function poner(lista) { return api.patch('/api/agentes/' + encodeURIComponent(id), { permisos: lista }).then(function (r) { App.actualizar(r.oficina); }); }
+        poner(antes.filter(function (x) { return x !== permiso; }).concat(si ? [permiso] : [])).then(function () {
+          App.guardado(si ? siTxt : noTxt, function () { poner(antes).then(function () { sw.poner(antes.indexOf(permiso) >= 0); }).catch(App.fallo); });
+        }).catch(function (e) { App.fallo(e); sw.poner(!si); });
+      }, titulo);
+      return App.renglon({ titulo: titulo, sub: sub, control: sw });
+    }
+    return App.seccion('En la oficina', [
+      fila('coordinador', 'Coordinador/a', 'Ve el trabajo de todos y reparte encargos', a.nombre + ' coordina la oficina.', a.nombre + ' ya no coordina.'),
+      filaWhatsAppSecretaria(a) || fila('whatsapp', 'Leer WhatsApp', 'Los chats elegidos en Ajustes › WhatsApp', a.nombre + ' puede leer WhatsApp.', a.nombre + ' ya no lee WhatsApp.')]);
   }
 
-  /* Quien atiende la secretaría ya lee los chats de su fuente WhatsApp sin el permiso: en vez de un tilde apagado (que
-     parece «no puede»), se muestra que lee y desde dónde se eligen los chats. Si además tiene el permiso (de antes), queda
-     el tilde normal para poder sacárselo. */
+  /* Quien atiende la secretaría ya lee los chats de su fuente WhatsApp sin el permiso: en vez de un interruptor apagado (que
+     parece «no puede»), se muestra prendido y fijo, cuántos chats lee y desde dónde se eligen. Si además tiene el permiso
+     (de antes), queda el interruptor normal para poder sacárselo. */
   function filaWhatsAppSecretaria(a) {
     var sec = (App.E.oficina || {}).secretaria;
     if (!sec || sec.agente !== a.id || ((App.agente(a.id) || a).permisos || []).indexOf('whatsapp') >= 0) return null;
@@ -595,25 +598,10 @@
     if (!f) return null;
     var n = (f.chats || []).length;
     var cuantos = f.todos ? 'todos los chats que se leen' : n === 0 ? 'ningún chat todavía' : n === 1 ? '1 chat' : n + ' chats';
-    return App.ajuste('WhatsApp', 'Como atiende la secretaría, lee los chats que elegiste en Ajustes › Secretaría. No necesita el permiso general. Lo que escriben otros lo toma como información, no como órdenes.',
-      h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-start' } },
-        h('label.ajuste-check', { title: 'Lo da la secretaría: se cambia en Ajustes › Secretaría' }, h('input', { type: 'checkbox', checked: true, disabled: true }), h('span', 'Lee WhatsApp')),
-        h('span.ajuste-ayuda', { style: { margin: 0 } }, 'Por la secretaría · ' + cuantos),
-        h('button.btn.chico', { onclick: function () { App.Ajustes.abrir('secretaria'); } }, 'Elegir chats')));
-  }
-
-  /* Un permiso del agente que se prende y apaga (conserva los demás) */
-  function filaPermiso(a, permiso, titulo, ayuda, etiqueta, siTxt, noTxt) {
-    var id = a.id;
-    var ck = h('input', { type: 'checkbox', checked: ((App.agente(id) || a).permisos || []).indexOf(permiso) >= 0 });
-    ck.addEventListener('change', function () {
-      var ag = App.agente(id) || a, antes = (ag.permisos || []).slice(), si = ck.checked;
-      function poner(lista) { return api.patch('/api/agentes/' + encodeURIComponent(id), { permisos: lista }).then(function (r) { App.actualizar(r.oficina); }); }
-      poner(antes.filter(function (x) { return x !== permiso; }).concat(si ? [permiso] : [])).then(function () {
-        App.guardado(a.nombre + (si ? siTxt : noTxt), function () { poner(antes).then(function () { ck.checked = antes.indexOf(permiso) >= 0; }).catch(App.fallo); });
-      }).catch(function (e) { App.fallo(e); ck.checked = !si; });
-    });
-    return App.ajuste(titulo, ayuda, h('label.ajuste-check', ck, h('span', etiqueta)));
+    var fijo = App.interruptor(true, null, 'Lee WhatsApp por la secretaría', true);
+    fijo.title = 'Lo da la secretaría: se cambia en Ajustes › Secretaría';
+    return App.renglon({ titulo: 'Leer WhatsApp', sub: 'Por la secretaría · ' + cuantos,
+      control: [h('button.btn.chico.fantasma', { onclick: function () { App.Ajustes.abrir('secretaria'); } }, 'Elegir chats'), fijo] });
   }
 
   function despedir(a) {
@@ -628,8 +616,29 @@
   }
 
   /* ---------------- permisos (docs/plan-creador-flujos.md §12, docs/plan-ui-presentacion.md §3 y §4) ----------------
-     Todo se guarda al cambiarlo (PATCH + «Guardado · Deshacer»). Las reglas crudas («Bash(git pull:*)») solo van en el title. */
+     Lo que puede hacer, agrupado por cuánto te consulta: «En la oficina» (coordinador/a, leer WhatsApp), «Sin preguntarte»
+     (dónde escribe, qué comandos corre, qué hace solo), «Te consulta antes» y los conectores. Lo que sabe hacer (skills y
+     MCP) está en «Habilidades». Todo se guarda al cambiarlo (PATCH + «Guardado · Deshacer»). Las reglas crudas
+     («Bash(git pull:*)») solo van en el title. */
   var sondeoPermisos = null;
+
+  /* un guardado a la vez: cada uno arma su cuerpo con lo último que quedó guardado. `repintar` se llama si hay que volver atrás. */
+  function guardador(id, repintar) {
+    var cola = Promise.resolve(), url = '/api/agentes/' + encodeURIComponent(id);
+    return function (armar, texto, previo) {
+      cola = cola.then(function () {
+        var cuerpoPatch = armar(); if (!cuerpoPatch) return null;
+        return api.patch(url, cuerpoPatch).then(function (r) {
+          App.actualizar(r.oficina);
+          App.guardado(texto, previo ? function () {
+            api.patch(url, previo).then(function (r2) { App.actualizar(r2.oficina); repintar(); }).catch(App.fallo);
+          } : null);
+        });
+      }).catch(function (e) { App.fallo(e); repintar(); });
+    };
+  }
+  function copia(x) { return JSON.parse(JSON.stringify(x)); }
+  function grupoPerm(titulo, contenido) { return h('div.perm-grupo', h('div.perm-grupo-tit', titulo), contenido); }
 
   function pintarPermisos(a, cuerpo) {
     var id = a.id, cont = h('div.perm');
@@ -641,38 +650,10 @@
     var reglas = (ag().reglas || []).slice();
     var catalogo = null, carpetaEnt = '';
     var global = ((App.E.estado && App.E.estado.conectores_agentes) || 'por_agente') === 'todos';
-    var resumen = h('div.resumen-ui'), zonaReglas = h('div'), zonaConectores = h('div'), zonaHab = h('div');
-    var url = '/api/agentes/' + encodeURIComponent(id);
-
-    /* un guardado a la vez: cada uno arma su cuerpo con lo último que quedó guardado */
-    var cola = Promise.resolve();
-    function guardar(armar, texto, previo) {
-      cola = cola.then(function () {
-        var cuerpoPatch = armar(); if (!cuerpoPatch) return null;
-        return api.patch(url, cuerpoPatch).then(function (r) {
-          App.actualizar(r.oficina);
-          App.guardado(texto, previo ? function () {
-            api.patch(url, previo).then(function (r2) { App.actualizar(r2.oficina); if (vigente()) pintar(); }).catch(App.fallo);
-          } : null);
-          pintarResumen();
-        });
-      }).catch(function (e) { App.fallo(e); if (vigente()) pintar(); });
-    }
-    function copia(x) { return JSON.parse(JSON.stringify(x)); }
+    var zonaReglas = h('div'), zonaConectores = h('div');
+    var guardar = guardador(id, function () { if (vigente()) pintar(); });
 
     function nombreServ(n) { return App.Ajustes.nombreServidor(n); }
-    function conectadosTexto() {
-      if (global) return 'todos';
-      var nombres = (ag().conectores || []).filter(function (c) { return (c.leer || []).length || (c.actuar || []).length; }).map(function (c) { return nombreServ(c.servidor); });
-      return nombres.length ? nombres.join(', ') : 'ninguno';
-    }
-    function pintarResumen() {
-      var corre = App.humano.reglas(reglas).filter(function (g) { return g.tipo === 'correr'; }).length;
-      resumen.textContent = a.nombre + ' escribe en sus notas y sus entregables'
-        + (reglas.length && App.humano.reglas(reglas).some(function (g) { return g.tipo === 'escribir'; }) ? ' (y en lo que le permitiste)' : '')
-        + ' · ' + (corre ? 'puede correr ' + corre + (corre === 1 ? ' comando' : ' comandos') + ' sin preguntar' : 'te pide permiso para correr comandos')
-        + ' · conectores: ' + conectadosTexto();
-    }
 
     /* permisos que le diste con «Siempre» al responder un pedido (permisos.js): acá solo se quitan */
     function quitarReglas(crudas, texto) {
@@ -684,7 +665,7 @@
       var grupos = App.humano.reglas(reglas).filter(function (g) { return tipos.indexOf(g.tipo) >= 0; });
       var items = grupos.map(function (g) { return g.texto; });
       function grupoDe(t) { return grupos.filter(function (g) { return g.texto === t; })[0]; }
-      if (!items.length && !(fijos && fijos.length)) return h('span.ayuda', vacio);
+      if (!items.length && !(fijos && fijos.length)) return h('span.nota-chica', vacio);
       return App.chipsEditables(items, { agregar: false, fijos: fijos,
         titulo: function (t) { var g = grupoDe(t); return g ? g.reglas.join(' · ') : t; },
         alCambiar: function (lista, c) {
@@ -696,19 +677,16 @@
     }
     function pintarReglas() {
       App.vaciar(zonaReglas);
-      var hay = function (tipos) { return App.humano.reglas(reglas).some(function (g) { return tipos.indexOf(g.tipo) >= 0; }); };
+      var hay = App.humano.reglas(reglas).some(function (g) { return g.tipo === 'conector' || g.tipo === 'otro'; });
       App.add(zonaReglas,
-        App.ajuste('Puede escribir en', 'Solo ahí y en lo que le permitiste. El resto de la oficina lo puede leer, pero no tocar.',
-          chipsDeReglas(['escribir'], '', [
-            { texto: 'Sus notas', title: 'conocimiento/agentes/' + id + '.md', icono: 'candado', accion: function () { irPestana('notas'); } },
-            { texto: 'Sus entregables', title: carpetaEnt || ('archivos/entregables/' + id + '/'), icono: 'candado', accion: function () { irPestana('archivos'); } }])),
-        App.ajuste('Puede correr sin preguntar', 'Los comandos a los que le dijiste «Siempre» cuando te pidió permiso. Si quiere correr otro, te pregunta.',
-          chipsDeReglas(['correr'], 'Ninguno todavía.')),
-        hay(['conector', 'otro']) ? App.ajuste('Otros permisos', 'También los guardaste con «Siempre».', chipsDeReglas(['conector', 'otro'], '')) : null);
-      pintarResumen();
+        grupoPerm('Escribe en', chipsDeReglas(['escribir'], '', [
+          { texto: 'Sus notas', title: 'conocimiento/agentes/' + id + '.md', icono: 'candado', accion: function () { irPestana('notas'); } },
+          { texto: 'Sus entregables', title: carpetaEnt || ('archivos/entregables/' + id + '/'), icono: 'candado', accion: function () { irPestana('archivos'); } }])),
+        grupoPerm('Corre', chipsDeReglas(['correr'], 'Ninguno: te pide permiso y con «Siempre» queda acá.')),
+        hay ? grupoPerm('Otros que guardaste con «Siempre»', chipsDeReglas(['conector', 'otro'], '')) : null);
     }
 
-    /* conectores: «todos» es una línea; por agente, una fila por servidor con No / Leer / Leer y actuar */
+    /* conectores: «todos» es una línea; por agente, un renglón por servidor con No · Leer · Actuar */
     function nivelActual(s) {
       var o = (ag().conectores || []).filter(function (c) { return c.servidor === s.nombre; })[0] || { leer: [], actuar: [] };
       var tiene = function (tipo) { return App.Ajustes.delTipo(s, tipo).filter(function (n) { return (o[tipo] || []).indexOf(n) >= 0; }).length; };
@@ -724,9 +702,9 @@
     }
     function pintarConectores() {
       App.vaciar(zonaConectores);
+      var todosBtn = h('button.btn.chico.fantasma', { onclick: function () { App.Ajustes.abrir('conectores'); } }, 'Todos');
       if (global) {
-        App.add(zonaConectores, App.ajuste('Conectores', 'Está elegido para toda la oficina.',
-          h('div', 'Usa todos los conectores conectados. ', h('button.btn.chico.fantasma', { onclick: function () { App.Ajustes.abrir('conectores'); } }, App.icono('enchufe'), 'Ajustes › Conectores'))));
+        App.add(zonaConectores, App.seccion('Conectores', App.renglon({ marca: h('div.renglon-marca', App.icono('enchufe')), titulo: 'Usa todos los conectados', sub: 'Está elegido para toda la oficina' }), { accion: todosBtn }));
         return;
       }
       if (!catalogo) { zonaConectores.appendChild(App.seccion('Conectores', App.cargando('Trayendo tus conectores…'))); return; }
@@ -742,69 +720,30 @@
       var todos = servs.concat(extra);
       var filas = todos.map(function (s) {
         var hayLeer = s._viejo || App.Ajustes.delTipo(s, 'leer').length, hayActuar = s._viejo || App.Ajustes.delTipo(s, 'actuar').length;
-        var control;
-        if (!s.disponible) control = h('span.ayuda', s._viejo ? 'Ya no aparece en tus conectores.' : 'No disponible · conectalo en claude.ai');
+        var control = null, sub = null;
+        if (!s.disponible) sub = s._viejo ? 'Ya no aparece en tus conectores' : 'No disponible · conectalo en claude.ai';
         else {
           var ops = [{ valor: 'no', titulo: 'No' }];
           if (hayLeer) ops.push({ valor: 'leer', titulo: 'Leer' });
-          if (hayActuar) ops.push({ valor: 'actuar', titulo: hayLeer ? 'Leer y actuar' : 'Actuar', sub: 'Actuar siempre pide tu aprobación' });
-          /* de menos a más permiso: deslizador (o interruptor si solo hay una forma de usarlo, con «No» como apagado) */
-          var formaCon = ops.length > 2 ? 'deslizador' : ops.length === 2 ? 'interruptor' : 'chips';
-          if (formaCon === 'interruptor') ops.reverse();
-          control = App.elegir({ forma: formaCon, etiqueta: nombreServ(s.nombre), opciones: ops, valor: nivelActual(s), alCambiar: function (v) { cambiarConector(s, v); } });
+          if (hayActuar) ops.push({ valor: 'actuar', titulo: 'Actuar', sub: hayLeer ? 'Leer y actuar. Actuar siempre pide tu aprobación' : 'Actuar siempre pide tu aprobación' });
+          control = App.elegir({ forma: 'segmento', etiqueta: nombreServ(s.nombre), opciones: ops, valor: nivelActual(s), alCambiar: function (v) { cambiarConector(s, v); } });
         }
-        return App.ajuste(nombreServ(s.nombre), null, control);
+        return App.renglon({ marca: h('div.renglon-marca.chica', App.icono('enchufe')), titulo: nombreServ(s.nombre), sub: sub, control: control });
       });
       App.add(zonaConectores, App.seccion('Conectores', [
-        catalogo.detectando ? h('div.ayuda', 'Mirando tus conectores de claude.ai… puede tardar un minuto.') : null,
-        todos.length ? filas : h('div.ayuda', catalogo.detectando ? '' : fuera ? 'La oficina no habilita ningún conector.' : 'No hay conectores detectados. Conectalos en claude.ai y actualizá la lista en Ajustes › Conectores.'),
-        fuera ? h('div.ayuda', fuera === 1 ? 'Hay 1 conector que la oficina no habilita.' : 'Hay ' + fuera + ' conectores que la oficina no habilita.',
-          ' ', h('button.btn.chico.fantasma', { onclick: function () { App.Ajustes.abrir('habilitados'); } }, 'Ajustes › Skills y MCP')) : null,
-        h('button.btn.chico.fantasma', { onclick: function () { App.Ajustes.abrir('conectores'); } }, App.icono('enchufe'), 'Ver todos los conectores')],
-        { ayuda: 'Actuar es hacer algo afuera (mandar, publicar, crear) y siempre queda como propuesta que aprobás vos.' }));
-    }
-
-    function normServ(n) { var t = String(n || '').trim().toLowerCase(); return t.indexOf('claude.ai ') === 0 ? t.slice(10).trim() : t; }
-
-    /* skills y MCP de Claude Code: hereda lo que habilita la oficina o elige dentro de eso (PATCH skills/mcp; null = hereda) */
-    function pintarHabilitados(cat) {
-      App.vaciar(zonaHab);
-      var iaOf = (App.E.oficina && App.E.oficina.ia) || {};
-      function fila(clave, titulo, catalogoTipo, ayuda, nombreOp) {
-        var deOficina = iaOf[clave];
-        var base = deOficina ? deOficina.slice() : (catalogoTipo || []).slice();
-        var ops = App.Ajustes.opcionesNombres(base);
-        if (nombreOp) ops.forEach(nombreOp);
-        var el = App.Ajustes.selector({ etiqueta: titulo, opciones: ops, valor: ag()[clave],
-          vacio: deOficina ? 'La oficina no habilita ninguno.' : 'No hay nada instalado en tu Claude Code.',
-          todo: { titulo: 'Hereda de la oficina', sub: deOficina ? 'Usa los ' + deOficina.length + ' que habilita la oficina' : 'Usa todos los que habilita la oficina' },
-          algunas: { titulo: 'Solo los que elijas', sub: 'Dentro de lo que habilita la oficina' },
-          alCambiar: function (v) {
-            var antes = ag()[clave];
-            var previo = {}; previo[clave] = antes === undefined ? null : copia(antes);
-            guardar(function () { var c = {}; c[clave] = v; return c; },
-              titulo + ': ' + (v ? (v.length ? 'solo ' + v.length + ' de la lista' : 'nada') : 'hereda de la oficina') + '.', previo);
-          } });
-        return App.ajuste(titulo, ayuda, el);
-      }
-      App.add(zonaHab, App.seccion('Skills y MCP', [
-        fila('skills', 'Skills', cat.skills, 'Las skills de Claude Code que recibe en cada paso. Menos skills, menos tokens.'),
-        fila('mcp', 'Servidores MCP', cat.mcp, 'Los MCP de tu Claude Code que puede usar.',
-          function (o) { o.titulo = nombreServ(o.sub.replace(/^plugin:[^:]+:/, '')); }),
-        h('button.btn.chico.fantasma', { onclick: function () { App.Ajustes.abrir('habilitados'); } }, App.icono('chispa'), 'Lo que habilita la oficina')],
-        { ayuda: 'Lo que la oficina no habilita no aparece acá.' }));
-    }
-    function cargarHabilitados() {
-      zonaHab.appendChild(App.seccion('Skills y MCP', App.cargando('Trayendo lo que tenés en Claude Code…')));
-      api.get('/api/skills').then(function (r) { if (vigente()) pintarHabilitados(r); })
-        .catch(function () { if (vigente()) pintarHabilitados({ skills: [], mcp: [] }); });
+        catalogo.detectando ? h('div.nota-chica', 'Mirando tus conectores de claude.ai… puede tardar un minuto.') : null,
+        todos.length ? filas : h('div.nota-chica', catalogo.detectando ? '' : fuera ? 'La oficina no habilita ningún conector.' : 'No hay conectores detectados. Conectalos en claude.ai y actualizá la lista en Ajustes › Conectores.'),
+        todos.length ? h('div.nota-chica', { style: { marginTop: '4px' } }, 'Actuar (mandar, publicar, crear) siempre queda como propuesta que aprobás vos.') : null,
+        fuera ? h('div.nota-chica', (fuera === 1 ? 'Hay 1 conector que la oficina no habilita. ' : 'Hay ' + fuera + ' conectores que la oficina no habilita. '),
+          h('button.btn.chico.fantasma', { onclick: function () { App.Ajustes.abrir('habilitados'); } }, 'Cambiarlo')) : null],
+        { accion: todosBtn }));
     }
 
     function cargarCatalogo() {
       clearTimeout(sondeoPermisos);
       api.get('/api/conectores').then(function (r) {
         if (!vigente()) return;
-        catalogo = r; pintarConectores(); pintarResumen();
+        catalogo = r; pintarConectores();
         if (r.detectando) sondeoPermisos = setTimeout(function () { if (vigente()) cargarCatalogo(); }, 2000);
       }).catch(function () { if (vigente()) { catalogo = { servidores: [] }; pintarConectores(); } });
     }
@@ -815,17 +754,74 @@
         { limites: { solo: copia(l.solo || []), proponer: copia(l.proponer || []) } });
     }
     var chipsSolo = App.chipsEditables(solo, { placeholder: 'Algo que puede hacer sin preguntarte', max: 12, largo: 300, alCambiar: guardarLimites });
-    var chipsProponer = App.chipsEditables(proponer, { placeholder: 'Algo que te tiene que consultar antes', max: 12, largo: 300, alCambiar: guardarLimites });
+    /* mandar mails, publicar y gastar siempre quedan como propuesta: se ven fijos */
+    var siempre = 'Siempre queda como propuesta que aprobás vos';
+    var chipsProponer = App.chipsEditables(proponer, { placeholder: 'Algo que te tiene que consultar antes', max: 12, largo: 300, alCambiar: guardarLimites,
+      fijos: [{ texto: 'Mandar mails', icono: 'mail', title: siempre }, { texto: 'Publicar', icono: 'enviar', title: siempre }, { texto: 'Gastar', icono: 'escudo', title: siempre }] });
 
-    App.add(cont, resumen, zonaReglas,
-      App.ajuste('Hace solo', 'Lo que resuelve sin consultarte.', chipsSolo),
-      App.ajuste('Te consulta antes', 'Mail, publicar o gastar siempre quedan como propuesta, aunque no figure acá.', chipsProponer),
-      App.SkillsPropias ? App.SkillsPropias.seccion(ag()) : null, zonaHab, zonaConectores);
-    pintarReglas(); pintarConectores(); cargarHabilitados();
+    App.add(cont,
+      seccionOficina(a),
+      App.seccion('Sin preguntarte', [zonaReglas, grupoPerm('Hace', chipsSolo)]),
+      App.seccion('Te consulta antes', chipsProponer),
+      zonaConectores);
+    pintarReglas(); pintarConectores();
     if (!global) cargarCatalogo();
     api.get('/api/biblioteca/entregables', { agente: id }).then(function (r) {
       if (vigente() && r.carpeta) { carpetaEnt = String(r.carpeta); pintarReglas(); }
     }).catch(function () {});
+  }
+
+  function normServ(n) { var t = String(n || '').trim().toLowerCase(); return t.indexOf('claude.ai ') === 0 ? t.slice(10).trim() : t; }
+
+  /* ---------------- habilidades ----------------
+     Lo que sabe hacer: sus skills propias (skills-propias.js, con las que te propone arriba) y qué skills y servidores MCP de
+     Claude Code recibe: hereda lo que habilita la oficina o elige dentro de eso (PATCH skills/mcp; null = hereda). */
+  function pintarHabilidades(a, cuerpo) {
+    var id = a.id, cont = h('div.perm');
+    cuerpo.appendChild(cont);
+    function vigente() { return actual === id && viendo('habilidades') && cont.isConnected; }
+    function ag() { return App.agente(id) || a; }
+    var zonaHab = h('div'), abiertos = {}, cat = null;
+    var guardar = guardador(id, function () { if (vigente()) pintar(); });
+    function nombreServ(n) { return App.Ajustes.nombreServidor(n); }
+
+    function pintarHabilitados() {
+      App.vaciar(zonaHab);
+      var iaOf = (App.E.oficina && App.E.oficina.ia) || {};
+      function fila(clave, titulo, catalogoTipo, sub, nombreOp) {
+        var deOficina = iaOf[clave];
+        var base = deOficina ? deOficina.slice() : (catalogoTipo || []).slice();
+        var ops = App.Ajustes.opcionesNombres(base);
+        if (nombreOp) ops.forEach(nombreOp);
+        var v = ag()[clave];
+        var resumen = v ? (v.length ? (v.length === 1 ? '1 elegido' : v.length + ' elegidos') : 'Ninguno')
+          : deOficina ? (deOficina.length === 1 ? 'El de la oficina' : 'Los ' + deOficina.length + ' de la oficina') : 'Todos los instalados';
+        var boton = h('button.btn.chico', { 'aria-expanded': String(!!abiertos[clave]), onclick: function () { abiertos[clave] = !abiertos[clave]; pintarHabilitados(); } },
+          resumen, h('span.renglon-chev' + (abiertos[clave] ? '.girado' : ''), App.icono('abajo')));
+        var renglon = App.renglon({ titulo: titulo, sub: sub, control: boton });
+        if (!abiertos[clave]) return renglon;
+        var el = App.Ajustes.selector({ etiqueta: titulo, opciones: ops, valor: v,
+          vacio: deOficina ? 'La oficina no habilita ninguno.' : 'No hay nada instalado en tu Claude Code.',
+          todo: { titulo: 'Hereda de la oficina', sub: deOficina ? 'Usa los ' + deOficina.length + ' que habilita la oficina' : 'Usa todos los que habilita la oficina' },
+          algunas: { titulo: 'Solo los que elijas', sub: 'Dentro de lo que habilita la oficina' },
+          alCambiar: function (nv) {
+            var antes = ag()[clave];
+            var previo = {}; previo[clave] = antes === undefined ? null : copia(antes);
+            guardar(function () { var c = {}; c[clave] = nv; return c; },
+              titulo + ': ' + (nv ? (nv.length ? 'solo ' + nv.length + ' de la lista' : 'nada') : 'hereda de la oficina') + '.', previo);
+          } });
+        return [renglon, h('div.renglon-abierto', { style: { marginLeft: 0 } }, el)];
+      }
+      App.add(zonaHab, App.seccion('De Claude Code', [
+        fila('skills', 'Skills', cat.skills, 'Menos skills, menos tokens'),
+        fila('mcp', 'Servidores MCP', cat.mcp, null, function (o) { o.titulo = nombreServ(o.sub.replace(/^plugin:[^:]+:/, '')); }),
+        h('div.nota-chica', { style: { marginTop: '4px' } }, 'Lo que la oficina no habilita no aparece. ',
+          h('button.btn.chico.fantasma', { onclick: function () { App.Ajustes.abrir('habilitados'); } }, 'Cambiarlo'))]));
+    }
+    App.add(cont, App.SkillsPropias ? App.SkillsPropias.seccion(ag()) : null, zonaHab);
+    zonaHab.appendChild(App.seccion('De Claude Code', App.cargando('Trayendo lo que tenés en Claude Code…')));
+    api.get('/api/skills').then(function (r) { if (vigente()) { cat = r; pintarHabilitados(); } })
+      .catch(function () { if (vigente()) { cat = { skills: [], mcp: [] }; pintarHabilitados(); } });
   }
 
   /* ---------------- notas ---------------- */

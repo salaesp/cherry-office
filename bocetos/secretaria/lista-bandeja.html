@@ -242,7 +242,7 @@ h1 { font-size: 24px; margin: 0 0 6px; text-wrap: balance; }
     if (!hay) return mostrar('a');
     botones.forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-ir') === id)); });
   }
-  botones.forEach(function (b) { b.addEventListener('click', function () { var id = b.getAttribute('data-ir'); history.replaceState(null, '', '#' + id); mostrar(id); }); });
+  botones.forEach(function (b) { b.addEventListener('click', function () { var id = b.getAttribute('data-ir'); try { history.replaceState(null, '', '#' + id); } catch (e) {} mostrar(id); }); });
   window.addEventListener('hashchange', function () { mostrar(location.hash.slice(1)); });
   mostrar(location.hash.slice(1) || 'a');
 })();
