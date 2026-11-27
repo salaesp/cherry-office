@@ -163,6 +163,9 @@ export function mapearPublicacionApify(p) {
   }
 }
 
+/** Como en el perfil: primero las fijadas y después de la más nueva a la más vieja (Apify las devuelve mezcladas). */
+export const ordenar = (pubs) => [...pubs].sort((a, b) => (b.fijada - a.fijada) || String(b.fecha ?? '').localeCompare(String(a.fecha ?? '')))
+
 /** Los datos de perfil de Apify (`resultsType: "details"`) en el formato del spike. Si vienen `posts` (de otra corrida
  *  con `resultsType: "posts"`), reemplazan a las `latestPosts` del perfil. */
 export function mapearPerfilApify(d, posts) {
@@ -180,7 +183,7 @@ export function mapearPerfilApify(d, posts) {
     seguidores: sinNegativo(d.followersCount),
     seguidos: sinNegativo(d.followsCount),
     publicacionesTotal: sinNegativo(d.postsCount),
-    publicaciones: lista.map(mapearPublicacionApify),
+    publicaciones: ordenar(lista.map(mapearPublicacionApify)),
     hayMas: (sinNegativo(d.postsCount) ?? 0) > lista.length,
   }
 }

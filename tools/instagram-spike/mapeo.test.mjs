@@ -85,3 +85,14 @@ test('mapearPerfilApify deja el mismo formato que la lectura directa', async () 
   assert.deepEqual(resumir(apify).tipos, resumir(directo).tipos)
   assert.equal(mapearPerfilApify({ error: 'not_found' }), undefined)
 })
+
+test('ordenar: fijadas primero y después de la más nueva a la más vieja', async () => {
+  const { ordenar } = await import('./mapeo.mjs')
+  const r = ordenar([
+    { codigo: 'a', fecha: '2026-11-05T00:00:00Z', fijada: false },
+    { codigo: 'b', fecha: '2026-11-20T00:00:00Z', fijada: false },
+    { codigo: 'c', fecha: '2026-11-08T00:00:00Z', fijada: true },
+    { codigo: 'd', fecha: null, fijada: false },
+  ])
+  assert.deepEqual(r.map((p) => p.codigo), ['c', 'b', 'a', 'd'])
+})
