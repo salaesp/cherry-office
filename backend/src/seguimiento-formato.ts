@@ -237,10 +237,21 @@ export function actualizarTema(t: Tema, nuevo: boolean, p: CambioTema, hoy: stri
     if (f !== '' && !fechaValida(f)) throw falla('La fecha va como AAAA-MM-DD o AAAA-MM-DD HH:MM (vacía para sacarla).')
     if (f !== t.fecha) { t.fecha = f; cambio = true }
   }
+  let proximoEntero = ''
   if (p.proximo !== undefined) {
-    const x = unaLinea(p.proximo)
-    if (largo(x) > T.maxProximo) throw falla(`El próximo paso puede tener hasta ${T.maxProximo} caracteres.`)
+    let x = unaLinea(p.proximo)
+    // Un próximo paso largo no tira el cambio entero: se recorta (en un espacio, con «…») y, si no vino nota, el texto
+    // completo queda en el historial para no perder nada.
+    if (largo(x) > T.maxProximo) {
+      proximoEntero = x
+      const corte = prefijo(x, T.maxProximo - 1)
+      const esp = corte.lastIndexOf(' ')
+      x = (esp > T.maxProximo / 2 ? corte.slice(0, esp) : corte).trimEnd() + '…'
+    }
     if (x !== t.proximo) { t.proximo = x; cambio = true }
+  }
+  if (proximoEntero !== '' && (p.nota === undefined || unaLinea(p.nota) === '')) {
+    p = { ...p, nota: prefijo(`Próximo paso: ${proximoEntero}`, T.maxHecho) }
   }
   if (p.personas !== undefined) {
     const lista = personasValidas(p.personas, T)

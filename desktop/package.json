@@ -44,6 +44,11 @@
         "to": "icono.png"
       },
       {
+        "from": "build",
+        "to": "bandeja",
+        "filter": ["bandeja*.png"]
+      },
+      {
         "from": "build/recursos/transcriptor",
         "to": "transcriptor"
       }

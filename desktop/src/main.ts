@@ -409,8 +409,16 @@ function devTools(): MenuItemConstructorOptions[] {
   return app.isPackaged ? [] : [{ type: 'separator' }, { role: 'reload', label: 'Recargar' }, { role: 'toggleDevTools', label: 'Herramientas de desarrollo' }]
 }
 
+/** El edificio de 16×16 dibujado para la bandeja (con @2x para retina); el ícono grande achicado queda borroso. */
+function iconoBandeja(): Electron.NativeImage {
+  const nombre = esMac ? 'bandeja-mac.png' : 'bandeja.png'
+  const f = app.isPackaged ? path.join(process.resourcesPath, 'bandeja', nombre) : path.resolve(__dirname, '../build', nombre)
+  const img = nativeImage.createFromPath(f)
+  return img.isEmpty() ? icono(esMac ? 18 : 16) : img
+}
+
 function armarBandeja() {
-  const img = esMac ? icono(18) : icono(16)
+  const img = iconoBandeja()
   if (img.isEmpty()) return
   if (esMac) img.setTemplateImage(false)
   bandeja = new Tray(img)

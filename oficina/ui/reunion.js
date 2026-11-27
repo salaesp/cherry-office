@@ -285,7 +285,7 @@
       var mandar = h('button.btn.primario.icono', { title: 'Enviar (Enter)', disabled: cerrando, onclick: enviar }, App.icono('enviar'));
       function alto() { txt.style.height = 'auto'; txt.style.height = Math.min(160, txt.scrollHeight + 2) + 'px'; }
       txt.addEventListener('input', function () { borrador[r.id] = txt.value; alto(); });
-      txt.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); enviar(); } });
+      txt.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !App.tactil()) { e.preventDefault(); enviar(); } });
       function enviar() {
         var v = txt.value.trim(); if (!v || cerrando || mandar.disabled) { txt.focus(); return; }
         mandar.disabled = true;

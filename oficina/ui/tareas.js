@@ -114,7 +114,8 @@ App.Tareas = (function () {
   function fila(t, g) {
     var ag = App.agente(t.agente);
     var unica = t.tipo === 'unica', activa = t.activa !== false;
-    var abrirFicha = function () { if (ag) App.Agente.abrir(t.agente, 'tareas'); };
+    /* celular: la tarea sola en su hoja (como desde la Bandeja); en la compu, la ficha del agente con la tarea destacada */
+    var abrirFicha = function () { if (!ag) return; if (App.tactil() || window.matchMedia('(max-width: 720px)').matches) App.Agente.verTarea(t.id); else App.Agente.abrir(t.agente, 'tareas', t.id); };
 
     var principal = null;
     if (g !== 'corriendo' && g !== 'permiso') {
@@ -172,7 +173,7 @@ App.Tareas = (function () {
     App.add(App.vaciar(der), cabecera(sub.join(' · ')), cuerpo, pie);
 
     if (!ts.length) {
-      App.add(cuerpo, App.vacio('reloj', 'Todavía no hay tareas', 'Programale a un agente algo que haga solo: un informe cada mañana, o un encargo de una sola vez. Usá «Nueva tarea», abajo.'));
+      App.add(cuerpo, App.vacio('reloj', 'Todavía no hay tareas', 'Programale a un agente algo que haga solo: un informe cada mañana, o un encargo de una sola vez. ' + (App.movil ? 'Tocá «+» y elegí «Nueva tarea», o pedíselo en una charla.' : 'Usá «Nueva tarea», abajo.')));
     } else {
       var ahora = Date.now(), finHoy = new Date(); finHoy.setHours(23, 59, 59, 999);
       var hoy = g.proximas.filter(function (t) { return instante(t) <= finHoy.getTime(); });

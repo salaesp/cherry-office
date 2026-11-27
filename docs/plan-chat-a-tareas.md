@@ -1,7 +1,10 @@
 # Plan: del chat a las tareas
 
-> Estado: C0, C1 y C2 hechos. Botón «Sacar tareas» (reloj) en la cabecera del chat;
-> backend en `backend/src/chat-tareas.ts`, hoja en `oficina/ui/chat-tareas.js`.
+> Estado: C0, C1 y C2 hechos. «Sacar tareas» es una sugerencia (chip) debajo de la última respuesta, con 3 idas y vueltas
+> o más; backend en `backend/src/chat-tareas.ts`, hoja en `oficina/ui/chat-tareas.js`.
+> Antes era un botón fijo en la cabecera del chat. Dejó de serlo cuando todos los agentes pasaron a proponer tareas en la
+> charla (`proponer_tarea`, `delegar` con «cuando»): el botón queda para el repaso del final, lo que los agentes no hacen
+> (leer toda la charla de una vez, separar lo que le toca a la persona y revisar todo junto en la hoja).
 
 ## Contexto
 Una charla con un agente suele terminar en «entonces hay que hacer X, Y y Z». Hoy eso queda en el historial y la persona
@@ -57,7 +60,8 @@ Objetivo: **chat → propuesta de tareas → la persona revisa → tareas creada
   avisa antes de crear el lote si no entran.
 
 ## Fase C2: interfaz
-- **Botón «Sacar tareas»** en el menú del chat del agente (`oficina/ui/agente.js`), visible con al menos un ida y vuelta.
+- **Sugerencia «¿Sacamos tareas de esta charla?»** debajo de la última respuesta (`oficina/ui/agente.js`), con 3 idas y
+  vueltas o más y sin respuesta en curso ni mensajes en cola. (Al principio era un botón en la cabecera del chat.)
   Mientras corre, `App.cargando` («Leyendo la charla…»).
 - **Hoja «Tareas de esta charla»**, armada con las piezas de presentación (`elegir`, `filaDecision`, `seccion`, menú con
   filtro). Una fila por pendiente:

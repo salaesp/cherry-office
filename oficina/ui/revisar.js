@@ -81,7 +81,7 @@ App.Revisar = (function () {
     if (!archivos.length) { App.aviso('Esta entrega no tiene archivos para ver acá.', true); return null; }
     var estado = {
       archivo: archivos.indexOf(op.archivo) !== -1 ? op.archivo : archivos[0],
-      modo: 'ver', ancho: 'escritorio', vista: null, notas: leerNotas(e), borrador: null, retoques: (e.retoques || []).length
+      modo: 'ver', ancho: window.matchMedia('(max-width: 720px)').matches ? 'telefono' : 'escritorio', vista: null, notas: leerNotas(e), borrador: null, retoques: (e.retoques || []).length
     };
     var puedeCambiar = !!op.puedeCambiar, puedeRetocar = !!op.puedeRetocar;
     var anchoHoja = Math.max(720, Math.min(1400, window.innerWidth - 48));

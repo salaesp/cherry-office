@@ -183,7 +183,7 @@ App.Entregables = (function () {
     /* solo los encargos `encargo:<reunión>:<n>` vienen de una reunión (los `coord:xxxx` del coordinador no) */
     var reu = e.origen === 'reunion' ? e.ref : (e.origen === 'encargo' && e.ref.indexOf('encargo:') === 0 ? (e.ref.split(':')[1] || '') : '');
     if (reu && App.Reunion && App.Reunion.ver) return h('button.btn.chico.fantasma', { onclick: function () { App.Reunion.ver(reu); } }, App.icono('reunion'), 'Ver la reunión');
-    if (e.origen === 'tarea' && e.agente) return h('button.btn.chico.fantasma', { onclick: function () { App.Agente.abrir(e.agente, 'tareas'); } }, 'Ver la tarea');
+    if (e.origen === 'tarea' && e.agente) return h('button.btn.chico.fantasma', { onclick: function () { if (e.ref) App.Agente.verTarea(e.ref); else App.Agente.abrir(e.agente, 'tareas'); } }, 'Ver la tarea');
     return null;
   }
 

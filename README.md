@@ -29,8 +29,8 @@ En los dos casos hace falta **Claude Code** instalado y con la sesión iniciada.
 - **Equipo, chat y reuniones:** Equipo funciona como un chat: cada agente es un contacto y tocarlo (en la lista o en la oficina)
   abre su charla pegada a la lista, con la oficina a la vista y la persona centrada. Al costado van sus charlas, tareas,
   archivos y notas (el lápiz abre su perfil y permisos; el pin muestra dónde está). Las reuniones tienen su pestaña en Equipo,
-  desde donde se llama a una nueva. Desde una charla, «Sacar tareas» propone
-  el trabajo que quedó pendiente (para ese agente o para otros) y, después de revisarlo, lo crea como tareas.
+  desde donde se llama a una nueva. Al final de una charla larga aparece la sugerencia «¿Sacamos tareas de esta charla?»:
+  propone el trabajo que quedó pendiente (para ese agente o para otros) y, después de revisarlo, lo crea como tareas.
 - **Hablarles y que se pasen trabajo:** en cualquier charla podés escribir o grabar un audio (se transcribe en tu compu).
   Si lo que pedís es para otro, el agente se lo pasa a ese colega: lo que pediste explícito arranca a los 45 segundos (se
   puede deshacer) y lo que dedujo queda como propuesta; si algo no está claro, te pregunta con opciones. Cada cosa queda

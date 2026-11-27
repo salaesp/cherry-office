@@ -164,7 +164,7 @@
       if (!filas) {
         lista.appendChild(h('div.vacio', q ? 'No encontré nada con eso.' : h('div',
           h('p', vista === 'todo' ? 'Todavía no hay archivos.' : 'Todavía no hay documentos de ' + (vista === OFICINA ? 'toda la oficina' : nombreDueno(vista)) + '.'),
-          h('p.ayuda', 'Arrastrá documentos acá o tocá «Subir a ' + textoDestino() + '». También podés cambiarle el dueño a uno que ya esté desde su etiqueta.'))));
+          h('p.ayuda', (App.tactil() ? 'Tocá' : 'Arrastrá documentos acá o tocá') + ' «Subir a ' + textoDestino() + '». También podés cambiarle el dueño a uno que ya esté desde su etiqueta.'))));
       }
       biblio.classList.toggle('con-sel', !!sel);
     }

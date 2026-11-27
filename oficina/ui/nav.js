@@ -59,9 +59,9 @@ App.Nav = (function () {
     var sec = p[0] === 'reuniones' || p[0] === 'charlas' || SECCIONES.some(function (s) { return s.id === p[0]; }) ? p[0] : 'oficina';
     return { sec: sec, a: p[1] || null, b: p[2] || null, resto: p.slice(2).join('/') };
   }
-  function empujar(ruta, reemplazar) {
+  function empujar(ruta, reemplazar, estado) {
     if (location.hash === ruta) return;
-    if (reemplazar) history.replaceState(null, '', ruta); else history.pushState(null, '', ruta);
+    if (reemplazar) history.replaceState(estado || null, '', ruta); else history.pushState(estado || null, '', ruta);
   }
 
   /* ---------------- riel ---------------- */
@@ -98,11 +98,12 @@ App.Nav = (function () {
       { texto: 'Cambiar de oficina…', icono: 'edificio', accion: function () { App.menuOficina(ancla); } });
     App.menu(ancla, items);
   }
-  /* modo celular: lo poco que no va en la barra; lo demás (contratar, departamentos, flujos, Creador, Ajustes) es de la compu */
+  /* modo celular: lo poco que no va en la barra; lo demás (contratar, departamentos, editar flujos, Creador) es de la compu */
   function menuMasMovil(ancla) {
     var items = [
-      { texto: 'Archivos', icono: 'carpeta', nota: 'solo leer', accion: function () { ir('#/archivos'); } },
-      { texto: 'Reuniones', icono: 'reunion', nota: 'solo leer', accion: function () { ir('#/equipo/reuniones'); } }];
+      { texto: 'Archivos', icono: 'carpeta', accion: function () { ir('#/archivos'); } },
+      { texto: 'Reuniones', icono: 'reunion', accion: function () { ir('#/equipo/reuniones'); } },
+      { texto: 'Ajustes', icono: 'ajustes', accion: function () { App.Ajustes.abrir(); } }];
     if (App.Push && App.Push.itemMenu) { var p = App.Push.itemMenu(); if (p) items.push('-', p); }
     items.push('-', { texto: 'Cambiar de oficina…', icono: 'edificio', accion: function () { App.menuOficina(ancla); } },
       { titulo: 'Lo demás, en la compu' });
@@ -112,7 +113,6 @@ App.Nav = (function () {
   function deLaCompu(r) {
     if (r.sec === 'oficina') return true;
     if (r.sec === 'equipo' && ['departamentos', 'contratar', 'creador', 'nueva-reunion'].indexOf(r.a) >= 0) return true;
-    if (r.sec === 'equipo' && r.a && r.b && App.Agente.PESTANAS.indexOf(r.b) >= 0) return true;   // la ficha del agente
     if (r.sec === 'trabajo' && r.a === 'flujos' && r.b === 'editar') return true;
     return false;
   }
@@ -142,6 +142,9 @@ App.Nav = (function () {
       dom.items[k].classList.toggle('activo', k === sec);
       if (k === sec) dom.items[k].setAttribute('aria-current', 'page'); else dom.items[k].removeAttribute('aria-current');
     });
+    /* celular: una sección que no está en la barra (Archivos) marca «Más», que es por donde se entra */
+    var mas = dom.riel && dom.riel.querySelector('.riel-mas');
+    if (mas) mas.classList.toggle('activo', !!dom.items[sec] && dom.items[sec].classList.contains('riel-no-movil') && esMovil());
     marcarDetalle();
     pintarLista();
   }
@@ -297,14 +300,17 @@ App.Nav = (function () {
     if (modo !== 'agente') App.dom.derecho.classList.remove('con-relacionado', 'lado-movil');
     var lugar = lugarDe(modo);
     if (!lugar) return;
+    /* se abrió desde otra sección (una charla desde la Bandeja): su ✕ vuelve ahí, no a la lista de esta sección */
+    var deOtra = !aplicando && seccion && seccion !== 'oficina' && seccion !== lugar[0];
     if (seccion !== lugar[0] || (lugar[1] && sub !== lugar[1])) ponerSeccion(lugar[0], lugar[1]);
-    if (!aplicando) empujar(rutaDe(modo));
+    if (!aplicando) empujar(rutaDe(modo), false, deOtra ? { volver: true } : null);
     marcarDetalle();
     pintarLista();
   }
   /* App.cerrarDerecho avisa acá: en una sección, cerrar el panel vuelve a la lista (en el celular) o al vacío */
   function alCerrar(silencioso) {
     if (seccion === 'oficina' || silencioso) { marcarDetalle(); return; }
+    if (!aplicando && history.state && history.state.volver) { history.back(); return; }
     vacio();
     if (!aplicando) empujar('#/' + seccion);
     pintarLista();
@@ -519,7 +525,7 @@ App.Nav = (function () {
   var MAX_LADO = 3;
   function charlasDe(id) { return (sesiones || []).filter(function (s) { return s.agente === id; }); }
   function filaCharla(id, s, activa) {
-    return h('button.lat-fila.charla' + (activa ? '.act' : ''), { onclick: function () { ir('#/equipo/' + encodeURIComponent(id) + '/' + s.session); } },
+    return h('button.lat-fila.charla' + (activa ? '.act' : ''), { onclick: function () { App.Agente.alElegirCharla(); ir('#/equipo/' + encodeURIComponent(id) + '/' + s.session); } },
       App.icono('charla'), h('span', h('b', titulo(s)), h('small', activa ? 'abierta ahora' : corto(s.ts))));
   }
   function relacionado(id) {
@@ -533,7 +539,7 @@ App.Nav = (function () {
     function verTodas(cual, n, texto) { return n > MAX_LADO ? h('button.lat-mas', { onclick: function () { App.Agente.verLado(cual); } }, (texto || 'Ver todas') + ' (' + n + ')', App.icono('flecha')) : null; }
     function cuenta(n) { return h('em', n == null ? '' : String(n)); }
     /* «nuevo» de cada sección: con borde y texto (no un «+» suelto), todos iguales */
-    var botonMas = function (texto, titulo_, accion) { return App.movil ? null : h('button.btn.chico.lat-nueva', { title: titulo_, onclick: accion }, App.icono('mas'), texto); };
+    var botonMas = function (texto, titulo_, accion) { return h('button.btn.chico.lat-nueva', { title: titulo_, onclick: accion }, App.icono('mas'), texto); };
 
     /* charlas */
     var charlas = h('div'), charlasVer = h('div'), charlasN = cuenta(null);
@@ -542,7 +548,7 @@ App.Nav = (function () {
       var actualSid = App.Agente.sesion(id), ss = charlasDe(id);
       charlasN.textContent = sesiones ? String(ss.length) : '';
       var actual = ss.filter(function (s) { return s.session === actualSid; })[0];
-      if (!actual && App.Agente.actual() === id) charlas.appendChild(h('button.lat-fila.charla.act', App.icono('charla'), h('span', h('b', 'Charla nueva'), h('small', 'abierta ahora'))));
+      if (!actual && App.Agente.actual() === id) charlas.appendChild(h('button.lat-fila.charla.act', { onclick: function () { App.Agente.alElegirCharla(); } }, App.icono('charla'), h('span', h('b', 'Charla nueva'), h('small', 'abierta ahora'))));
       var vis = ss.slice(0, MAX_LADO + 1);
       if (actual && vis.indexOf(actual) < 0) vis.push(actual);
       vis.forEach(function (s) { charlas.appendChild(filaCharla(id, s, s === actual)); });
@@ -576,7 +582,7 @@ App.Nav = (function () {
       tareasN.textContent = String(ts.length);
       if (!ts.length) tareas.appendChild(h('div.lat-vacio', 'Sin tareas programadas.'));
       ts.slice(0, MAX_LADO).forEach(function (t) {
-        tareas.appendChild(h('button.lat-fila', { onclick: function () { App.Agente.verLado('tareas'); } }, App.icono('reloj'),
+        tareas.appendChild(h('button.lat-fila', { onclick: function () { if (App.movil || window.matchMedia('(max-width: 720px)').matches) App.Agente.verTarea(t.id); else App.Agente.verLado('tareas'); } }, App.icono('reloj'),
           h('span', h('b', t.nombre), h('small', t.corriendo ? 'corriendo' : t.activa === false ? 'en pausa' : (t.unica ? 'una vez' : 'programada')))));
       });
       var v = verTodas('tareas', ts.length); if (v) tareasVer.appendChild(v);
@@ -602,13 +608,21 @@ App.Nav = (function () {
     caja.appendChild(seccion_('Notas', notasN, null, notas, notasVer));
     api().get('/api/agentes/' + encodeURIComponent(id) + '/conocimiento').then(function (r) {
       App.vaciar(notas);
-      var renglones = (r.texto || '').split('\n').map(function (l) { return l.replace(/^\s*([-*+]|\d+\.|#+)\s*/, '').replace(/[*_`>]/g, '').trim(); }).filter(Boolean);
+      var renglones = renglonesNotas(r.texto);
       notasN.textContent = String(renglones.length);
       if (!renglones.length) notas.appendChild(h('div.lat-vacio', 'Todavía no anotó nada.'));
       renglones.slice(0, MAX_LADO).forEach(function (l) { notas.appendChild(h('div.lat-nota', l)); });
       var v = verTodas('notas', renglones.length); if (v) notasVer.appendChild(v);
     }).catch(function () { App.vaciar(notas); });
     return caja;
+  }
+  /* los renglones que anotó, sin lo que trae la plantilla de sus notas (el título, «Rol: …» y «Estado actual de …»,
+     backend/src/plantillas.ts notasAgenteMD): si nunca anotó nada, son cero */
+  function renglonesNotas(texto) {
+    return (texto || '').split('\n').filter(function (l) {
+      var t = l.trim();
+      return t && !/^#/.test(t) && !/^Rol:\s/.test(t) && !/^Estado actual de .+: en qué está, qué entregó último/.test(t);
+    }).map(function (l) { return l.replace(/^\s*([-*+]|\d+\.)\s*/, '').replace(/[*_`>]/g, '').trim(); }).filter(Boolean);
   }
   /* cuántas charlas, tareas, archivos y notas tiene: alLlegar(clave, n) por cada una, a medida que llegan */
   function cuentas(id, alLlegar) {
@@ -617,7 +631,7 @@ App.Nav = (function () {
     api().get('/api/tareas').then(function (r) { alLlegar('tareas', (r.tareas || []).filter(function (t) { return t.agente === id; }).length); }).catch(function () {});
     api().get('/api/biblioteca/entregables', { agente: id }).then(function (r) { alLlegar('archivos', (r.entregables || []).length); }).catch(function () {});
     api().get('/api/agentes/' + encodeURIComponent(id) + '/conocimiento').then(function (r) {
-      alLlegar('notas', (r.texto || '').split('\n').map(function (l) { return l.replace(/^\s*([-*+]|\d+\.|#+)\s*/, '').replace(/[*_`>]/g, '').trim(); }).filter(Boolean).length);
+      alLlegar('notas', renglonesNotas(r.texto).length);
     }).catch(function () {});
   }
   /* todas sus charlas, para «Ver todas» (con buscador) */
@@ -627,7 +641,7 @@ App.Nav = (function () {
     if (!sesiones) { cargarSesiones().then(function () { App.Agente.repintarLado('charlas'); }); caja.appendChild(h('div.lat-vacio', '…')); return caja; }
     ss.forEach(function (s) {
       var ult = App.Adjuntos && App.Adjuntos.separar ? App.Adjuntos.separar(s.ultimo || '').texto : s.ultimo;
-      caja.appendChild(h('button.lat-fila.charla' + (s.session === actualSid ? '.act' : ''), { onclick: function () { App.Agente.verLado('detalles'); ir('#/equipo/' + encodeURIComponent(id) + '/' + s.session); } },
+      caja.appendChild(h('button.lat-fila.charla' + (s.session === actualSid ? '.act' : ''), { onclick: function () { App.Agente.alElegirCharla(); ir('#/equipo/' + encodeURIComponent(id) + '/' + s.session); } },
         App.icono('charla'), h('span', h('b', titulo(s)), h('small', (s.de === 'u' ? 'Vos: ' : '') + (ult || '').replace(/[*#`|>]/g, ''))), h('em.meta', corto(s.ts))));
     });
     if (!ss.length) caja.appendChild(h('div.lat-vacio', q ? 'Nada con «' + q + '».' : 'Todavía no charlaron.'));
