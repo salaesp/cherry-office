@@ -2,7 +2,8 @@
    configurada con los chats elegidos de WhatsApp y, si están conectados, Gmail y el calendario) y se configura todo acá:
    qué chats revisa (de la lista completa: elegir uno acá lo elige también en Ajustes › WhatsApp), cada cuánto, Gmail y
    Calendario (prenderlos le asigna el conector), la franja horaria y «Revisar ahora». En la ficha del agente queda un
-   resumen con «Configurar». API: GET/PUT /api/secretaria, POST /api/secretaria/contratar y /revisar. */
+   resumen con «Configurar». Su memoria privada (bloque «Memoria») está en secretaria-memoria.js. API: GET/PUT
+   /api/secretaria, POST /api/secretaria/contratar y /revisar. */
 (function () {
   var h = App.h;
   var api = function () { return App.api; };
@@ -62,7 +63,8 @@
           item(cal && cal.disponible, cal && cal.disponible ? 'Calendario: tu agenda, y puede proponerte eventos' : 'Calendario, si lo conectás en claude.ai'))),
         h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '12px', flexWrap: 'wrap' } }, h('span', 'Nombre'), nombre, btn),
         err,
-        h('div.ajuste-ayuda', { style: { marginTop: '8px' } }, 'Se sienta en la recepción. Solo lee: nunca manda mensajes ni hace nada sin que lo apruebes.'));
+        h('div.ajuste-ayuda', { style: { marginTop: '8px' } }, 'Se sienta en la recepción. Solo lee: nunca manda mensajes ni hace nada sin que lo apruebes.'),
+        App.SecretariaMemoria ? App.SecretariaMemoria.bloque(false) : null);
     }
 
     /* ---- con secretaría ---- */
@@ -188,8 +190,10 @@
         h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, ahora, h('span.ajuste-ayuda', { style: { flex: 1 } }, textoNovedades(estadoWa))),
         err,
         revs.length ? h('div', { style: { marginTop: '8px' } }, h('div.ajuste-tit', { style: { fontSize: '12px' } }, 'Últimas revisiones'), revs) : null));
+      /* memoria privada de la secretaría (secretaria-memoria.js) */
+      if (App.SecretariaMemoria) caja.appendChild(App.SecretariaMemoria.bloque(true));
       caja.appendChild(h('div', { style: { marginTop: '16px' } }, h('button.btn.chico.fantasma', { onclick: function () {
-        App.confirmar('¿Cerrar la secretaría?', ag.nombre + ' deja de revisar (sigue en la oficina; si querés, despedilo desde su ficha). Los reportes que ya dejó quedan en la bandeja.', 'Cerrar', true).then(function (si) {
+        App.confirmar('¿Cerrar la secretaría?', ag.nombre + ' deja de revisar (sigue en la oficina; si querés, despedilo desde su ficha). Los reportes que ya dejó quedan en la bandeja, y su memoria también (podés borrarla desde «Memoria»).', 'Cerrar', true).then(function (si) {
           if (si) guardar({ agente: null }, 'La oficina ya no tiene secretaría.');
         });
       } }, 'Cerrar la secretaría')));

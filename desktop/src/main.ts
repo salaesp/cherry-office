@@ -244,14 +244,16 @@ async function borrarOficina(carpeta?: string): Promise<Record<string, unknown>>
 }
 
 /** Abrir (con su aplicación) o mostrar en el Finder/Explorador, solo dentro de la oficina, de una carpeta vinculada o de
- *  una carpeta de trabajo. */
+ *  una carpeta de trabajo (y, para mostrar, la carpeta de la memoria de la secretaría). */
 async function abrirRuta(accion: 'abrir' | 'revelar', ruta?: string) {
   const estado = await api('/api/estado')
   const carpeta: string | undefined = estado.oficina?.carpeta
   const vinculos = await api('/api/vinculos')
   const trabajo = await api('/api/carpetas-trabajo')
+  // la memoria privada de la secretaría vive fuera de la oficina (datosDir/secretaria/<id>): solo se puede mostrar
+  const memoria = accion === 'revelar' && ruta !== undefined ? (await api('/api/secretaria/memoria/carpeta')).ruta : undefined
   const bases = [carpeta, ...((vinculos.vinculos ?? []) as { ruta?: string }[]).map((v) => v.ruta),
-    ...((trabajo.carpetas ?? []) as { ruta?: string }[]).map((c) => c.ruta)].filter((x): x is string => typeof x === 'string')
+    ...((trabajo.carpetas ?? []) as { ruta?: string }[]).map((c) => c.ruta), memoria].filter((x): x is string => typeof x === 'string')
   const pedida = ruta ?? carpeta
   if (!pedida) return shell.beep()
   // un .oficina.zip exportado puede quedar fuera de la oficina (Descargas): se puede mostrar, no abrir
