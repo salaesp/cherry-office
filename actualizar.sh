@@ -37,6 +37,24 @@ if [ "$antes" != "$despues" ]; then
   git --no-pager log --oneline "$antes..$despues"
 fi
 
+# --- HQ_HOSTS ---
+# Si la máquina se publica con `tailscale serve`, el backend tiene que aceptar ese
+# nombre (HQ_HOSTS). Se toma de `tailscale serve status` y, si el servicio no lo
+# tiene, se agrega con un drop-in de systemd y se reinicia aunque no haya cambios.
+TS_HOST=$(tailscale serve status 2>/dev/null | sed -n '1s|^https://\([^ /:]*\).*|\1|p' || true)
+if [ -n "$TS_HOST" ] && systemctl --user cat "$SERVICIO" >/dev/null 2>&1; then
+  hosts=$(systemctl --user show -p Environment --value "$SERVICIO" | tr ' ' '\n' | sed -n 's/^HQ_HOSTS=//p')
+  if ! printf '%s\n' "${hosts//,/$'\n'}" | grep -qxF "$TS_HOST"; then
+    nuevos=${hosts:+$hosts,}$TS_HOST
+    echo "Agregando HQ_HOSTS=$nuevos a $SERVICIO (para entrar por https://$TS_HOST)…"
+    dropin="$HOME/.config/systemd/user/$SERVICIO.d"
+    mkdir -p "$dropin"
+    printf '[Service]\nEnvironment=HQ_HOSTS=%s\n' "$nuevos" > "$dropin/hq-hosts.conf"
+    systemctl --user daemon-reload
+    FORZAR=1
+  fi
+fi
+
 # Se compila si lo que hay en dist/ no corresponde al commit actual, aunque el
 # pull no haya traído nada (por ejemplo, si se hizo el pull a mano antes).
 compilado=$(cat "$MARCA" 2>/dev/null || true)
@@ -84,6 +102,10 @@ else
     echo "No había un backend corriendo; lo arranco."
   fi
   for v in ${VARS[@]+"${VARS[@]}"}; do case "$v" in PORT=*) PUERTO="${v#PORT=}";; esac; done
+  # sin systemd: si el proceso viejo no traía HQ_HOSTS, usar el nombre de tailscale serve
+  if [ -n "$TS_HOST" ] && ! printf '%s\n' ${VARS[@]+"${VARS[@]}"} | grep -q '^HQ_HOSTS='; then
+    VARS+=("HQ_HOSTS=$TS_HOST")
+  fi
 
   echo "Arrancando el backend…"
   (cd "$RAIZ/backend" && nohup env ${VARS[@]+"${VARS[@]}"} node dist/src/dev.js >> "$LOG" 2>&1 &)
