@@ -417,7 +417,7 @@
               if (App.Oficina.marcar) App.Oficina.marcar(a.id); else if (App.Oficina.enfocarAgente) App.Oficina.enfocarAgente(a.id); } }, App.icono('pin')),
             /* cerrar no va acá: queda arriba a la derecha del todo, en la cabecera de la columna del costado */)),
         h('div.charla-barra', h('b.charla-tit', App.Nav.tituloCharla ? App.Nav.tituloCharla(a.id) : ''), chipContexto(a),
-          h('button.btn.chico.fantasma.sacar-tareas', { title: 'Convertir esta charla en tareas (para ' + a.nombre + ' o para otros)', onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), 'Sacar tareas'), botonSkill(a, true)),
+          botonSkill(a, true)),
         cuerpo, pie);
       der.classList.add('con-relacionado');
       ponerColumnas(a);
@@ -436,7 +436,7 @@
             App.retratoImg(a, 'retrato', 120),
             h('span.der-tit', h('span.agente-nombre', h('h2', a.nombre), App.icono('flecha')), sub, pista)),
           h('div.der-acciones', chipContexto(a),
-            h('button.btn.chico.sacar-tareas', { title: 'Convertir esta charla en tareas (para ' + a.nombre + ' o para otros)', onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), 'Sacar tareas'), botonSkill(a)),
+            botonSkill(a)),
           cerrarBtn),
         filaCuentas(a),
         cuerpo, pie);
@@ -448,7 +448,7 @@
           h('div.der-tit', h('h2', a.nombre), sub),
           /* con texto: un ícono solo no dice qué hace. La charla actual no se pierde: queda en la lista de Charlas */
           h('div.der-acciones', chipContexto(a),
-            h('button.btn.chico.sacar-tareas', { title: 'Convertir esta charla en tareas (para ' + a.nombre + ' o para otros)', onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), 'Sacar tareas'), botonSkill(a),
+            botonSkill(a),
             h('button.btn.chico', { title: 'Empezar de cero con ' + a.nombre + '. Esta charla queda guardada en Charlas.', onclick: function () { nueva(a.id); } }, App.icono('mas'), 'Nueva charla')),
           cerrarBtn),
         cuerpo, pie);
@@ -598,9 +598,17 @@
       parar.style.display = ocup ? '' : 'none';
       parar.disabled = !!cancelando[a.id];
       parar.title = cancelando[a.id] ? 'Deteniendo…' : 'Detener lo que está haciendo ' + a.nombre;
-      /* «Sacar tareas»: solo con una charla que tenga algo tuyo y sin respuesta en curso */
+      /* «Convertir en skill»: solo con una charla que tenga algo tuyo y sin respuesta en curso */
       var sinCharla = !!enCurso[a.id] || !sesiones[a.id] || !msgs.some(function (m) { return m.r === 'u'; });
-      App.dom.derecho.querySelectorAll('.sacar-tareas, .convertir-skill').forEach(function (b) { b.disabled = sinCharla; });
+      App.dom.derecho.querySelectorAll('.convertir-skill').forEach(function (b) { b.disabled = sinCharla; });
+      /* «Sacar tareas» ya no es un botón fijo: los agentes proponen tareas en la charla (proponer_tarea, delegar). Queda
+         como sugerencia debajo de la última respuesta, para el repaso del final, cuando la charla ya tiene sustancia
+         (3 idas y vueltas) y no hay nada en curso ni en cola. */
+      var idas = msgs.filter(function (m) { return m.r === 'u'; }).length;
+      if (!sinCharla && idas >= 3 && !(colas[a.id] || []).length) {
+        sug.appendChild(h('button.chip.sug-tareas', { title: 'Repasar la charla y convertir lo pendiente en tareas (para ' + a.nombre + ' o para otros)',
+          onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), '¿Sacamos tareas de esta charla?'));
+      }
     }
 
     var leyendo = false;
