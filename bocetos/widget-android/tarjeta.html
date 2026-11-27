@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tarjeta de la secretaría</title>
+<style>
+  :root {
+    --panel: #ffffff; --linea: rgba(0,0,0,.06); --texto: #1d1d1f; --suave: #6d6962;
+    --acento: #1d1d1f; --sobre-acento: #ffffff; --boton: #f2f0ec; --pared: #efe6d8; --pared-2: #e4d7c3;
+  }
+  :root[data-tema="oscuro"] {
+    --panel: #232326; --linea: rgba(255,255,255,.06); --texto: #f1f1f2; --suave: #a3a3a8;
+    --acento: #f1f1f2; --sobre-acento: #1b1b1d; --boton: #313135; --pared: #34302c; --pared-2: #2b2825;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f2f0ec; color: #1d1d1f; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { max-width: 1180px; margin: 0 auto; padding: 28px 16px 8px; display: flex; gap: 16px; align-items: end; justify-content: space-between; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+  header p { margin: 4px 0 0; color: #6d6962; max-width: 660px; }
+  .tema { display: inline-flex; border: 1px solid #d3cfc7; border-radius: 999px; overflow: hidden; background: #fff; }
+  .tema button { border: 0; background: none; padding: 7px 14px; font: inherit; cursor: pointer; color: #1d1d1f; }
+  .tema button[aria-pressed="true"] { background: #1d1d1f; color: #fff; }
+  main { max-width: 1180px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 30px 22px; }
+  h2 { font-size: 16px; margin: 12px 0 2px; }
+  .opcion p { margin: 2px 0 0; color: #4a4741; font-size: 13px; }
+
+  /* fondo de pantalla de inicio, recortado */
+  .inicio { position: relative; aspect-ratio: 1; border-radius: 22px; padding: 34px; display: grid; place-items: center;
+    background: radial-gradient(120% 90% at 15% 0%, #cdb9a4 0%, #8f8076 48%, #4e4952 100%); overflow: hidden; }
+  :root[data-tema="oscuro"] .inicio { background: radial-gradient(120% 90% at 15% 0%, #3d3a47 0%, #24232c 55%, #121216 100%); }
+  .w { width: 100%; max-width: 270px; aspect-ratio: 1; }
+
+  .cara { display: block; image-rendering: pixelated; }
+  .btn { border: 0; font: inherit; font-weight: 700; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; }
+  .btn svg { width: 21px; height: 21px; flex: none; }
+  .claro { background: var(--boton); color: var(--texto); }
+  .fuerte { background: var(--acento); color: var(--sobre-acento); }
+  .punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #3fa35b; box-shadow: 0 0 0 2px var(--panel); }
+
+  /* A · Retrato */
+  .a { background: var(--panel); border-radius: 28px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+  .a .arriba { position: relative; flex: 1; background: linear-gradient(var(--pared) 0 72%, var(--pared-2) 72%); display: flex; justify-content: center; align-items: end; overflow: hidden; }
+  .a .arriba .cara { width: 62%; }
+  .a .abajo { display: flex; align-items: center; gap: 8px; padding: 12px 12px 12px 16px; }
+  .a .quien { flex: 1; min-width: 0; color: var(--texto); }
+  .a .quien b { display: block; font-size: 17px; line-height: 1.15; }
+  .a .quien small { color: var(--suave); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+  .a .btn { width: 46px; height: 46px; border-radius: 50%; padding: 0; }
+
+  /* B · Contacto */
+  .b { background: var(--panel); border-radius: 28px; padding: 18px 14px 14px; display: flex; flex-direction: column; align-items: center; box-shadow: 0 6px 20px rgba(0,0,0,.18); color: var(--texto); }
+  .b .aro { position: relative; width: 44%; aspect-ratio: 1; border-radius: 50%; background: var(--pared); overflow: hidden; box-shadow: 0 0 0 3px var(--panel), 0 0 0 5px #3fa35b; }
+  .b .aro .cara { position: absolute; left: 8%; bottom: -6%; width: 84%; }
+  .b b { margin-top: 10px; font-size: 17px; }
+  .b small { color: var(--suave); font-size: 12.5px; }
+  .b .fila { margin-top: auto; display: flex; gap: 8px; width: 100%; }
+  .b .btn { flex: 1; height: 46px; border-radius: 16px; font-size: 14px; }
+
+  /* C · Ventana a la recepción */
+  .c { position: relative; border-radius: 28px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+  .c svg.escena { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .c .nombre { position: absolute; left: 14px; top: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.88); color: #1d1d1f; font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .c .barra { position: absolute; left: 10px; right: 10px; bottom: 10px; display: flex; gap: 8px; padding: 6px; border-radius: 20px; background: rgba(255,255,255,.72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+  :root[data-tema="oscuro"] .c .barra { background: rgba(30,30,33,.72); }
+  .c .btn { flex: 1; height: 42px; border-radius: 15px; font-size: 14px; }
+
+  /* D · Sale del marco */
+  .d { position: relative; }
+  .d .marco { position: absolute; left: 0; right: 0; bottom: 0; height: 74%; border-radius: 28px; background: linear-gradient(160deg, #e8735f, #c4473a); box-shadow: 0 6px 20px rgba(0,0,0,.22); }
+  :root[data-tema="oscuro"] .d .marco { background: linear-gradient(160deg, #9c4235, #6d2a22); }
+  .d .cara { position: absolute; left: 6%; bottom: 38%; width: 48%; filter: drop-shadow(0 4px 0 rgba(0,0,0,.12)); }
+  .d .quien { position: absolute; left: 56%; right: 12px; bottom: 44%; color: #fff; }
+  .d .quien b { display: block; font-size: 18px; line-height: 1.1; }
+  .d .quien small { font-size: 12.5px; opacity: .85; }
+  .d .fila { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; gap: 8px; }
+  .d .btn { flex: 1; height: 48px; border-radius: 16px; font-size: 14px; }
+  .d .btn.blanco { background: rgba(255,255,255,.95); color: #1d1d1f; }
+  .d .btn.trans { background: rgba(255,255,255,.2); color: #fff; }
+
+  /* E · Pregunta grande */
+  .e { background: var(--panel); border-radius: 28px; padding: 16px; display: flex; flex-direction: column; box-shadow: 0 6px 20px rgba(0,0,0,.18); color: var(--texto); }
+  .e .cab { display: flex; align-items: center; gap: 10px; }
+  .e .mini { width: 40px; height: 40px; border-radius: 12px; background: var(--pared); overflow: hidden; position: relative; flex: none; }
+  .e .mini .cara { position: absolute; left: 2px; bottom: -3px; width: 36px; }
+  .e .cab b { font-size: 14px; display: block; line-height: 1.15; }
+  .e .cab small { color: var(--suave); font-size: 12px; }
+  .e .preg { margin: auto 0; font-size: 23px; line-height: 1.12; font-weight: 700; letter-spacing: -.02em; }
+  .e .fila { display: flex; gap: 8px; }
+  .e .btn.grande { flex: 1; height: 50px; border-radius: 18px; }
+  .e .btn.chico { width: 50px; height: 50px; border-radius: 18px; padding: 0; }
+
+  .nota { max-width: 1180px; margin: 4px auto 40px; padding: 0 16px; color: #6d6962; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Widget 3 · la tarjeta de la secretaría, 5 versiones</h1>
+    <p>Todas son de 2×2. «Hablar» y «Escribir» abren una charla nueva con ella. El retrato sale de su avatar pixel de la oficina (acá, uno de ejemplo); el puntito verde dice si está libre o atendiendo otra cosa.</p>
+  </div>
+  <div class="tema" role="group" aria-label="Tema del teléfono">
+    <button type="button" data-t="claro" aria-pressed="true">Claro</button>
+    <button type="button" data-t="oscuro" aria-pressed="false">Oscuro</button>
+  </div>
+</header>
+<main id="opciones"></main>
+<p class="nota">Se pueden mezclar: por ejemplo, el retrato de A con los botones con texto de B.</p>
+
+<script>
+  var LAPIZ = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
+  var MIC = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>';
+
+  /* busto pixel 24×24: se escribe la mitad izquierda y se espeja */
+  var MITAD = [
+    '............',
+    '........kkkk',
+    '......kkkkkk',
+    '.....kkkhhkk',
+    '....kkkkkhkk',
+    '...kkkkkkkkk',
+    '...kkkkkksss',
+    '...kkkksssss',
+    '..kkkkssssss',
+    '..kkkssseess',
+    '..kkksssweus',
+    '..kkksbbssss',
+    '..kkkssssssm',
+    '..kkkkssssss',
+    '...kkkkdssss',
+    '...kkkk..dss',
+    '....rrrrrccs',
+    '..rrrrrrrrcs',
+    '.rrrrrrrrrrc',
+    '.rRrrrrrrrrc',
+    'rrRrrrrrrrrc',
+    'rrRrrrrrrrrr',
+    'rRrrrrrrrrrr',
+    'rRrrrrrrrrrr'
+  ];
+  var COL = { k: '#2b1f1a', h: '#5a4235', s: '#f0c39b', d: '#d9a47c', e: '#1d1d1f', w: '#1d1d1f', u: '#f0c39b', b: '#f2a28c', m: '#b5524a', r: '#c94b3d', R: '#a83a2f', c: '#f4e6c8' };
+  function filas() {
+    return MITAD.map(function (f) {
+      var der = f.split('').reverse().join('');
+      return f + der;
+    });
+  }
+  function busto(cls) {
+    var r = '';
+    filas().forEach(function (fila, y) {
+      for (var x = 0; x < 24; x++) { var c = COL[fila[x]]; if (c) r += '<rect x="' + x + '" y="' + y + '" width="1.02" height="1.02" fill="' + c + '"/>'; }
+    });
+    return '<svg class="cara ' + (cls || '') + '" viewBox="0 0 24 24" shape-rendering="crispEdges">' + r + '</svg>';
+  }
+
+  /* recepción pixel para C (48×48) */
+  function recepcion() {
+    var r = '<svg class="escena" viewBox="0 0 48 48" preserveAspectRatio="xMidYMid slice" shape-rendering="crispEdges">';
+    r += '<rect width="48" height="48" fill="#e9dcc6"/>';
+    r += '<rect width="48" height="2" fill="#dccdb3"/>';
+    r += '<rect x="30" y="6" width="14" height="13" fill="#9cc3d4"/><rect x="30" y="6" width="14" height="1" fill="#7aa3b6"/><rect x="36" y="6" width="1" height="13" fill="#7aa3b6"/><rect x="30" y="12" width="14" height="1" fill="#7aa3b6"/><rect x="29" y="19" width="16" height="1" fill="#c9b796"/>';
+    r += '<rect x="4" y="9" width="7" height="6" fill="#f6efe2"/><rect x="5" y="10" width="5" height="1" fill="#c4473a"/><rect x="5" y="12" width="4" height="1" fill="#b8ab94"/>';
+    r += '<rect x="40" y="25" width="5" height="5" fill="#b86a45"/><rect x="39" y="19" width="2" height="3" fill="#4f8a55"/><rect x="41" y="17" width="3" height="5" fill="#5f9e63"/><rect x="44" y="20" width="2" height="3" fill="#4f8a55"/><rect x="40" y="22" width="5" height="3" fill="#5f9e63"/>';
+    var x0 = 12, y0 = 12;
+    filas().forEach(function (fila, y) {
+      for (var x = 0; x < 24; x++) { var c = COL[fila[x]]; if (c) r += '<rect x="' + (x0 + x) + '" y="' + (y0 + y) + '" width="1.02" height="1.02" fill="' + c + '"/>'; }
+    });
+    r += '<rect x="0" y="30" width="48" height="18" fill="#7a5a42"/><rect x="0" y="30" width="48" height="2" fill="#94714f"/>';
+    r += '<rect x="28" y="24" width="9" height="6" fill="#2d2d33"/><rect x="29" y="25" width="7" height="4" fill="#86cdb0"/><rect x="31" y="30" width="3" height="1" fill="#2d2d33"/>';
+    r += '<rect x="8" y="28" width="6" height="2" fill="#f6efe2"/><rect x="16" y="27" width="2" height="3" fill="#f4f4f4"/>';
+    r += '</svg>';
+    return r;
+  }
+
+  var OPCIONES = [
+    {
+      t: 'A · Retrato', d: 'Su busto pixel grande, parada en la recepción, y abajo nombre y dos botones redondos. El más limpio.',
+      w: '<div class="w a"><div class="arriba">' + busto() + '</div><div class="abajo"><div class="quien"><b>Betty</b><small><span class="punto"></span>Secretaría</small></div>' +
+        '<button class="btn claro" aria-label="Escribir">' + LAPIZ + '</button><button class="btn fuerte" aria-label="Hablar">' + MIC + '</button></div></div>'
+    },
+    {
+      t: 'B · Contacto', d: 'Como un contacto del teléfono: retrato en círculo con un aro verde si está libre, y botones con texto.',
+      w: '<div class="w b"><div class="aro">' + busto() + '</div><b>Betty</b><small>Secretaría · libre</small>' +
+        '<div class="fila"><button class="btn claro">' + LAPIZ + 'Escribir</button><button class="btn fuerte">' + MIC + 'Hablar</button></div></div>'
+    },
+    {
+      t: 'C · Ventana a la recepción', d: 'Una ventanita a la oficina: ella en su escritorio, con la ventana y la planta. Los botones van sobre una barra translúcida.',
+      w: '<div class="w c">' + recepcion() + '<span class="nombre"><span class="punto"></span>Betty</span>' +
+        '<div class="barra"><button class="btn claro">' + LAPIZ + 'Escribir</button><button class="btn fuerte">' + MIC + 'Hablar</button></div></div>'
+    },
+    {
+      t: 'D · Sale del marco', d: 'La tarjeta toma el color de su ropa y la cabeza se asoma por arriba. Más jugado, se nota mucho en la pantalla.',
+      w: '<div class="w d"><div class="marco"></div>' + busto() + '<div class="quien"><b>Betty</b><small>Secretaría</small></div>' +
+        '<div class="fila"><button class="btn trans">' + LAPIZ + 'Escribir</button><button class="btn blanco">' + MIC + 'Hablar</button></div></div>'
+    },
+    {
+      t: 'E · Pregunta grande', d: 'Retrato chico arriba y la pregunta grande al medio. El botón de hablar es el principal; escribir queda al costado.',
+      w: '<div class="w e"><div class="cab"><span class="mini">' + busto() + '</span><span><b>Betty</b><small>Secretaría</small></span></div>' +
+        '<div class="preg">¿Qué<br>necesitás?</div>' +
+        '<div class="fila"><button class="btn fuerte grande">' + MIC + 'Hablar</button><button class="btn claro chico" aria-label="Escribir">' + LAPIZ + '</button></div></div>'
+    }
+  ];
+
+  document.getElementById('opciones').innerHTML = OPCIONES.map(function (o) {
+    return '<section class="opcion"><div class="inicio">' + o.w + '</div><h2>' + o.t + '</h2><p>' + o.d + '</p></section>';
+  }).join('');
+
+  document.querySelectorAll('.tema button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.documentElement.dataset.tema = b.dataset.t;
+      document.querySelectorAll('.tema button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+    });
+  });
+</script>
+</body>
+</html>
