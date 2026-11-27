@@ -211,7 +211,7 @@ export const WhatsAppAgente = {
  *  en la charla. Los demás agentes no tienen estas herramientas. */
 export const MemoriaSecretariaAgente = {
   nombresMCP: [
-    'memoria_diario_anotar', 'memoria_diario_leer', 'memoria_dia_resumir', 'memoria_semana_resumir', 'memoria_tema', 'memoria_temas',
+    'memoria_diario_anotar', 'memoria_diario_leer', 'memoria_dia_resumir', 'memoria_semana_resumir', 'memoria_mes_resumir', 'memoria_tema', 'memoria_temas',
     'memoria_tema_leer', 'memoria_ficha', 'memoria_ficha_leer', 'memoria_buscar', 'memoria_sugerir_compartir',
   ],
   /** ¿Este agente atiende la secretaría? (aunque esté en pausa: la memoria sigue siendo suya). */

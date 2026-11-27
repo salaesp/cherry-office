@@ -1,5 +1,6 @@
 // Memoria privada de la secretaría (docs/plan-secretaria.md): almacén de archivos e índice en hq.db, consolidación diaria y
-// semanal, herramientas MCP solo para quien atiende, la consigna de la revisión, la API y el olvido al borrar la oficina.
+// semanal (la pasada de orden, en secretaria-orden.test.ts), herramientas MCP solo para quien atiende, la consigna de la
+// revisión, la API y el olvido al borrar la oficina.
 import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -203,7 +204,7 @@ describe('diario y consolidación', () => {
     expect(semanaDe('2024-12-30')).toBe('2025-W01')
   })
 
-  test('pendientes: el resumen de ayer y, como mucho, una semana vieja; condensar borra los días', async () => {
+  test('pendientes: los días sin resumen y las semanas viejas; condensar pasa los días al archivo', async () => {
     const { carpeta, mem } = await preparar()
     const hoy = new Date(2026, 10, 26, 8, 0)   // jueves 26/11/2026
     const en = (d: string, h = 10) => { const [y, m, dd] = d.split('-').map(Number); return new Date(y!, m! - 1, dd!, h, 0) }
@@ -215,8 +216,12 @@ describe('diario y consolidación', () => {
     mem.anotarDiario(carpeta, { texto: 'otra semana vieja', fecha: en('2026-10-05') })   // W41
     mem.anotarDiario(carpeta, { texto: 'reciente de hace 20 días', fecha: en('2026-11-06') })
     let p = mem.pendientes(carpeta, hoy)
+    // todos los días sin resumen (no solo los de la última semana), menos hoy y los de semanas que ya toca condensar
+    expect(p.dias).toEqual(['2026-11-06', '2026-11-23', '2026-11-25'])
     expect(p.dia).toBe('2026-11-25')
+    expect(p.semanas.map((s) => s.semana)).toEqual(['2026-W38', '2026-W41'])
     expect(p.semana).toMatchObject({ semana: '2026-W38', desde: '2026-09-14', hasta: '2026-09-20', dias: 2 })
+    expect(p.meses).toEqual([])
     mem.resumirDia(carpeta, '2026-11-25', 'ayer: nada importante')
     expect(mem.pendientes(carpeta, hoy).dia).toBe('2026-11-23')
     // una semana reciente no se condensa
@@ -227,6 +232,12 @@ describe('diario y consolidación', () => {
     expect(mem.semanas(carpeta)).toEqual([{ semana: '2026-W38', desde: '2026-09-14', hasta: '2026-09-20' }])
     expect(mem.leerSemana(carpeta, '2026-W38')!.resumen).toBe('Semana de septiembre: se arregló el seguro.')
     expect(fs.readFileSync(path.join(mem.raiz(carpeta), 'semanas', '2026-W38.md'), 'utf8')).toBe('# Semana 2026-W38\nDesde: 2026-09-14\nHasta: 2026-09-20\n\n## Resumen\nSemana de septiembre: se arregló el seguro.\n')
+    // los días no se borran enseguida: esperan en el archivo 30 días
+    expect(mem.archivados(carpeta)).toEqual([
+      { nombre: '2026-09-16', tipo: 'dia', archivado: '2026-11-26', borra: '2026-12-26' },
+      { nombre: '2026-09-14', tipo: 'dia', archivado: '2026-11-26', borra: '2026-12-26' },
+    ])
+    expect(fs.readFileSync(path.join(mem.raiz(carpeta), 'archivo', '2026-09-14.md'), 'utf8')).toContain('muy viejo uno')
     p = mem.pendientes(carpeta, hoy)
     expect(p.semana).toMatchObject({ semana: '2026-W41', dias: 1 })
     mem.resumirSemana(carpeta, '2026-W41', 'octubre', hoy)
@@ -259,11 +270,11 @@ describe('herramientas MCP', () => {
     expect(nombres(mcp.consultas.herramientas(mcp.tokens.emitir(id), id)).filter((n: string) => n.startsWith('memoria_'))).toEqual([])
     // en pausa, sigue siendo suya
     await llamar(b, 'PUT', '/api/secretaria', { activa: false })
-    expect(nombres(herramientas('sofia')).filter((n: string) => n.startsWith('memoria_'))).toHaveLength(11)
+    expect(nombres(herramientas('sofia')).filter((n: string) => n.startsWith('memoria_'))).toHaveLength(12)
     // si la secretaría pasa a otro agente, las pierde la anterior
     await llamar(b, 'PUT', '/api/secretaria', { agente: 'marce' })
     expect(nombres(herramientas('sofia')).filter((n: string) => n.startsWith('memoria_'))).toEqual([])
-    expect(nombres(herramientas('marce')).filter((n: string) => n.startsWith('memoria_'))).toHaveLength(11)
+    expect(nombres(herramientas('marce')).filter((n: string) => n.startsWith('memoria_'))).toHaveLength(12)
   })
 
   test('anotar, seguir temas, fichas, leer y buscar; lo de terceros va delimitado como datos', async () => {
@@ -375,7 +386,8 @@ describe('consigna de la revisión', () => {
     const rep = mem.seccionReporte(carpeta).join('\n')
     expect(rep).toContain('Temas que parecen trabados')
     expect(rep).toContain('Cuota del colegio: sin movimiento hace 9 días')
-    expect(mem0).toContain('Resumí el día')
+    // resumir y condensar no van en la revisión: los hace la pasada diaria de orden (secretaria-orden.ts)
+    expect(mem0).not.toContain('Resumí el día')
     expect(mem0).toContain('Las decisiones de Ana sobre tus propuestas')
     expect(mem0).toContain('<memoria_secretaria>')
     // la corrida permite las herramientas de memoria (y las de WhatsApp)
@@ -385,7 +397,7 @@ describe('consigna de la revisión', () => {
     void b
   })
 
-  test('sin memoria todavía, la consigna igual explica cómo empezar; una semana vieja pide condensar', async () => {
+  test('sin memoria todavía, la consigna igual explica cómo empezar; una semana vieja no se condensa en la revisión', async () => {
     const { carpeta, sec, mem, mensaje, ultima } = await conWhatsApp()
     mensaje('hola')
     await sec.revisar()
@@ -396,10 +408,9 @@ describe('consigna de la revisión', () => {
     mensaje('hola otra vez')
     await sec.revisar(new Date(Date.now() + 3601 * 1000))
     await esperar(() => !sec.store.corriendo(carpeta))
-    const semana = semanaDe(diaLocal(haceDias(60)))
-    expect(ultima()).toContain('Consolidaciones pendientes')
-    expect(ultima()).toContain(`Condensá la semana ${semana}`)
-    expect(ultima()).toContain(`memoria_semana_resumir {semana: "${semana}", resumen}`)
+    expect(mem.pendientes(carpeta).semana?.semana).toBe(semanaDe(diaLocal(haceDias(60))))
+    expect(ultima()).not.toContain('Consolidaciones pendientes')
+    expect(ultima()).not.toContain('Condensá la semana')
   })
 })
 

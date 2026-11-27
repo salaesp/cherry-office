@@ -1,7 +1,8 @@
 /* Memoria privada de la secretaría (docs/plan-secretaria.md, «Memoria de la secretaría»): en Ajustes › Secretaría, el bloque
    «Memoria» y la hoja con tres vistas: Seguimiento (temas por estado y fecha: cambiar el estado, ver el historial, editar,
-   compartir con la oficina, borrar), Días (el diario y los resúmenes semanales) y Personas y cosas (fichas). Editar es
-   escribir el .md tal cual. Es privada: no pasa por la Biblioteca ni por la memoria de la oficina salvo que se comparta acá.
+   compartir con la oficina, borrar), Días (el diario, los resúmenes por semana y por mes, el archivo y el estado de la
+   pasada diaria de orden, con «Ordenar ahora») y Personas y cosas (fichas). Editar es escribir el .md tal cual. Es privada:
+   no pasa por la Biblioteca ni por la memoria de la oficina salvo que se comparta acá.
    «Importar notas…»: pasa una carpeta de notas de la compu (Obsidian, etc.) a esta memoria, en segundo plano y con progreso.
    API: /api/secretaria/memoria (ver backend/API.md). */
 (function () {
@@ -76,7 +77,8 @@
       App.add(hj.pie,
         h('button.btn.fantasma', { onclick: function () { hj.cerrar(); borrar(ruta, titulo, op.borrar || 'Se borra de la memoria de la secretaría. No se puede deshacer.', alCambiar); } }, App.icono('papelera'), 'Borrar'),
         op.compartir ? h('button.btn', { onclick: function () { hj.cerrar(); compartir(ruta, titulo, alCambiar); } }, 'Compartir con la oficina') : null,
-        h('button.btn', { onclick: function () { hj.cerrar(); editar(ruta, titulo, alCambiar); } }, App.icono('lapiz'), 'Editar'),
+        op.recuperar ? h('button.btn', { onclick: function () { hj.cerrar(); op.recuperar(); } }, 'Recuperar') : null,
+        op.recuperar ? null : h('button.btn', { onclick: function () { hj.cerrar(); editar(ruta, titulo, alCambiar); } }, App.icono('lapiz'), 'Editar'),
         h('button.btn.primario', { onclick: hj.cerrar }, 'Cerrar'));
     }).catch(App.fallo);
   }
@@ -99,7 +101,7 @@
       App.vaciar(pestanas);
       var sinMov = datos.temas.filter(function (t) { return t.trabado; }).length;
       [['seguimiento', 'Seguimiento', datos.temas.filter(function (t) { return t.estado === 'abierto' || t.estado === 'esperando'; }).length],
-        ['dias', 'Días', datos.dias.length + datos.semanas.length], ['fichas', 'Personas y cosas', datos.fichas.length]].forEach(function (p) {
+        ['dias', 'Días', datos.dias.length + datos.semanas.length + (datos.meses || []).length], ['fichas', 'Personas y cosas', datos.fichas.length]].forEach(function (p) {
         pestanas.appendChild(h('button.pestana' + (vista === p[0] ? '.activa' : ''), { onclick: function () { vista = p[0]; dibujar(); } },
           p[1] + (p[2] ? ' (' + p[2] + ')' : ''), p[0] === 'seguimiento' && sinMov ? h('span.insignia.aviso', { style: { marginLeft: '6px' }, title: 'Trabados o con la fecha pasada' }, sinMov) : null));
       });
@@ -186,12 +188,56 @@
     function hoy() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
 
     /* ---- Días ---- */
+    /* La pasada diaria de orden: cómo terminó la última, qué falta y el botón «Ordenar ahora». */
+    function estadoOrden() {
+      var pend = datos.pendientes || {}, orden = datos.orden || {}, u = orden.ultima;
+      var faltan = [];
+      if (pend.dias && pend.dias.length) faltan.push(pend.dias.length + (pend.dias.length === 1 ? ' día por resumir' : ' días por resumir'));
+      if (pend.semanas && pend.semanas.length) faltan.push(pend.semanas.length + (pend.semanas.length === 1 ? ' semana por condensar' : ' semanas por condensar'));
+      if (pend.meses && pend.meses.length) faltan.push(pend.meses.length + (pend.meses.length === 1 ? ' mes por juntar' : ' meses por juntar'));
+      var linea;
+      if (orden.corriendo) linea = 'Ordenando la memoria ahora…';
+      else if (!u) linea = 'Todavía no se ordenó.';
+      else {
+        var cuando = u.terminada ? new Date(u.terminada * 1000) : new Date(u.creada * 1000);
+        var hechos = [];
+        if (u.hechos.dias) hechos.push(u.hechos.dias + (u.hechos.dias === 1 ? ' día resumido' : ' días resumidos'));
+        if (u.hechos.semanas) hechos.push(u.hechos.semanas + (u.hechos.semanas === 1 ? ' semana condensada' : ' semanas condensadas'));
+        if (u.hechos.meses) hechos.push(u.hechos.meses + (u.hechos.meses === 1 ? ' mes juntado' : ' meses juntados'));
+        var temas = u.temasNuevos.length + u.temasActualizados.length;
+        if (temas) hechos.push(temas + (temas === 1 ? ' tema puesto al día' : ' temas puestos al día'));
+        var como = { ok: 'terminó bien', incompleta: 'quedó a medias (se reintenta en un rato)', error: 'falló (se reintenta en un rato)', incierta: 'se cortó al cerrar la app' }[u.estado] || u.estado;
+        linea = 'Última vez: ' + fechaCorta(u.dia) + ' a las ' + ('0' + cuando.getHours()).slice(-2) + ':' + ('0' + cuando.getMinutes()).slice(-2) + ', ' + como + (hechos.length ? ' · ' + hechos.join(', ') : '') + '.';
+      }
+      var boton = h('button.btn.chico', { disabled: !!orden.corriendo, onclick: function () {
+        boton.disabled = true;
+        api().post(base + '/ordenar', {}).then(function (r) {
+          App.guardado(r.orden ? 'La secretaría está ordenando su memoria.' : r.motivo);
+          return cargar();
+        }).catch(function (e) { App.fallo(e); boton.disabled = false; });
+      } }, 'Ordenar ahora');
+      return h('div', { style: { border: '1px solid var(--linea)', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px', display: 'flex', gap: '10px', alignItems: 'center' } },
+        h('div', { style: { flex: 1, minWidth: 0 } },
+          h('div', { style: { fontWeight: 500 } }, 'Orden de la memoria'),
+          h('div.ajuste-ayuda', linea + (faltan.length ? ' Falta: ' + faltan.join(', ') + '.' : ' No falta nada.'))),
+        boton);
+    }
+    /* mientras ordena, refresca cada tanto hasta que termine */
+    var siguiendo = false;
+    function seguir() {
+      if (siguiendo || !vivo || !datos.orden || !datos.orden.corriendo) return;
+      siguiendo = true;
+      setTimeout(function () { siguiendo = false; if (vivo) cargar(); }, 4000);
+    }
+
     function dias() {
-      var pend = datos.pendientes || {};
-      caja.appendChild(h('div.ajuste-ayuda', { style: { marginBottom: '6px' } },
-        'Cada revisión anota en el diario lo relevante de cada fuente, con su origen. En la primera revisión del día resume el día anterior, y los días de más de ' + datos.limites.diasCondensar + ' días se juntan en un resumen por semana (y se borran).'
-        + (pend.dia ? ' Falta resumir el ' + fechaCorta(pend.dia) + '.' : '') + (pend.semana ? ' Falta condensar la semana ' + pend.semana.semana + '.' : '')));
-      if (!datos.dias.length && !datos.semanas.length) caja.appendChild(h('div.vacio', 'Todavía no hay nada anotado.'));
+      caja.appendChild(h('div.ajuste-ayuda', { style: { marginBottom: '8px' } },
+        'Cada revisión anota en el diario lo relevante de cada fuente, con su origen. Una vez por día la secretaría ordena su memoria: resume los días, junta los de más de '
+        + datos.limites.diasCondensar + ' días en un resumen por semana y, pasados ' + Math.round(datos.limites.diasMeses / 30) + ' meses, las semanas en un resumen por mes. Con lo que lee pone al día los temas. Lo que condensa queda '
+        + datos.limites.diasArchivo + ' días en el archivo, por si hace falta recuperarlo.'));
+      caja.appendChild(estadoOrden());
+      var meses = datos.meses || [], archivo = datos.archivo || [];
+      if (!datos.dias.length && !datos.semanas.length && !meses.length) caja.appendChild(h('div.vacio', 'Todavía no hay nada anotado.'));
       datos.dias.forEach(function (d) {
         var ruta = 'diario/' + d.dia + '.md';
         caja.appendChild(fila([h('span', { style: { fontWeight: 500 } }, fechaCorta(d.dia)),
@@ -204,10 +250,35 @@
       datos.semanas.forEach(function (s) {
         var ruta = 'semanas/' + s.semana + '.md', t = 'Semana del ' + fechaCorta(s.desde) + ' al ' + fechaCorta(s.hasta);
         caja.appendChild(fila([h('span', { style: { fontWeight: 500 } }, t), h('span.ajuste-ayuda', { style: { marginLeft: '8px' } }, s.semana)],
-          [h('button.btn.chico.fantasma', { onclick: function () { ver(ruta, t, { borrar: 'Se borra el resumen de esa semana (los días ya no están). No se puede deshacer.' }, cargar); } }, 'Ver'),
+          [h('button.btn.chico.fantasma', { onclick: function () { ver(ruta, t, { borrar: 'Se borra el resumen de esa semana. Sus días, si siguen en el archivo, se pueden recuperar. No se puede deshacer.' }, cargar); } }, 'Ver'),
             iconoBtn('lapiz', 'Editar', function () { editar(ruta, t, cargar); }),
-            iconoBtn('papelera', 'Borrar', function () { borrar(ruta, t, 'Se borra el resumen de esa semana (los días ya no están). No se puede deshacer.', cargar); })]));
+            iconoBtn('papelera', 'Borrar', function () { borrar(ruta, t, 'Se borra el resumen de esa semana. Sus días, si siguen en el archivo, se pueden recuperar. No se puede deshacer.', cargar); })]));
       });
+      if (meses.length) caja.appendChild(h('h4.seccion-tit', { style: { marginTop: '14px' } }, h('span', 'Meses resumidos')));
+      meses.forEach(function (m) {
+        var ruta = 'meses/' + m.mes + '.md';
+        var nombre = new Date(Number(m.mes.slice(0, 4)), Number(m.mes.slice(5, 7)) - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+        var t = nombre.charAt(0).toUpperCase() + nombre.slice(1);
+        caja.appendChild(fila([h('span', { style: { fontWeight: 500 } }, t)],
+          [h('button.btn.chico.fantasma', { onclick: function () { ver(ruta, t, { borrar: 'Se borra el resumen de ese mes. No se puede deshacer.' }, cargar); } }, 'Ver'),
+            iconoBtn('lapiz', 'Editar', function () { editar(ruta, t, cargar); }),
+            iconoBtn('papelera', 'Borrar', function () { borrar(ruta, t, 'Se borra el resumen de ese mes. No se puede deshacer.', cargar); })]));
+      });
+      if (archivo.length) {
+        caja.appendChild(h('h4.seccion-tit', { style: { marginTop: '14px' } }, h('span', 'Archivo')));
+        caja.appendChild(h('div.ajuste-ayuda', { style: { marginBottom: '4px' } }, 'Lo que ya quedó en un resumen. Se borra solo; si un resumen salió mal, recuperalo y la próxima pasada lo vuelve a condensar.'));
+      }
+      archivo.forEach(function (x) {
+        var ruta = 'archivo/' + x.nombre + '.md';
+        var t = x.tipo === 'dia' ? 'Diario del ' + fechaCorta(x.nombre) : 'Semana ' + x.nombre;
+        var recuperar = function () {
+          api().post(base + '/recuperar', { nombre: x.nombre }).then(function () { App.guardado('Recuperado: «' + t + '» volvió a la memoria.'); return cargar(); }).catch(App.fallo);
+        };
+        caja.appendChild(fila([h('span', t), h('span.ajuste-ayuda', { style: { marginLeft: '8px' } }, x.borra ? 'se borra el ' + fechaCorta(x.borra) : '')],
+          [h('button.btn.chico.fantasma', { onclick: function () { ver(ruta, t, { recuperar: recuperar, borrar: 'Se borra ya del archivo. No se puede deshacer.' }, cargar); } }, 'Ver'),
+            h('button.btn.chico.fantasma', { onclick: recuperar }, 'Recuperar')]));
+      });
+      seguir();
     }
 
     /* ---- Personas y cosas ---- */

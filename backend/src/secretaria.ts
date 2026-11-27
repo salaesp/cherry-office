@@ -643,6 +643,8 @@ export class ServicioSecretaria {
       const cfg = this.cfg(act.oficina)
       if (!cfg?.activa || !enFranja(cfg.franja, ahora)) return undefined
       if (this.store.corriendo(act.carpeta) || this.store.reporteCorriendo(act.carpeta)) return undefined
+      // mientras la pasada diaria ordena la memoria, las revisiones esperan (corren de a una: no se pisan los temas)
+      if ((this.s.huecos.secretariaOrden as { corriendo(carpeta: string): boolean } | undefined)?.corriendo(act.carpeta)) return undefined
       const t = ahora.getTime() / 1000
       const tocan: string[] = []
       for (const fc of cfg.fuentes) {

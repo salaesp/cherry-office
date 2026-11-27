@@ -229,6 +229,8 @@ export class Programador implements ProgramadorEntregas {
   static readonly prefijoSecretaria = 'secretaria:'
   /** Una tanda de la importación de notas a la memoria de la secretaría: `secretaria-importar:<importación>:<tanda>`. */
   static readonly prefijoImportar = 'secretaria-importar:'
+  /** La pasada diaria que ordena la memoria de la secretaría (secretaria-orden.ts): `secretaria-orden:<orden>`. */
+  static readonly prefijoOrden = 'secretaria-orden:'
   /** Algo que un agente le pasó a un colega desde una charla (o el coordinador en una corrida): `delegar:<tarjeta>` (delegar.ts). */
   static readonly prefijoDelegar = 'delegar:'
 
@@ -538,6 +540,7 @@ export class Programador implements ProgramadorEntregas {
     if (id.startsWith(Programador.prefijoEspera)) return 'espera'
     if (id.startsWith(Programador.prefijoSecretaria)) return 'secretaria'
     if (id.startsWith(Programador.prefijoImportar)) return 'importacion'
+    if (id.startsWith(Programador.prefijoOrden)) return 'secretaria'
     return 'tarea'
   }
 
@@ -794,6 +797,7 @@ export function nombreCorrida(id: string): string {
   if (/^secretaria:r\d+$/.test(id)) return 'Reporte de la secretaría'
   if (id.startsWith(Programador.prefijoSecretaria)) return 'Revisión de la secretaría'
   if (id.startsWith(Programador.prefijoImportar)) return 'Importación a la memoria de la secretaría'
+  if (id.startsWith(Programador.prefijoOrden)) return 'Orden de la memoria de la secretaría'
   if (id.startsWith(Programador.prefijoDelegar)) return 'Encargo desde una charla'
   return id
 }
