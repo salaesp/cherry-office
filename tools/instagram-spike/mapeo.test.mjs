@@ -71,8 +71,11 @@ test('mapearPerfilApify deja el mismo formato que la lectura directa', async () 
   const apify = mapearPerfilApify(d)
   const directo = mapearPerfil(JSON.parse(crudo))
   assert.equal(apify.seguidores, directo.seguidores)
-  assert.deepEqual(apify.publicaciones.map((p) => p.tipo), directo.publicaciones.map((p) => p.tipo))
-  const [reel, carrusel, foto] = apify.publicaciones
+  const porCodigo = (pubs) => Object.fromEntries(pubs.map((p) => [p.codigo, p.tipo]))
+  assert.deepEqual(porCodigo(apify.publicaciones), porCodigo(directo.publicaciones))
+  // Ordenadas: la fijada primero y después de la más nueva a la más vieja.
+  assert.deepEqual(apify.publicaciones.map((p) => p.codigo), ['CCC', 'AAA', 'BBB'])
+  const [foto, reel, carrusel] = apify.publicaciones
   assert.deepEqual(reel.hashtags, ['#cafe', '#latteart'])
   assert.deepEqual(reel.menciones, ['@barista.uno'])
   assert.equal(reel.reproducciones, 50000)
