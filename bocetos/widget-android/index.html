@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Widget de la secretaría</title>
+<style>
+  :root {
+    --fondo: #f2f0ec; --panel: #ffffff; --linea: #e4e1db; --texto: #1d1d1f; --suave: #6d6962;
+    --acento: #1d1d1f; --sobre-acento: #ffffff; --boton: #f2f0ec;
+    --papel: #f2f0ec;
+  }
+  :root[data-tema="oscuro"] {
+    --panel: #232326; --linea: #333337; --texto: #f1f1f2; --suave: #a3a3a8;
+    --acento: #f1f1f2; --sobre-acento: #1b1b1d; --boton: #2e2e32;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--papel); color: #1d1d1f; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { max-width: 1180px; margin: 0 auto; padding: 28px 16px 8px; display: flex; gap: 16px; align-items: end; justify-content: space-between; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: -.01em; }
+  header p { margin: 4px 0 0; color: #6d6962; max-width: 640px; }
+  .tema { display: inline-flex; border: 1px solid #d3cfc7; border-radius: 999px; overflow: hidden; background: #fff; }
+  .tema button { border: 0; background: none; padding: 7px 14px; font: inherit; cursor: pointer; color: #1d1d1f; }
+  .tema button[aria-pressed="true"] { background: #1d1d1f; color: #fff; }
+  main { max-width: 1180px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 28px 20px; }
+  .opcion h2 { font-size: 16px; margin: 12px 0 2px; }
+  .opcion .tam { color: #6d6962; font-size: 12.5px; }
+  .opcion ul { margin: 6px 0 0; padding-left: 18px; color: #3d3a35; font-size: 13px; }
+  .opcion li.contra { color: #8a5a10; }
+
+  /* el teléfono */
+  .tel { width: 100%; max-width: 330px; aspect-ratio: 330 / 400; margin: 0 auto; border-radius: 34px; padding: 10px; background: #111; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+  .pantalla { position: relative; height: 100%; border-radius: 26px; overflow: hidden; padding: 34px 14px 14px;
+    background: radial-gradient(120% 80% at 20% 0%, #c9b8a6 0%, #8e7f74 45%, #4f4a52 100%); }
+  :root[data-tema="oscuro"] .pantalla { background: radial-gradient(120% 80% at 20% 0%, #3c3a46 0%, #23222b 55%, #121216 100%); }
+  .barra { position: absolute; top: 10px; left: 22px; right: 22px; display: flex; justify-content: space-between; color: #fff; font-size: 12px; font-weight: 600; opacity: .9; }
+  .grilla { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px 10px; }
+  .app { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #fff; font-size: 10.5px; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+  .app i { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.28); display: block; }
+  .ocupa-4 { grid-column: span 4; }
+  .ocupa-2 { grid-column: span 2; }
+  .ocupa-2x2 { grid-column: span 2; grid-row: span 2; }
+  .dock { position: absolute; left: 14px; right: 14px; bottom: 16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .dock .app span { display: none; }
+  .tocado { position: relative; }
+  .tocado::after { content: ""; position: absolute; left: 50%; top: 50%; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; border: 2px solid rgba(255,255,255,.95); box-shadow: 0 0 0 5px rgba(127,127,127,.35); pointer-events: none; }
+
+  /* piezas del widget */
+  .w { background: var(--panel); color: var(--texto); border: 1px solid var(--linea); border-radius: 24px; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
+  .btn { border: 0; font: inherit; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 18px; cursor: pointer; }
+  .btn.claro { background: var(--boton); color: var(--texto); }
+  .btn.fuerte { background: var(--acento); color: var(--sobre-acento); }
+  .btn svg { width: 19px; height: 19px; flex: none; }
+  .cara { image-rendering: pixelated; flex: none; border-radius: 50%; background: #e9dfd0; overflow: hidden; display: block; }
+  :root[data-tema="oscuro"] .cara { background: #3a3530; }
+
+  /* 1 */
+  .w1 { height: 64px; padding: 8px; display: flex; gap: 6px; }
+  .w1 .btn { flex: 1; }
+  /* 2 */
+  .w2 { height: 58px; border-radius: 999px; padding: 6px 6px 6px 8px; display: flex; align-items: center; gap: 10px; }
+  .w2 .ph { flex: 1; color: var(--suave); font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .w2 .redondo { width: 46px; height: 46px; border-radius: 50%; padding: 0; }
+  /* 3 */
+  .w3 { aspect-ratio: 1; padding: 14px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; }
+  .w3 .nom { font-weight: 700; font-size: 14px; margin-top: 6px; }
+  .w3 .rol { font-size: 11.5px; color: var(--suave); }
+  .w3 .fila { display: flex; gap: 8px; width: 100%; }
+  .w3 .fila .btn { flex: 1; height: 40px; border-radius: 14px; padding: 0; }
+  /* 4 */
+  .w4 { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .w4 .burbuja { position: relative; width: 58px; height: 58px; border-radius: 50%; }
+  .w4 .burbuja .cara { width: 58px; height: 58px; border: 3px solid var(--panel); box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+  .w4 .chapa { position: absolute; right: -4px; bottom: -4px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--panel); }
+  .w4 .chapa svg { width: 14px; height: 14px; }
+  .w4 .chapa.fuerte { background: var(--acento); color: var(--sobre-acento); }
+  .w4 .chapa.claro { background: var(--boton); color: var(--texto); }
+  .w4 span.et { color: #fff; font-size: 10.5px; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+  /* 5 */
+  .w5 { padding: 0; overflow: hidden; border-radius: 22px; }
+  .w5 .escena { position: relative; height: 112px; background: #d9cdb8; image-rendering: pixelated; }
+  .w5 .escena svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .w5 .globo { position: absolute; left: 112px; top: 18px; right: 12px; background: #fff; color: #1d1d1f; border: 2px solid #1d1d1f; padding: 6px 9px; font: 700 12.5px/1.25 ui-monospace, Menlo, monospace; box-shadow: 3px 3px 0 #1d1d1f; }
+  .w5 .globo::before { content: ""; position: absolute; left: -10px; top: 12px; border: 5px solid transparent; border-right-color: #1d1d1f; border-width: 5px 8px; }
+  .w5 .fila { display: flex; gap: 6px; padding: 8px; }
+  .w5 .fila .btn { flex: 1; height: 42px; border-radius: 0; font-family: ui-monospace, Menlo, monospace; font-size: 13px; box-shadow: 3px 3px 0 rgba(0,0,0,.35); }
+  .nota { max-width: 1180px; margin: 4px auto 40px; padding: 0 16px; color: #6d6962; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Widget de la secretaría · 5 bocetos</h1>
+    <p>Cada uno abre una <b>charla nueva</b> con la secretaría, escribiendo o grabando un audio, y después la app queda en ese chat. El círculo blanco marca el botón de hablar. Android no deja escribir dentro de un widget: «Escribir» abre la app con el teclado listo.</p>
+  </div>
+  <div class="tema" role="group" aria-label="Tema del teléfono">
+    <button type="button" data-t="claro" aria-pressed="true">Claro</button>
+    <button type="button" data-t="oscuro" aria-pressed="false">Oscuro</button>
+  </div>
+</header>
+
+<main id="opciones"></main>
+<p class="nota">La cara de la secretaría sale de su avatar pixel de la oficina (acá, una de ejemplo). Los tamaños son en celdas de la pantalla de inicio de Android; casi todos se pueden estirar.</p>
+
+<script>
+  /* íconos */
+  var LAPIZ = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
+  var MIC = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>';
+
+  /* cara pixel de ejemplo (16×16) */
+  var CARA = [
+    '................',
+    '.....kkkkkk.....',
+    '...kkkkkkkkkk...',
+    '..kkkkkkkkkkkk..',
+    '..kkksssssskkk..',
+    '.kkksssssssskkk.',
+    '.kkssoossoosskk.',
+    '.kksswwsswwsskk.',
+    '.kkssssssssssskk',
+    '.kkssssnnsssskk.',
+    '.kksssmmmmssskk.',
+    '..kksssssssskk..',
+    '...kkssssssk....',
+    '....rrsssrrr....',
+    '..rrrrrrrrrrrr..',
+    '.rrrrrrrrrrrrrr.'
+  ];
+  var COL = { k: '#2a211d', s: '#e8b98f', o: '#c0622f', w: '#ffffff', n: '#d39a72', m: '#a8473c', r: '#c4473a' };
+  function caraSvg(px) {
+    var r = '';
+    CARA.forEach(function (fila, y) {
+      for (var x = 0; x < 16; x++) { var c = COL[fila[x]]; if (c) r += '<rect x="' + x + '" y="' + y + '" width="1.02" height="1.02" fill="' + c + '"/>'; }
+    });
+    return '<svg class="cara" width="' + px + '" height="' + px + '" viewBox="0 0 16 16" shape-rendering="crispEdges">' + r + '</svg>';
+  }
+
+  /* recepción pixel para el boceto 5 */
+  function escena() {
+    var r = '<svg viewBox="0 0 120 40" preserveAspectRatio="xMinYMax slice" shape-rendering="crispEdges">';
+    r += '<rect width="120" height="40" fill="#d9cdb8"/><rect y="0" width="120" height="3" fill="#c9bba3"/>';
+    r += '<rect x="86" y="6" width="16" height="12" fill="#8fb3c4"/><rect x="86" y="6" width="16" height="1" fill="#6d8fa0"/><rect x="93" y="6" width="1" height="12" fill="#6d8fa0"/>';
+    r += '<rect y="30" width="120" height="10" fill="#b49a77"/><rect y="30" width="120" height="1" fill="#9c815e"/>';
+    var x0 = 8, y0 = 8;
+    CARA.forEach(function (fila, y) {
+      for (var x = 0; x < 16; x++) { var c = COL[fila[x]]; if (c) r += '<rect x="' + (x0 + x) + '" y="' + (y0 + y) + '" width="1.02" height="1.02" fill="' + c + '"/>'; }
+    });
+    r += '<rect x="2" y="24" width="30" height="16" fill="#6b4f3a"/><rect x="2" y="24" width="30" height="2" fill="#86664c"/>';
+    r += '<rect x="22" y="20" width="7" height="5" fill="#2d2d33"/><rect x="23" y="21" width="5" height="3" fill="#7fc4a8"/>';
+    r += '<rect x="6" y="22" width="5" height="2" fill="#f4f0e6"/>';
+    r += '</svg>';
+    return r;
+  }
+
+  function telefono(widget, toque, abajo) {
+    var apps = '';
+    var nombres = ['Fotos', 'Mapas', 'Clima', 'Notas', 'Reloj', 'Música', 'Banco', 'Mail'];
+    function app(i) { return '<div class="app"><i></i><span>' + nombres[i % nombres.length] + '</span></div>'; }
+    var cuerpo = abajo ? abajo(app) : '';
+    return '<div class="tel"><div class="pantalla">' +
+      '<div class="barra"><span>9:41</span><span>●●● ▮</span></div>' +
+      '<div class="grilla">' + (abajo ? cuerpo : widget) + '</div>' +
+      '<div class="dock">' + app(0) + app(1) + app(2) + app(3) + '</div>' +
+            '</div></div>';
+  }
+
+  var OPCIONES = [
+    {
+      t: '1 · Dos botones', tam: '3×1 · se estira a lo ancho',
+      tel: telefono(null, null, function (app) {
+        return '<div class="ocupa-4"><div class="w w1">' +
+          '<button class="btn claro">' + LAPIZ + 'Escribir</button>' +
+          '<button class="btn fuerte tocado">' + MIC + 'Hablar</button></div></div>' +
+          app(4) + app(5) + app(6) + app(7);
+      }),
+      pro: ['Lo más claro: dos acciones, dos botones grandes.', 'Se usa con el pulgar sin mirar mucho.'],
+      contra: ['No dice a quién le hablás (no tiene cara ni nombre).']
+    },
+    {
+      t: '2 · Barra tipo buscador', tam: '4×1 · como la barra de Google',
+      tel: telefono(null, null, function (app) {
+        return '<div class="ocupa-4"><div class="w w2">' + caraSvg(42) +
+          '<span class="ph">Escribile a Betty…</span>' +
+          '<button class="btn fuerte redondo tocado" aria-label="Hablar">' + MIC + '</button></div></div>' +
+          app(4) + app(5) + app(6) + app(7);
+      }),
+      pro: ['Se entiende solo: tocar el texto es escribir, el micrófono es hablar.', 'Con su cara: sabés que es la secretaría.'],
+      contra: ['El área de «escribir» parece un campo, pero abre la app (Android no deja escribir en el widget).']
+    },
+    {
+      t: '3 · Tarjeta con la secretaría', tam: '2×2',
+      tel: telefono(null, null, function (app) {
+        return '<div class="ocupa-2x2"><div class="w w3">' +
+          '<div>' + caraSvg(64).replace('class="cara"', 'class="cara" style="margin:0 auto"') + '<div class="nom">Betty</div><div class="rol">Secretaría</div></div>' +
+          '<div class="fila"><button class="btn claro" aria-label="Escribir">' + LAPIZ + '</button><button class="btn fuerte" aria-label="Hablar">' + MIC + '</button></div>' +
+          '</div></div>' + app(4) + app(5) + app(6) + app(7);
+      }),
+      pro: ['Se siente como un contacto: su cara, su nombre.', 'Tocar la cara también puede abrir la última charla.'],
+      contra: ['Ocupa cuatro celdas por solo dos botones.']
+    },
+    {
+      t: '4 · Dos burbujas chicas', tam: '1×1 cada una · las ponés por separado',
+      tel: telefono(null, null, function (app) {
+        function burbuja(ico, cls, et) {
+          return '<div class="w4"><div class="burbuja">' + caraSvg(58) + '<span class="chapa ' + cls + '">' + ico + '</span></div><span class="et">' + et + '</span></div>';
+        }
+        return burbuja(LAPIZ, 'claro', 'Escribir') + burbuja(MIC, 'fuerte tocado', 'Hablar') + app(4) + app(5) + app(6) + app(7) + app(0) + app(1);
+      }),
+      pro: ['Ocupa lo mismo que un ícono: entra en cualquier lado, hasta en el dock.', 'Podés poner solo la de hablar.'],
+      contra: ['Son dos widgets para agregar, no uno.', 'Chiquitas: el lápiz y el micrófono se distinguen por la chapita.']
+    },
+    {
+      t: '5 · Recepción pixel', tam: '4×2 · el estilo de la oficina',
+      tel: telefono(null, null, function (app) {
+        return '<div class="ocupa-4"><div class="w w5"><div class="escena">' + escena() +
+          '<div class="globo">¿Qué necesitás?</div></div>' +
+          '<div class="fila"><button class="btn claro">' + LAPIZ + 'Escribir</button><button class="btn fuerte tocado">' + MIC + 'Hablar</button></div>' +
+          '</div></div>' + app(4) + app(5) + app(6) + app(7);
+      }),
+      pro: ['El más «Oficina»: la secretaría pixel en su escritorio de la recepción.', 'Más adelante puede mostrar si está ocupada (escribiendo en la compu).'],
+      contra: ['El más grande (media pantalla de ancho y dos filas).', 'Hay que dibujar la escena para cada apariencia de la secretaría.']
+    }
+  ];
+
+  var main = document.getElementById('opciones');
+  main.innerHTML = OPCIONES.map(function (o) {
+    return '<section class="opcion">' + o.tel + '<h2>' + o.t + '</h2><div class="tam">' + o.tam + '</div><ul>' +
+      o.pro.map(function (p) { return '<li>' + p + '</li>'; }).join('') +
+      o.contra.map(function (p) { return '<li class="contra">' + p + '</li>'; }).join('') + '</ul></section>';
+  }).join('');
+
+  document.querySelectorAll('.tema button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.documentElement.dataset.tema = b.dataset.t;
+      document.querySelectorAll('.tema button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+    });
+  });
+</script>
+</body>
+</html>
