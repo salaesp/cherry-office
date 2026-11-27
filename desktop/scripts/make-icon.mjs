@@ -1,6 +1,6 @@
 // Ícono de la app en pixel art: el edificio de la oficina (el mismo de App.logo() en oficina/ui/base.js, con más
 // detalle). Un solo dibujo en una grilla de 32×32 celdas; de acá salen todos los tamaños, escalados sin suavizado.
-// Uso: node scripts/make-icon.mjs   (escribe build/icon.png, build/icono.svg y ../oficina/iconos/*.png)
+// Uso: node scripts/make-icon.mjs   (escribe build/icon.png, build/icono.svg, build/bandeja*.png y ../oficina/iconos/*.png)
 import { writeFileSync } from 'node:fs'
 import { deflateSync } from 'node:zlib'
 import { dirname, resolve } from 'node:path'
@@ -87,7 +87,7 @@ const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), pa
 
 /** PNG RGBA de `lado` px; `recorte` saca píxeles de cada borde después de escalar (para tamaños que no son múltiplo de 32). */
 function png(g, lado, recorte = 0) {
-  const cel = (lado + 2 * recorte) / N
+  const cel = (lado + 2 * recorte) / g.length
   const filas = []
   for (let y = 0; y < lado; y++) {
     const f = Buffer.alloc(1 + lado * 4)
@@ -120,10 +120,27 @@ function svg(g) {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${N} ${N}" width="1024" height="1024" shape-rendering="crispEdges">${v}</svg>\n`
 }
 
+/** Versión chica para la bandeja / barra de menú: el logo de 16×16 de App.logo() (oficina/ui/base.js), celda por celda,
+    con `margen` celdas transparentes alrededor (en Mac la barra pide 18 pt). */
+function bandeja(margen) {
+  const L = 16 + 2 * margen, g = Array.from({ length: L }, () => Array(L).fill(null))
+  const r = (x, y, w, h, c) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) g[j + margen][i + margen] = c }
+  r(2, 2, 9, 13, C.K); r(3, 3, 7, 12, C.amb); r(3, 3, 7, 1, C.ambL); r(9, 3, 1, 12, C.ambS)
+  r(10, 6, 4, 9, C.K); r(11, 7, 2, 8, C.azul); r(11, 7, 2, 1, C.azulL)
+  for (const [x, y] of [[4, 5], [7, 5], [4, 8], [7, 8], [4, 11]]) r(x, y, 2, 2, C.luz)
+  r(7, 12, 2, 3, C.K); r(11, 9, 2, 1, C.luz); r(11, 12, 2, 1, C.luz); r(1, 15, 14, 1, C.K)
+  return g
+}
+
 const baldosa = escena(false), lleno = escena(true)
 const sal = (p, d) => { writeFileSync(resolve(aqui, p), d); console.log('escribí', p) }
 sal('../build/icon.png', png(baldosa, 1024))
 sal('../build/icono.svg', svg(baldosa))
+// Electron toma solo el @2x al cargar bandeja.png en pantallas retina
+sal('../build/bandeja.png', png(bandeja(0), 16))
+sal('../build/bandeja@2x.png', png(bandeja(0), 32))
+sal('../build/bandeja-mac.png', png(bandeja(1), 18))
+sal('../build/bandeja-mac@2x.png', png(bandeja(1), 36))
 sal('../../oficina/iconos/icono-512.png', png(baldosa, 512))
 sal('../../oficina/iconos/icono-192.png', png(baldosa, 192))
 sal('../../oficina/iconos/icono-maskable-512.png', png(lleno, 512)) // a sangre: Android le pone su propia máscara
