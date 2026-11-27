@@ -243,7 +243,7 @@ export function rutasChat(d: DepsChat): RutaNucleo {
     aplicarEleccion(ctx, eleccion)
     // pasar trabajo a un colega y preguntarle a la persona: instrucciones como mensaje de sistema, con las demás
     const ganchos = d.charla?.()
-    const extra = ganchos?.instrucciones(act.oficina, def)
+    const extra = ganchos?.instrucciones(act.oficina, def, act.carpeta, sid)
     if (extra) ctx.instrucciones = ctx.instrucciones ? `${ctx.instrucciones}\n\n${extra}` : extra
 
     let resultado: Resp
@@ -258,9 +258,11 @@ export function rutasChat(d: DepsChat): RutaNucleo {
           ganchos?.empezar(carpeta, agente, sid)
           const activa = store.estaActiva(sid)
           // el cartel: fijo arriba («Respondiéndote») y abajo lo que va haciendo en vivo (sin IA)
-          const texto = await runner.actividad.seguir({ oficina: carpeta, agente, origen: 'chat', tarea: 'Respondiéndote', extra: caja.observador(escritos.observador(uso.observador(enVivo.observador()))) },
+          let texto = await runner.actividad.seguir({ oficina: carpeta, agente, origen: 'chat', tarea: 'Respondiéndote', extra: caja.observador(escritos.observador(uso.observador(enVivo.observador()))) },
             (obs) => runner.ejecutarChat({ agente, mensaje, sid, activa, carpeta, obs, envExtra, cancelacion, armar: (p) => argumentos(config, ctx, p) }))
           store.marcarActiva(sid)
+          // las citas ([wa:N] → el mensaje real) y lo que sumen otros módulos, antes de guardar y mostrar
+          if (ganchos?.respuesta && texto !== '') texto = ganchos.respuesta(act.oficina, def, texto)
           const guardado = texto === '' ? '(sin respuesta)' : texto
           store.agregar(sid, 'a', guardado)
           const av = avisos.crear({ oficina: carpeta, tipo: 'respuesta', agente, texto: TextoAviso.respuesta(guardado), ref: sid })

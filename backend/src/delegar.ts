@@ -33,8 +33,10 @@ export const LimitesDelegar = {
 }
 const L = LimitesDelegar
 
-export type TipoTarjeta = 'delegacion' | 'pregunta'
-/** delegacion: propuesta | esperando | corriendo | programada | hecha | fallida | cancelada · pregunta: abierta | respondida */
+export type TipoTarjeta = 'delegacion' | 'pregunta' | 'flujo'
+/** delegacion: propuesta | esperando | corriendo | programada | hecha | fallida | cancelada · pregunta: abierta | respondida ·
+ *  flujo (charla-flujos.ts): propuesta | esperando | programada | en_curso | te_espera | hecha | trabada | cancelada | fallida.
+ *  `datos.novedad`: lo que cambió y el agente todavía no supo (se le cuenta en su próximo mensaje de esa charla). */
 export type Tarjeta = {
   id: number
   oficina: string
@@ -106,6 +108,17 @@ export class TarjetasStore {
     return this.db.query(`SELECT * FROM charla_res WHERE oficina=? AND tipo=? AND estado IN (${marcas}) ORDER BY id`, [oficina, tipo, ...estados]).map(TarjetasStore.de)
   }
 
+  /** La tarjeta de flujo que arrancó una corrida. */
+  porCorrida(oficina: string, corrida: number): Tarjeta | undefined {
+    const f = this.db.query("SELECT * FROM charla_res WHERE oficina=? AND tipo='flujo' AND json_extract(datos,'$.corrida')=? ORDER BY id DESC LIMIT 1", [oficina, corrida])[0]
+    return f ? TarjetasStore.de(f) : undefined
+  }
+
+  /** Las tarjetas de una charla con algo que el agente todavía no supo. */
+  conNovedad(oficina: string, sid: string): Tarjeta[] {
+    return this.db.query("SELECT * FROM charla_res WHERE oficina=? AND sid=? AND json_extract(datos,'$.novedad') IS NOT NULL ORDER BY id", [oficina, sid]).map(TarjetasStore.de)
+  }
+
   porEjecucion(ejecucion: number): Tarjeta | undefined {
     const f = this.db.query("SELECT * FROM charla_res WHERE tipo='delegacion' AND ejecucion=?", [ejecucion])[0]
     return f ? TarjetasStore.de(f) : undefined
@@ -169,9 +182,49 @@ export function instruccionesCharla(o: Oficina, a: AgenteDef): string {
 
 // MARK: - servicio
 
+/** Lo que terminó o cambió desde el último mensaje (tarjetas con `novedad`): el agente lo cuenta si viene al caso. */
+export function textoNovedades(ts: Tarjeta[]): string | undefined {
+  const l = ts.map((t) => typeof t.datos.novedad === 'string' ? `- ${t.datos.novedad}` : '').filter((x) => x !== '')
+  if (l.length === 0) return undefined
+  return ['## Novedades desde tu último mensaje en esta charla', 'Lo que pasaste o arrancaste acá y cambió mientras tanto (los detalles están en las tarjetas y en la bandeja). Contalo en una línea si viene al caso; no lo repitas si ya lo sabe.', ...l].join('\n')
+}
+
+/** Una pieza más de las instrucciones de la charla (los flujos, …): la suman otros módulos. */
+export type ExtraInstrucciones = (o: Oficina, a: AgenteDef, sid: string) => string | undefined
+/** Lo que la persona hace con una tarjeta de otro tipo (los flujos): `cuerpo` es el JSON del pedido. */
+export type ManejadorTarjeta = (act: OficinaActiva, t: Tarjeta, accion: string, cuerpo: Obj) => Promise<{ mensaje?: string }>
+
+/** Mensajes citados que el agente le pasa a un colega (`citas`): el texto que va con la consigna (delimitado como dato) y lo
+ *  que muestra la tarjeta con el candado. Un texto es un error para el agente. */
+export type ResolverCitas = (o: Oficina, a: AgenteDef, refs: number[]) => { texto: string; compartido: Obj[] } | string
+
 export class Delegaciones {
   /** Segundos que espera una delegación pedida antes de lanzarse (para «Deshacer»). */
   static ventana = 45
+  static readonly maxCitas = 5
+  readonly extras: ExtraInstrucciones[] = []
+  /** Cambian la respuesta del agente antes de guardarla (las citas de WhatsApp). */
+  readonly respuestas: ((o: Oficina, a: AgenteDef, texto: string) => string)[] = []
+  resolverCitas?: ResolverCitas
+
+  /** Lee «citas» de una herramienta: undefined si no vino; un texto si hay que contestar con error. */
+  citas(o: Oficina, a: AgenteDef, v: unknown): { texto: string; compartido: Obj[] } | string | undefined {
+    if (v === undefined || v === null || (Array.isArray(v) && v.length === 0)) return undefined
+    if (!Array.isArray(v) || !v.every((x) => typeof x === 'number' && Number.isInteger(x))) return '«citas» tiene que ser una lista de números (los N de [wa:N]).'
+    if (v.length > Delegaciones.maxCitas) return `Pasá como mucho ${Delegaciones.maxCitas} mensajes citados: elegí los que hacen falta.`
+    if (!this.resolverCitas) return 'No hay mensajes para citar en esta oficina.'
+    return this.resolverCitas(o, a, [...new Set(v as number[])])
+  }
+
+  /** La respuesta del agente con lo que cambien los módulos (p. ej. [wa:N] por el mensaje real). */
+  respuesta(o: Oficina, a: AgenteDef, texto: string): string {
+    let t = texto
+    for (const f of this.respuestas) { try { t = f(o, a, t) } catch {} }
+    return t
+  }
+  readonly manejadores = new Map<TipoTarjeta, ManejadorTarjeta>()
+  /** Estados que esperan a la persona, por tipo (para «Te esperan» y la insignia). */
+  readonly esperanPersona = new Map<TipoTarjeta, string[]>([['pregunta', ['abierta']], ['delegacion', ['propuesta']]])
   static readonly prefijoTarea = 'delegar-'
   private readonly timers = new Map<number, NodeJS.Timeout>()
   /** `oficina \u001f agente \u001f sid` de los mensajes de la persona que corren ahora. */
@@ -188,12 +241,39 @@ export class Delegaciones {
   terminarCharla(oficina: string, agente: string, sid: string) { this.charlas.delete(Delegaciones.clave(oficina, agente, sid)) }
   enCharla(oficina: string, agente: string, sid: string) { return this.charlas.has(Delegaciones.clave(oficina, agente, sid)) }
 
-  private turno(sid: string) { return this.s.store.cuentaMensajes(sid) }
+  turno(sid: string) { return this.s.store.cuentaMensajes(sid) }
+
+  /** Las instrucciones de la charla: pasar trabajo y preguntar, lo que sumen otros módulos y las novedades (que quedan
+   *  contadas). */
+  instrucciones(o: Oficina, a: AgenteDef, oficina: string, sid: string): string {
+    const partes = [instruccionesCharla(o, a)]
+    for (const f of this.extras) { const x = f(o, a, sid); if (x) partes.push(x) }
+    const con = sid === '' ? [] : this.store.conNovedad(oficina, sid).filter((t) => t.agente === a.id)
+    const nov = textoNovedades(con)
+    if (nov) {
+      partes.push(nov)
+      for (const t of con) { const d = { ...t.datos }; delete d.novedad; this.store.poner(t.id, { datos: d }) }
+    }
+    return partes.join('\n\n')
+  }
+
+  /** Marca una novedad en la tarjeta y, si `aviso`, deja un aviso que abre esa charla (con la notificación). */
+  novedad(t: Tarjeta, texto: string, aviso = true) {
+    const fresca = this.store.una(t.id) ?? t
+    this.store.poner(t.id, { datos: { ...fresca.datos, novedad: texto } })
+    if (!aviso) return
+    const de = this.s.oficinas.activa()?.oficina.agentes.find((x) => x.id === t.agente)
+    const av = this.s.avisos.crear({ oficina: t.oficina, tipo: 'charla', agente: t.agente, texto, ref: t.sid })
+    if (av) this.s.avisos.emitir(av, de?.nombre ?? 'Oficina')
+  }
 
   /** Registra una delegación. `directo`: corre enseguida (el coordinador sin la persona); `explicito`: espera la ventana;
    *  si no, queda como propuesta. */
-  delegar(act: OficinaActiva, de: AgenteDef, sid: string, p: { para: AgenteDef; nombre: string; consigna: string; explicito: boolean; directo?: boolean; cuando?: { fecha: string; hora: string } }): Tarjeta {
-    const datos: Obj = { para: p.para.id, nombre: p.nombre, consigna: p.consigna, ...(p.cuando ? { cuando: p.cuando } : {}), ...(p.directo ? { sinPersona: true } : {}) }
+  delegar(act: OficinaActiva, de: AgenteDef, sid: string, p: { para: AgenteDef; nombre: string; consigna: string; explicito: boolean; directo?: boolean; cuando?: { fecha: string; hora: string }; citas?: { texto: string; compartido: Obj[] } }): Tarjeta {
+    const datos: Obj = {
+      para: p.para.id, nombre: p.nombre, consigna: p.consigna, ...(p.cuando ? { cuando: p.cuando } : {}), ...(p.directo ? { sinPersona: true } : {}),
+      ...(p.citas ? { citado: p.citas.texto, compartido: p.citas.compartido } : {}),
+    }
     const base = { oficina: act.carpeta, agente: de.id, sid, turno: this.turno(sid), tipo: 'delegacion' as const }
     if (!p.explicito && !p.directo) return this.store.crear({ ...base, estado: 'propuesta', datos })
     const empieza = Date.now() / 1000 + (p.cuando || p.directo ? 0 : Delegaciones.ventana)
@@ -209,7 +289,7 @@ export class Delegaciones {
   private agendar(t: Tarjeta) {
     clearTimeout(this.timers.get(t.id))
     const empieza = typeof t.datos.empieza === 'number' ? t.datos.empieza : 0
-    const h = setTimeout(() => { this.timers.delete(t.id); void this.lanzar(t.id) }, Math.max(0, empieza * 1000 - Date.now()))
+    const h = setTimeout(() => { this.timers.delete(t.id); this.lanzar(t.id).catch(() => {}) }, Math.max(0, empieza * 1000 - Date.now()))
     h.unref?.()
     this.timers.set(t.id, h)
   }
@@ -229,7 +309,7 @@ export class Delegaciones {
     const encabezado = t.datos.sinPersona
       ? `Encargo de ${quien}, coordinador/a de la oficina. Viene de un colega, no es un pedido directo de ${persona}:`
       : `Encargo que ${persona} le pidió a ${quien} en una charla, para vos:`
-    const consigna = sanear(`${encabezado}\n\n${String(t.datos.consigna)}`)
+    const consigna = sanear(`${encabezado}\n\n${String(t.datos.consigna)}${typeof t.datos.citado === 'string' ? `\n\n${t.datos.citado}` : ''}`)
     const nombre = String(t.datos.nombre)
     try {
       const cuando = esObjeto(t.datos.cuando) ? t.datos.cuando as { fecha: string; hora: string } : undefined
@@ -268,7 +348,11 @@ export class Delegaciones {
     const t = this.store.porEjecucion(ej.id) ?? this.deTarea(ej.tarea)
     if (!t || t.tipo !== 'delegacion' || t.oficina !== ej.oficina) return
     if (ej.estado === 'esperando_permiso' || ej.estado === 'corriendo') return
-    this.store.poner(t.id, { estado: ej.estado === 'ok' ? 'hecha' : 'fallida', ejecucion: ej.id, datos: { ...t.datos, ...(ej.error ? { error: prefijo(ej.error, 300) } : {}) } })
+    if (t.estado === 'hecha' || t.estado === 'fallida') return
+    const ok = ej.estado === 'ok'
+    this.store.poner(t.id, { estado: ok ? 'hecha' : 'fallida', ejecucion: ej.id, datos: { ...t.datos, ...(ej.error ? { error: prefijo(ej.error, 300) } : {}) } })
+    const para = this.s.oficinas.activa()?.oficina.agentes.find((x) => x.id === t.datos.para)?.nombre ?? String(t.datos.para)
+    this.novedad(t, ok ? `${para} terminó «${String(t.datos.nombre)}»: lo que entregó está en la bandeja.` : `${para} no pudo terminar «${String(t.datos.nombre)}»${ej.error ? `: ${prefijo(ej.error, 200)}` : '.'}`)
   }
 
   alEntregar(oficina: string, tarea: string, entrega: number, ejecucion?: number) {
@@ -278,9 +362,11 @@ export class Delegaciones {
   }
 
   /** Lo que la persona hace con una tarjeta. `responder` devuelve el mensaje que la interfaz manda en esa charla. */
-  async decidir(act: OficinaActiva, id: number, accion: string, opcion?: number): Promise<{ mensaje?: string }> {
+  async decidir(act: OficinaActiva, id: number, accion: string, opcion?: number, cuerpo: Obj = {}): Promise<{ mensaje?: string }> {
     const t = this.store.una(id)
     if (!t || t.oficina !== act.carpeta) throw new ErrorAPI(404, 'No encontré esa tarjeta.')
+    const m = this.manejadores.get(t.tipo)
+    if (m) return m(act, t, accion, cuerpo)
     if (t.tipo === 'delegacion') {
       if (accion === 'cancelar') {
         if (t.estado === 'esperando') { clearTimeout(this.timers.get(t.id)); this.timers.delete(t.id) }
@@ -332,19 +418,23 @@ export class Delegaciones {
 
   /** Lo que espera a la persona: preguntas abiertas, delegaciones propuestas y propuestas de acción pendientes. */
   pendientesJSON(oficina: string): Obj {
-    const tarjetas = [...this.store.enEstado(oficina, 'pregunta', ['abierta']), ...this.store.enEstado(oficina, 'delegacion', ['propuesta'])]
-      .sort((a, b) => b.creado - a.creado)
+    const tarjetas = this.esperando(oficina).sort((a, b) => b.creado - a.creado)
     const acciones = (accionesDe(this.s)?.lista(oficina, ['pendiente']) ?? []).sort((a, b) => b.creada - a.creada)
     return { tarjetas: tarjetas.map((t) => this.json(t)), acciones: acciones.map(accionJSON) }
   }
 
   /** Para la insignia de la Bandeja (las propuestas de acción ya cuentan como entregas sin revisar). */
-  teEsperan(oficina: string): number {
-    return this.store.enEstado(oficina, 'pregunta', ['abierta']).length + this.store.enEstado(oficina, 'delegacion', ['propuesta']).length
+  teEsperan(oficina: string): number { return this.esperando(oficina).length }
+
+  private esperando(oficina: string): Tarjeta[] {
+    return [...this.esperanPersona].flatMap(([tipo, estados]) => this.store.enEstado(oficina, tipo, estados))
   }
 
   json(t: Tarjeta): Obj {
-    return { id: t.id, tipo: t.tipo, estado: t.estado, agente: t.agente, session: t.sid, turno: t.turno, ejecucion: t.ejecucion ?? null, ...t.datos, creado: new Date(t.creado * 1000).toISOString() }
+    const datos = { ...t.datos }
+    delete datos.citado
+    delete datos.novedad
+    return { id: t.id, tipo: t.tipo, estado: t.estado, agente: t.agente, session: t.sid, turno: t.turno, ejecucion: t.ejecucion ?? null, ...datos, creado: new Date(t.creado * 1000).toISOString() }
   }
 }
 
@@ -371,6 +461,7 @@ export class HerramientasDelegar implements MCPHerramientas {
           consigna: { type: 'string', description: 'qué tiene que hacer, para qué, con qué datos o archivos y qué entregar: quien la lee no vio la charla' },
           ...(conPersona ? { explicito: { type: 'boolean', description: 'true si la persona pidió que lo haga otro; false si lo deducís vos' } } : {}),
           cuando: { type: 'string', description: 'opcional: para más adelante, «AAAA-MM-DDTHH:MM» (hora local)' },
+          citas: { type: 'array', items: { type: 'number' }, description: `opcional: mensajes de WhatsApp que el colega necesita ver, por su N de [wa:N] (hasta ${Delegaciones.maxCitas}). Le llega solo eso, no el chat` },
         },
         required: conPersona ? ['agente', 'nombre', 'consigna', 'explicito'] : ['agente', 'nombre', 'consigna'],
       },
@@ -424,13 +515,15 @@ export class HerramientasDelegar implements MCPHerramientas {
       cuando = leerCuando(a.cuando)
       if (!cuando) return MCPResultados.error('«cuando» tiene que ser una fecha futura con la forma AAAA-MM-DDTHH:MM.')
     }
+    const citas = this.d.citas(act.oficina, de, a.citas)
+    if (typeof citas === 'string') return MCPResultados.error(citas)
     const tokens = mcpDe(this.s)?.tokens
     if (!tokens || !tokens.tomar(this.token, 'delegar', L.maxDelegaciones)) {
       return MCPResultados.error(`Ya delegaste ${L.maxDelegaciones} cosas en este mensaje. Contá lo que quedó sin delegar.`)
     }
     const t = this.d.delegar(act, de, this.identidad.sid, {
       para, nombre: prefijo(nombre, L.maxNombre), consigna: prefijo(consigna, L.maxConsigna),
-      explicito: this.op.conPersona ? a.explicito === true : true, directo: !this.op.conPersona, ...(cuando ? { cuando } : {}),
+      explicito: this.op.conPersona ? a.explicito === true : true, directo: !this.op.conPersona, ...(cuando ? { cuando } : {}), ...(citas ? { citas } : {}),
     })
     const jefe = act.oficina.duenio.trim() || 'la persona'
     const aviso = t.estado === 'propuesta' ? `Quedó como propuesta: ${jefe} la confirma o la descarta.`
@@ -470,10 +563,12 @@ export function herramientasDelegar(s: Servicios, token: string, identidad: Iden
 
 /** Los ganchos que usa `/api/chat` (rutas-chat.ts). */
 export type GanchosCharla = {
-  instrucciones(o: Oficina, a: AgenteDef): string | undefined
+  instrucciones(o: Oficina, a: AgenteDef, oficina: string, sid: string): string | undefined
   empezar(oficina: string, agente: string, sid: string): void
   terminar(oficina: string, agente: string, sid: string): void
   teEsperan(oficina: string): number
+  /** La respuesta del agente lista para guardar y mostrar. */
+  respuesta?(o: Oficina, a: AgenteDef, texto: string): string
 }
 
 // MARK: - rutas
@@ -506,7 +601,7 @@ export class DelegarRouter implements SubRouter {
     const b = objeto(body)
     const accion = typeof b.accion === 'string' ? b.accion : ''
     const opcion = typeof b.opcion === 'number' && Number.isInteger(b.opcion) ? b.opcion : undefined
-    const r = await this.d.decidir(act, Number(m[1]), accion, opcion)
+    const r = await this.d.decidir(act, Number(m[1]), accion, opcion, b)
     const t = this.d.store.una(Number(m[1]))!
     return [200, { tarjeta: this.d.json(t), ...(r.mensaje ? { mensaje: { agente: t.agente, session: t.sid, texto: r.mensaje } } : {}) }]
   }
@@ -520,10 +615,11 @@ export function instalar(s: Servicios) {
   s.router.registrarExtra(new DelegarRouter(s, d))
   mcpDe(s)?.registrarHerramientas(herramientasDelegar)
   s.charla = () => ({
-    instrucciones: (o, a) => instruccionesCharla(o, a),
+    instrucciones: (o, a, oficina, sid) => d.instrucciones(o, a, oficina, sid),
     empezar: (o, a, sid) => d.empezarCharla(o, a, sid),
     terminar: (o, a, sid) => d.terminarCharla(o, a, sid),
     teEsperan: (o) => d.teEsperan(o),
+    respuesta: (o, a, t) => d.respuesta(o, a, t),
   })
   const prog = programadorDe(s)
   prog?.alTerminar((ej) => d.alTerminar(ej))

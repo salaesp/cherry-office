@@ -24,5 +24,7 @@ import './secretaria-memoria.js' // [secretaria-memoria]
 import './secretaria-importar.js' // [secretaria-importar]
 import './audio.js' // [audio]
 import './delegar.js' // [delegar]
+import './charla-flujos.js' // [charla-flujos]
+import './citas-whatsapp.js' // [citas-whatsapp]
 import './rutas-skills.js' // [skills-propias]
 export {}

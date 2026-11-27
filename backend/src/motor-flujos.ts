@@ -86,6 +86,16 @@ export class MotorFlujos {
   /** Pasos que se están lanzando o procesando ahora (el id va en negativo para lo que se procesa): evita que dos llamadas
    *  a la vez hagan lo mismo dos veces. */
   private readonly lanzando = new Set<number>()
+  /** Se llaman cuando una corrida cambia de estado (con la corrida ya guardada): la charla que la arrancó la sigue. */
+  readonly alCambiar: ((c: Corrida) => void)[] = []
+
+  private cambio(oficina: string, id: number) {
+    const c = this.store.corrida(oficina, id)
+    if (!c) return
+    for (const f of this.alCambiar) {
+      try { f(c) } catch (e) { this.s.log.error(`flujos: aviso de cambio: ${e instanceof Error ? e.message : e}`) }
+    }
+  }
 
   constructor(private readonly s: Servicios, readonly store: CorridasStore) {
     this.automatico = s.env.HQ_PROGRAMADOR !== '0'
@@ -160,6 +170,7 @@ export class MotorFlujos {
     if (!def) { this.trabar(c, undefined, 'La definición del flujo no se puede leer.'); return }
     if (indice >= def.pasos.length) {
       this.store.corridaActualizar(oficina, corrida, { paso: def.pasos.length, estado: 'terminada', terminada: ahoraSeg() })
+      this.cambio(oficina, corrida)
       const av = this.s.avisos.crear({ oficina, tipo: 'flujo', texto: `«${c.nombre}» terminó`, ref: String(corrida) })
       if (av) this.s.avisos.emitir(av, def.nombre)
       this.s.log.info(`flujo ${c.flujo} corrida=${corrida} terminada`)
@@ -210,11 +221,13 @@ export class MotorFlujos {
     const despues = conEspera && paso.esperaDias !== undefined ? Date.now() / 1000 + paso.esperaDias * 86400 : undefined
     this.store.corridaActualizar(c.oficina, c.id, { paso: indice, estado: 'en_curso' })
     this.store.pasoCrear({ corrida: c.id, paso: indice, intento: ultimo + 1, quien: paso.quien, estado: 'pendiente', despues, nota })
+    this.cambio(c.oficina, c.id)
   }
 
   private trabar(c: Corrida, p: PasoCorrida | undefined, motivo: string) {
     if (p) this.store.pasoActualizar(p.id, { estado: 'error', fin: ahoraSeg(), nota: motivo })
     this.store.corridaActualizar(c.oficina, c.id, { estado: 'trabada' })
+    this.cambio(c.oficina, c.id)
     this.s.log.info(`flujo ${c.flujo} corrida=${c.id} trabada: ${motivo}`)
   }
 
@@ -241,6 +254,7 @@ export class MotorFlujos {
     if (p.quien === 'persona') {
       this.store.pasoActualizar(p.id, { estado: 'esperando_persona' })
       this.store.corridaActualizar(c.oficina, c.id, { estado: 'esperando_persona' })
+      this.cambio(c.oficina, c.id)
       return
     }
     const agente = act.oficina.agentes.find((a) => a.id === p.quien)
@@ -312,6 +326,7 @@ export class MotorFlujos {
       if (pide) {
         this.store.pasoActualizar(p.id, { estado: 'esperando_aprobacion', ejecucion, entrega: e.id, sumarCosto: e.costo })
         this.store.corridaActualizar(oficina, c.id, { estado: 'esperando_aprobacion' })
+        this.cambio(oficina, c.id)
       } else {
         this.store.pasoActualizar(p.id, { estado: 'listo', ejecucion, entrega: e.id, fin: ahoraSeg(), sumarCosto: e.costo })
         await this.avanzar(oficina, c.id, c.paso + 1)
@@ -490,6 +505,7 @@ export class MotorFlujos {
     const p = this.store.pasoVigente(id)
     if (p && !['listo', 'saltado', 'cancelado', 'error'].includes(p.estado)) this.store.pasoActualizar(p.id, { estado: 'cancelado', fin: ahoraSeg() })
     this.store.corridaActualizar(act.carpeta, id, { estado: 'cancelada', terminada: ahoraSeg() })
+    this.cambio(act.carpeta, id)
     return this.existente(act, id)
   }
 

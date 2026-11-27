@@ -16,6 +16,7 @@ App.Avisos = (function () {
     if (a.tipo === 'skill') return (nombre(a) || 'Un agente') + ' propone una skill';
     if (a.tipo === 'pendiente') return 'Pendientes para vos';
     if (a.tipo === 'flujo') return 'Te toca en un flujo';
+    if (a.tipo === 'charla') return (nombre(a) || 'Un agente') + ': novedades de lo que pasó';
     if (a.tipo === 'espera') {
       var m = /espera a ([^«(.]+?)\s*(?:\(|«|hace\b|\.|$)/.exec(a.texto || '');
       return (nombre(a) || 'Un agente') + ' espera' + (m ? ' a ' + m[1] : ' una entrega');
@@ -99,6 +100,7 @@ App.Avisos = (function () {
     if (a.tipo === 'skill') { if (App.SkillsPropias) App.SkillsPropias.revisar(a.agente, a.ref); return; }
     if (a.tipo === 'flujo') { visto({ id: a.id }); if (App.Flujos && App.Flujos.verCorrida) App.Flujos.verCorrida(a.ref); return; }
     if (a.tipo === 'espera') { visto({ id: a.id }); if (App.Parte && App.Parte.abrirEspera) App.Parte.abrirEspera(a.ref); return; }
+    if (a.tipo === 'charla') { visto({ id: a.id }); if (a.agente && a.ref && App.Agente.abrirSesion) App.Agente.abrirSesion(a.agente, a.ref); return; }
     if (a.tipo === 'pendiente') { visto({ id: a.id }); if (App.Reunion.ver && a.ref) App.Reunion.ver(a.ref); else App.Reunion.abrir(); return; }
     if (a.agente && App.agente(a.agente)) {
       App.Agente.abrir(a.agente, 'chat');

@@ -282,6 +282,12 @@ async function main() {
     fin()
     return 0
   }
+  // RESPONDER: <texto>: contesta eso (lo que sigue, hasta el fin de la línea)
+  if (m.includes('RESPONDER:')) {
+    salida(JSON.stringify({ type: 'result', result: m.slice(m.indexOf('RESPONDER:') + 'RESPONDER:'.length).split('\n')[0].trim(), is_error: false, total_cost_usd: 0.01 }))
+    fin()
+    return 0
+  }
   salida(JSON.stringify({ type: 'result', result: `hola ${agent}`, is_error: false, total_cost_usd: 0.01 }))
   fin()
   return 0

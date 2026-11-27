@@ -178,7 +178,7 @@
   function hayVivas(id) {
     var todas = [].concat(sueltas[id] || []);
     (chats[id] || []).forEach(function (m) { if (m.tarjetas) todas = todas.concat(m.tarjetas); });
-    return todas.some(function (x) { return x.t && (x.t.estado === 'esperando' || x.t.estado === 'corriendo'); });
+    return todas.some(function (x) { return x.t && (x.t.estado === 'esperando' || x.t.estado === 'corriendo' || x.t.estado === 'en_curso'); });
   }
 
   function cargarConsultas(id) {

@@ -32,7 +32,10 @@ En los dos casos hace falta **Claude Code** instalado y con la sesión iniciada.
 - **Hablarles y que se pasen trabajo:** en cualquier charla podés escribir o grabar un audio (se transcribe en tu compu).
   Si lo que pedís es para otro, el agente se lo pasa a ese colega: lo que pediste explícito arranca a los 45 segundos (se
   puede deshacer) y lo que dedujo queda como propuesta; si algo no está claro, te pregunta con opciones. Cada cosa queda
-  como una tarjeta en la charla, y lo que te espera (preguntas, propuestas) aparece en Bandeja › Hoy. El micrófono
+  como una tarjeta en la charla, y lo que te espera (preguntas, propuestas) aparece en Bandeja › Hoy. Cuando lo que pasó
+  termina, te avisa y el agente se entera en tu próximo mensaje. Si lo que pedís encaja con un flujo, lo arranca (directo
+  si lo nombraste) y la tarjeta lo sigue: aprobás o pedís cambios ahí mismo, o se lo decís («aprobale el boceto»). Lo que
+  cita de WhatsApp se ve tal cual es, y si se lo pasa a otro, la tarjeta muestra exactamente qué compartió. El micrófono
   flotante, con la cara de la secretaría, le habla siempre a ella: también anda en el celular.
 - **Flujos:** procesos de varios pasos que pasan de agente en agente, con aprobaciones tuyas donde haga falta. Ves
   cada corrida en vivo y una pieza viaja por la maqueta. Un flujo puede **seguir con otro** al terminar («Al terminar,
@@ -67,7 +70,7 @@ En los dos casos hace falta **Claude Code** instalado y con la sesión iniciada.
 | Biblioteca | `backend/src/biblioteca.ts`, `oficina/ui/biblioteca.js` |
 | Reuniones | `backend/src/reuniones.ts`, `oficina/ui/reunion.js` |
 | Tareas programadas | `backend/src/programador.ts`, `backend/src/tareas.ts`, `oficina/ui/tareas.js` |
-| Pasar trabajo, preguntar y audio en la charla (`delegar`, `preguntar`, micrófonos) | `backend/src/delegar.ts`, `backend/src/audio.ts`, `oficina/ui/tarjetas.js`, `oficina/ui/grabadora.js`, `oficina/ui/microfono.js` · API: [backend/API.md#pasar-trabajo-preguntar-y-hablar-por-audio-en-la-charla](backend/API.md#pasar-trabajo-preguntar-y-hablar-por-audio-en-la-charla) · plan: [docs/plan-recados.md](docs/plan-recados.md) |
+| Pasar trabajo, preguntar y audio en la charla (`delegar`, `preguntar`, micrófonos); flujos desde la charla y citas de WhatsApp | `backend/src/delegar.ts`, `backend/src/charla-flujos.ts`, `backend/src/citas-whatsapp.ts`, `backend/src/audio.ts`, `oficina/ui/tarjetas.js`, `oficina/ui/grabadora.js`, `oficina/ui/microfono.js` · API: [backend/API.md#pasar-trabajo-preguntar-y-hablar-por-audio-en-la-charla](backend/API.md#pasar-trabajo-preguntar-y-hablar-por-audio-en-la-charla) · plan: [docs/plan-recados.md](docs/plan-recados.md) |
 | Navegación y rutas `#/…` de la UI | `oficina/ui/nav.js` |
 
 Hasta la 0.7 la app de Mac era nativa en Swift, con su propio backend; se retiró al pasar las dos plataformas a
