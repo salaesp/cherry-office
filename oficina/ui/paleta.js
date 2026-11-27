@@ -57,7 +57,9 @@ App.Paleta = (function () {
 
     [['Flujos', 'flujo', 'Correr, editar o armar uno nuevo', 'flujos flujo corrida nueva correr editar', function () { App.Flujos.abrir(); }],
      ['Tareas programadas y pendientes', 'reloj', '', 'tareas programadas pendientes', function () { App.Tareas.abrir(); }],
-     ['Armar con el Creador', 'chispa', 'Armá la oficina charlando', 'creador armar oficina', function () { App.Nav.ir('#/equipo/creador'); }],
+     [App.secretaria() ? 'Pedírselo a ' + App.secretaria().nombre : 'Armar con el Creador', 'chispa', App.secretaria() ? 'Contratar, armar flujos, programar tareas: lo propone y vos aprobás' : 'Armá la oficina charlando',
+       'creador armar oficina secretaria pedir crear contratar', function () { App.pedirleASecretaria(); }],
+     ['Propuestas', 'chispa', 'Lo que te propusieron para la oficina', 'propuestas tarjetas borrador aprobar', function () { App.Nav.ir('#/equipo/creador'); }],
      ['Contratar un agente', 'mas', '', 'contratar agente nuevo', function () { App.Nav.ir('#/equipo/contratar'); }],
      ['Llamar a reunión', 'reunion', '', 'llamar reunion', function () { App.Reunion.nueva(); }],
      ['Nuevo departamento', 'capas', '', 'nuevo departamento', function () { App.Departamentos.agregar(); }],
@@ -87,7 +89,7 @@ App.Paleta = (function () {
     var hay = pend.filter(function (x) { return x.pendiente; });
     var rec = items.filter(function (x) { return x.grupo === 'Recientes'; }).slice(0, 3);
     var gente = items.filter(function (x) { return x.tipo === 'Charla'; }).sort(function (a, b) { return (b.activo ? 1 : 0) - (a.activo ? 1 : 0); }).slice(0, 4);
-    var acc = items.filter(function (x) { return ['Flujos', 'Armar con el Creador', 'Llamar a reunión', 'Ajustes'].indexOf(x.txt) >= 0; });
+    var acc = items.filter(function (x) { return ['Flujos', 'Armar con el Creador', 'Llamar a reunión', 'Ajustes'].indexOf(x.txt) >= 0 || /^Pedírselo a /.test(x.txt || ''); });
     return (hay.length ? hay : pend.slice(0, 1)).concat(rec, gente, acc);
   }
 
@@ -173,7 +175,7 @@ App.Paleta = (function () {
     else if (hov.tipo === 'biblioteca') t = hov.id === 'bibliotecario' ? 'El bibliotecario cuida la memoria de la oficina · clic: abrir la biblioteca' : 'Clic: abrir la biblioteca';
     else if (hov.tipo === 'direccion') t = 'Clic: lo que te espera para revisar';
     else if (hov.tipo === 'yo') t = 'Sos vos' + (App.Yo.nombre() ? ', ' + App.Yo.nombre() : '') + ' · clic: cambiar tu nombre o ' + 'tu apariencia';
-    else if (hov.tipo === 'creador') t = 'Clic: armar o cambiar la oficina con el Creador';
+    else if (hov.tipo === 'creador') t = App.secretaria() ? 'Clic: pedirle a ' + App.secretaria().nombre + ' que arme o cambie la oficina' : 'Clic: armar o cambiar la oficina con el Creador';
     else if (hov.tipo === 'juegos') t = 'Juegos y café: acá descansan los agentes sin trabajo';
     else if (hov.texto) t = hov.texto;   // bandeja de entregables: la oficina ya arma el texto
     el.textContent = t || base();

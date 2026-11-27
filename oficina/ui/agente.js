@@ -465,7 +465,10 @@
   function pintarChat(a, cuerpo, pie) {
     var lista = h('div.chat'), sug = h('div.sugerencias');
     App.add(cuerpo, lista, sug);
-    var txt = h('textarea.campo', { rows: 1, placeholder: 'Escribile a ' + a.nombre + '…', maxlength: 20000 });
+    /* a la secretaría se le piden cosas (docs/plan-secretaria-creadora.md), y se le puede pegar cómo trabajás */
+    var esSecretaria = !!(App.secretaria && App.secretaria() && App.secretaria().id === a.id);
+    var invitacion = (esSecretaria ? 'Pedile algo a ' : 'Escribile a ') + a.nombre + '…';
+    var txt = h('textarea.campo', { rows: 1, placeholder: invitacion, maxlength: esSecretaria ? 60000 : 20000 });
     var enviar = h('button.btn.primario.icono', { title: 'Enviar (Enter)', onclick: mandar }, App.icono('enviar'));
     var parar = h('button.btn.peligro.icono', { style: { display: 'none' }, onclick: function () { detener(a.id); } }, App.icono('parar'));
     var adj = App.Adjuntos();
@@ -503,7 +506,10 @@
       App.vaciar(lista); App.vaciar(sug);
       var msgs = chats[a.id] || [];
       if (!msgs.length) {
-        lista.appendChild(h('div.chat-intro', App.retratoImg(a, 'x', 192), h('div', { style: { fontWeight: 600, color: 'var(--texto)' } }, a.nombre), h('div', a.rol)));
+        var esSec = App.secretaria && App.secretaria() && App.secretaria().id === a.id;
+        lista.appendChild(h('div.chat-intro', App.retratoImg(a, 'x', 192), h('div', { style: { fontWeight: 600, color: 'var(--texto)' } }, a.nombre), h('div', a.rol),
+          /* la secretaría es a quien se le pide crear cosas (docs/plan-secretaria-creadora.md) */
+          esSec ? h('div.chat-intro-sec', 'Pedime lo que necesites: contratar a alguien, crear un departamento, programar una tarea o arrancar un flujo. Te lo propongo y nada se crea hasta que lo apruebes.') : null));
         (a.chips || []).forEach(function (c) { sug.appendChild(h('button.chip', { onclick: function () { txt.value = c; mandar(); } }, c)); });
       }
       msgs.forEach(function (m) {
@@ -549,7 +555,7 @@
       /* con el agente trabajando se puede seguir escribiendo (queda en cola) y aparece «Detener» */
       var ocup = !!enCurso[a.id];
       enviar.title = ocup ? 'Dejar en cola (Enter): sale cuando ' + a.nombre + ' termine' : 'Enviar (Enter)';
-      txt.placeholder = ocup ? 'Dejalo en cola…' : 'Escribile a ' + a.nombre + '…';
+      txt.placeholder = ocup ? 'Dejalo en cola…' : invitacion;
       parar.style.display = ocup ? '' : 'none';
       parar.disabled = !!cancelando[a.id];
       parar.title = cancelando[a.id] ? 'Deteniendo…' : 'Detener lo que está haciendo ' + a.nombre;
@@ -1295,6 +1301,8 @@
     var filaCharla = t && t.charla && t.origen && t.origen.chat ? h('div.ct-de-charla', App.icono('charla'),
       h('span', 'Salió de una charla con ', h('b', t.charla.nombre)),
       h('button.btn.chico.fantasma', { type: 'button', onclick: function () { hj.cerrar(); App.Agente.abrirSesion(t.charla.agente, t.origen.chat); } }, 'Ver la charla')) : null;
+    /* una tarea nueva también se le puede pedir a la secretaría (docs/plan-secretaria-creadora.md) */
+    if (!t && App.pistaSecretaria) App.add(hj.cuerpo, App.pistaSecretaria('Decile qué querés que se haga y cuándo.', hj.cerrar));
     App.add(hj.cuerpo,
       filaCharla,
       filaAgente,

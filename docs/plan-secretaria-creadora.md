@@ -41,11 +41,28 @@ No hay un agente nuevo ni una maquinaria nueva: las tarjetas son las de `creador
 7. **Lo que te espera.** Las tarjetas de una charla que siguen pendientes (`lista` o `borrador`) cuentan en «Te esperan» de
    Bandeja › Hoy, agrupadas por charla, con «Ver la charla» y «Abrir en el Creador».
 
-## Fuera de este plan (decisión abierta)
-- **¿Toda oficina nueva arranca con secretaría?** Si sí, el Creador puede dejar de ser un personaje: la pantalla de armar la
-  oficina la atendería ella, con su consigna y su memoria. Si no, sin secretaría sigue el Creador de hoy. Hasta decidirlo,
-  la pantalla del Creador sigue atendida por el Creador; lo único que cambia ahí es que muestra las tarjetas que vienen de
-  la charla.
+## Toda oficina nueva viene con secretaría (decidido el 2026-11-27)
+Para crear cosas se le habla a la secretaría. El Creador deja de ser un personaje aparte:
+
+1. **Al crear una oficina** (las dos formas: «Crear una oficina» y «Armar una oficina charlando») se contrata la secretaría
+   en el mismo paso. El formulario pregunta cómo se llama (si queda vacío, «Secretaría»). `POST /api/oficinas` acepta
+   `secretaria: {nombre}`; sin ese campo no contrata (así siguen igual las importaciones y lo que ya usaba la API).
+2. **«Armar una oficina charlando» abre la charla con ella**, no la pantalla del Creador. Su charla vacía la presenta:
+   «Pedime lo que necesites: contratar a alguien, crear un departamento, programar una tarea o arrancar un flujo. Nada se
+   crea sin que lo apruebes», con atajos («Armemos el equipo», «Contratá a alguien», …).
+3. **Ella sabe armar una oficina.** Sus instrucciones de charla suman lo que sabía el Creador: una tarjeta por cosa,
+   modificar en vez de duplicar, quién coordina, la aprobación explícita en cada paso de un flujo, conectores y tareas
+   semanales, y cerrar con un resumen y hasta 3 preguntas.
+4. **La pantalla de armar la oficina pasa a ser «Propuestas»**: el tablero de tarjetas, igual que hoy, pero sin chat
+   propio. Donde estaba el chat queda ella: quién es, un campo para escribirle (lo manda a su charla y la abre) y «Hablarle
+   a Sofía». Sigue sirviendo para revisar y editar con calma una tanda grande.
+5. **Todos los caminos llevan a ella.** «Armar con el Creador…» del «+», de ⌘K, de Flujos y de la recepción de la oficina
+   pixel pasan a ser «Pedírselo a Sofía»: abren su charla. En Equipo › Contratar, en un departamento nuevo y en una tarea
+   nueva, una línea: «¿Preferís pedírselo a Sofía? Contale qué necesitás».
+6. **Oficinas que ya existen sin secretaría.** No se contrata sola. La pantalla de armar la oficina sigue con el Creador de
+   hoy, con un aviso arriba: «Ahora esto lo hace la secretaría» y «Contratar secretaría». Así ninguna oficina queda sin
+   alguien que la arme.
+
 - **«Pedírselo a Sofía» desde el reporte** (ejemplo 4 del boceto): un botón que te arma el recado a partir de algo que
   ella leyó. Es comodidad; la seguridad ya la da la decisión 2.
 
@@ -100,7 +117,9 @@ borrador. Pruebas en `test/unit/secretaria-creadora.test.ts`.
 ### S2: interfaz (hecho)
 Tarjetas en la charla, «Te esperan» y la marca en la pantalla del Creador.
 
-### S3: la pantalla del Creador atendida por la secretaría (pendiente de la decisión abierta)
+### S3: toda oficina nueva viene con secretaría (hecho)
+Contratación al crear (`Servicios.alCrear`), instrucciones con lo que sabía el Creador, «Propuestas» sin chat propio, los
+caminos de «Armar con el Creador» a la secretaría y el aviso en las oficinas viejas.
 
 ### S4: tareas programadas para todos los agentes (hecho)
 `HerramientasCambiosCharla` filtra las herramientas del Creador según `CambiosCharla.nombres` y limita lo que toca tarjetas

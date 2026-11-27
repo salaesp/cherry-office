@@ -38,6 +38,9 @@ export interface Servicios {
   // Ganchos del núcleo
   /** Al abrir una oficina (después de activarla). */
   readonly alAbrir: ((a: OficinaActiva) => Promise<void>)[]
+  /** Al crear una oficina, con el pedido de `POST /api/oficinas` (la secretaría se contrata acá). Devuelve la oficina como
+   *  quedó si la cambió. */
+  readonly alCrear: ((a: OficinaActiva, pedido: Obj) => OficinaActiva | undefined)[]
   /** Validaciones extra de oficina.json (tareas, flujos, reglas). Lanzan ErrorAPI. */
   readonly validaciones: ((o: Oficina) => void)[]
   /** Servidor MCP para el chat (lo pone el módulo de consultas). */

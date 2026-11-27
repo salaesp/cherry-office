@@ -178,7 +178,32 @@ describe('cuándo existen las herramientas', () => {
     expect(l[l.indexOf('--append-system-prompt') + 1]).not.toContain('## Armar la oficina')
     expect(l[l.indexOf('--append-system-prompt') + 1]).toContain('## Tareas programadas')
     const o = OficinaStore.leer(carpeta)
-    expect(instruccionesCreadora(o, o.agentes.find((a) => a.id === 'sofia')!)).toContain('te lo pide')
+    expect(instruccionesCreadora(o, o.agentes.find((a) => a.id === 'sofia')!)).toContain('armar y cambiar la oficina')
     void b
+  })
+})
+
+describe('toda oficina nueva viene con secretaría', () => {
+  test('POST /api/oficinas con «secretaria» la contrata en el mismo paso; sin ese campo, no', async () => {
+    const sb = new Sandbox()
+    const b = arrancar(sb)
+    const r = await llamar(b, 'POST', '/api/oficinas', { nombre: 'Estudio', duenio: 'Ana', vacia: true, secretaria: { nombre: 'Sofía' } })
+    expect(r.status, JSON.stringify(r.obj)).toBe(200)
+    const o = OficinaStore.leer(String(r.obj.carpeta))
+    const sec = o.agentes.find((a) => a.id === o.secretaria?.agente)!
+    expect(sec).toMatchObject({ nombre: 'Sofía', rol: 'Secretaría' })
+    expect(sec.chips?.[0]).toBe('Armemos el equipo')
+    // lo que devuelve la API ya la trae
+    expect(r.obj.oficina.agentes.map((a: any) => a.id)).toContain(sec.id)
+    const sin = await llamar(b, 'POST', '/api/oficinas', { nombre: 'Otra', duenio: 'Ana', vacia: true })
+    expect(OficinaStore.leer(String(sin.obj.carpeta)).secretaria).toBeUndefined()
+  })
+
+  test('sin nombre, se llama «Secretaría»', async () => {
+    const sb = new Sandbox()
+    const b = arrancar(sb)
+    const r = await llamar(b, 'POST', '/api/oficinas', { nombre: 'Estudio', duenio: 'Ana', secretaria: {} })
+    const o = OficinaStore.leer(String(r.obj.carpeta))
+    expect(o.agentes.find((a) => a.id === o.secretaria?.agente)?.nombre).toBe('Secretaría')
   })
 })

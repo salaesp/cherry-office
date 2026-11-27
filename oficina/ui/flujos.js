@@ -92,7 +92,7 @@ App.Flujos = (function () {
       if (fs === null) catalogo.appendChild(h('div.error-txt', 'No pude traer los flujos.'));
       else if (!fs.length) {
         catalogo.appendChild(App.vacio('flujo', 'Todavía no hay flujos', 'Un flujo pasa un trabajo de agente en agente, con tu aprobación donde haga falta.',
-          [h('button.btn', { onclick: function () { App.Creador.abrir(); } }, App.icono('chispa'), 'Armar un flujo con el Creador'),
+          [h('button.btn', { onclick: function () { App.pedirleASecretaria(); } }, App.icono('chispa'), App.secretaria() ? 'Pedírselo a ' + App.secretaria().nombre : 'Armar un flujo con el Creador'),
             h('button.btn.primario', { onclick: function () { editor(null); } }, App.icono('mas'), 'Crear uno')]));
       } else fs.forEach(function (f) { catalogo.appendChild(filaFlujo(f)); });
       App.add(App.vaciar(zona),
@@ -400,9 +400,9 @@ App.Flujos = (function () {
       var fs = (r.flujos || []).filter(function (f) { return f.activo !== false; });
       App.vaciar(hj.cuerpo);
       if (!fs.length) {
-        App.add(hj.cuerpo, App.vacio('flujo', 'Todavía no hay flujos para correr', 'Armalos con el Creador o a mano.'));
+        App.add(hj.cuerpo, App.vacio('flujo', 'Todavía no hay flujos para correr', App.secretaria() ? 'Pedíselos a ' + App.secretaria().nombre + ' o armalos a mano.' : 'Armalos con el Creador o a mano.'));
         App.add(hj.pie, h('button.btn', { onclick: hj.cerrar }, 'Cerrar'),
-          h('button.btn', { onclick: function () { hj.cerrar(); App.Creador.abrir(); } }, App.icono('chispa'), 'Armar con el Creador'),
+          h('button.btn', { onclick: function () { hj.cerrar(); App.pedirleASecretaria(); } }, App.icono('chispa'), App.secretaria() ? 'Pedírselo a ' + App.secretaria().nombre : 'Armar con el Creador'),
           h('button.btn.primario', { onclick: function () { hj.cerrar(); editor(); } }, 'Crear un flujo'));
         return;
       }

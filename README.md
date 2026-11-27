@@ -17,8 +17,10 @@ En los dos casos hace falta **Claude Code** instalado y con la sesión iniciada.
 
 ## Qué se puede hacer
 - **Oficinas:** cada oficina es una carpeta (por defecto `~/Oficinas/<Nombre>/`) con su `oficina.json`, sus agentes,
-  su conocimiento, sus reuniones y sus archivos. Podés crear una a mano, **armarla charlando con el Creador** (le contás
-  cómo trabajás y te propone departamentos, agentes y flujos), abrir una existente o importar un `.zip` exportado.
+  su conocimiento, sus reuniones y sus archivos. Podés crear una a mano, **armarla charlando con tu secretaría** (le contás
+  cómo trabajás y te propone departamentos, agentes y flujos), abrir una existente o importar un `.zip` exportado. Toda
+  oficina nueva viene con secretaría: es a quien le pedís crear cosas (contratar, armar flujos, programar tareas); lo
+  propone y vos lo aprobás (`docs/plan-secretaria-creadora.md`).
 - **Quién dirige:** tu nombre y tu apariencia, guardados en cada oficina. Tenés tu despacho en la oficina y una bandeja
   en el escritorio donde los agentes apilan lo que te entregan.
 - **Agentes y departamentos:** cada departamento es una sala del edificio. A los agentes los vestís con el editor de
@@ -65,7 +67,7 @@ En los dos casos hace falta **Claude Code** instalado y con la sesión iniciada.
 | Oficinas (abrir, crear, perfil) | `backend/src/oficinas.ts`, `backend/src/rutas-oficinas.ts` |
 | Agentes (contratar, editar, despedir) | `backend/src/agentes.ts`, UI en `oficina/ui/contratar.js` y `oficina/ui/agente.js` |
 | Skills propias de cada agente (ficha, «Convertir en skill», `proponer_skill`) | `backend/src/skills-propias.ts`, `backend/src/rutas-skills.ts`, UI en `oficina/ui/skills-propias.js` · API: [backend/API.md#skills-propias](backend/API.md#skills-propias) |
-| El Creador (armar una oficina con tarjetas) | `backend/src/creador.ts`, `backend/src/rutas-creador.ts`, `oficina/ui/creador.js` |
+| Armar la oficina con tarjetas (la secretaría en la charla; el Creador en las oficinas sin secretaría) | `backend/src/secretaria-creadora.ts`, `backend/src/creador.ts`, `backend/src/rutas-creador.ts`, `oficina/ui/creador.js` |
 | Flujos | `backend/src/flujos.ts`, `backend/src/motor-flujos.ts`, `oficina/ui/flujos.js` |
 | Biblioteca | `backend/src/biblioteca.ts`, `oficina/ui/biblioteca.js` |
 | Reuniones | `backend/src/reuniones.ts`, `oficina/ui/reunion.js` |

@@ -1355,3 +1355,10 @@ button.adjunto:hover { background: var(--panel-2); }
 .skill-aviso b { display: block; margin-bottom: 2px; }
 .skill-aviso .ayuda { margin-top: 4px; }
 textarea.campo.skill-contenido { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; min-height: 260px; }
+
+/* «¿Preferís pedírselo a Sofía?» arriba de lo que se crea a mano (App.pistaSecretaria, docs/plan-secretaria-creadora.md) */
+.pista-sec { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin: 2px 0 14px; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--panel-2); font-size: 13px; color: var(--suave); }
+.pista-sec > span { flex: 1; min-width: 0; }
+.pista-sec-cara { width: 26px; height: 26px; border-radius: 50%; image-rendering: pixelated; background: var(--panel); box-shadow: 0 0 0 1px var(--linea); flex: none; object-fit: cover; }
+.enlace { font: inherit; color: var(--texto); text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
+.chat-intro-sec { max-width: 40ch; margin-top: 8px; font-size: 13px; line-height: 1.45; color: var(--suave); text-align: center; }

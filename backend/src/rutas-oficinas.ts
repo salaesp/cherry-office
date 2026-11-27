@@ -58,8 +58,9 @@ function iaPedida(v: unknown): Partial<PreferenciasIA> {
 
 /** `alAbrir`: ganchos al abrir una oficina (reclamar chats de Próspera, escanear vínculos), se suman al portar esos módulos.
  *  `ocupada`: si hay agentes trabajando en esa oficina (no se puede borrar mientras tanto). */
-export function rutasOficinas({ config, oficinas, claude, alAbrir = [], ocupada = () => false }: {
+export function rutasOficinas({ config, oficinas, claude, alAbrir = [], alCrear = [], ocupada = () => false }: {
   config: Config; oficinas: Oficinas; claude: InfoClaude; alAbrir?: ((a: OficinaActiva) => Promise<void>)[]
+  alCrear?: ((a: OficinaActiva, pedido: Obj) => OficinaActiva | undefined)[]
   ocupada?: (carpeta: string) => boolean
 }): RutaNucleo {
   async function estado(): Promise<Obj> {
@@ -91,7 +92,10 @@ export function rutasOficinas({ config, oficinas, claude, alAbrir = [], ocupada 
       })
     }
     const vacia = d.vacia === true
-    return [200, sobreOficina(oficinas.crear({ nombre, duenio, carpeta, departamentos: deps, vacia }))]
+    let act = oficinas.crear({ nombre, duenio, carpeta, departamentos: deps, vacia })
+    // lo que se arma junto con la oficina (la secretaría, si el pedido trae `secretaria`)
+    for (const f of alCrear) act = f(act, d) ?? act
+    return [200, sobreOficina(act)]
   }
 
   return async ({ method, partes, query, body }) => {

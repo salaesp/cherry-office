@@ -241,8 +241,8 @@ App.Tarjetas = (function () {
     }
     var bs = [];
     if (op.enBandeja && op.session) bs.push(enlaceCharla({ agente: op.agente, session: op.session }));
-    if (pend.length) bs.push(boton('Abrir en el Creador', compacto ? 'primario' : 'fantasma', abrirCreador));
-    else bs.push(boton('Ver en el Creador', 'fantasma', abrirCreador));
+    if (pend.length) bs.push(boton(compacto ? 'Revisarlas en Propuestas' : 'Ver en Propuestas', compacto ? 'primario' : 'fantasma', abrirCreador));
+    else bs.push(boton('Ver en Propuestas', 'fantasma', abrirCreador));
     if (pend.length && !compacto) bs.push(boton('Descartar', 'fantasma', function () { return descartarTodas(pend, op); }));
     if (listas.length) {
       var txt = !compacto ? (listas.length === 1 ? 'Aprobar' : 'Aprobar las ' + listas.length) : listas.length === 1 ? 'Aprobar la lista' : 'Aprobar las ' + listas.length + ' listas';

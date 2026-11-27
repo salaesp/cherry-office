@@ -1,4 +1,7 @@
-/* Creador de flujos: una pantalla (#/equipo/creador) con el chat a la izquierda y el borrador de tarjetas a la derecha.
+/* La pantalla de armar la oficina (#/equipo/creador): el borrador de tarjetas a la derecha y, a la izquierda, a quién se le
+   pide. Con secretaría (toda oficina nueva la trae, docs/plan-secretaria-creadora.md) es «Propuestas»: la izquierda la
+   presenta y lo que le escribís va a su charla; las tarjetas son las que ella propone. Sin secretaría (oficinas de antes)
+   sigue el chat con el Creador, con un aviso para contratarla.
    Nada se crea hasta que la persona lo aprueba con el botón del pie. Las tarjetas se editan en el lugar. */
 window.App = window.App || {};
 (function () {
@@ -170,7 +173,8 @@ window.App = window.App || {};
     var tarjetas = [], resumen = {}, filtro = '', excluidas = {}, aplicando = false, erroresAplicar = [];
     var editando = {};   // id de tarjeta → formulario en el lugar (se conserva aunque el borrador se repinte)
 
-    var hj = App.hojaEnPanel({ titulo: 'Armar con el Creador', icono: 'chispa', sinPie: true, alCerrar: function () {
+    var sec = App.secretaria ? App.secretaria() : null;
+    var hj = App.hojaEnPanel({ titulo: sec ? 'Propuestas' : 'Armar con el Creador', icono: 'chispa', sinPie: true, alCerrar: function () {
       cerrada = true; clearTimeout(relojChat); abierta = null; alActividadActual = null;
     } }, 'creador');
     abierta = hj;
@@ -189,8 +193,26 @@ window.App = window.App || {};
     var selector = App.SelectorCharla({ soloModelo: true, modelo: (App.E.estado && App.E.estado.modelos && App.E.estado.modelos.creador) || 'sonnet' });
     txt.addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.isComposing) { e.preventDefault(); mandar(); } });
     txt.addEventListener('input', function () { txt.style.height = 'auto'; txt.style.height = Math.min(180, txt.scrollHeight + 2) + 'px'; });
-    var colChat = h('div.creador-col.creador-chat', cuerpoChat,
-      h('div.creador-redactar', h('div.redactar', txt, enviar), h('div.pie-charla', selector, h('div.ayuda', 'Cmd/Ctrl+Enter para enviar · Podés pegar un texto largo'))));
+    var colChat;
+    if (sec) {
+      /* con secretaría: lo que le escribís va a su charla (y la abre); las tarjetas que propone aparecen acá */
+      txt.placeholder = 'Pedile algo a ' + sec.nombre + ': «contratá a alguien que…», «armemos un flujo para…», o pegá cómo trabajás';
+      enviar.title = 'Mandárselo a ' + sec.nombre + ' (Cmd/Ctrl+Enter)';
+      colChat = h('div.creador-col.creador-chat.creador-sec',
+        h('div.creador-sec-cuerpo', App.retratoImg(sec, 'creador-sec-cara', 192),
+          h('b', sec.nombre), h('span.ayuda', 'Secretaría'),
+          h('p', 'Para crear o cambiar algo en la oficina, pedíselo a ' + sec.nombre + ': contratar a alguien, un departamento, una tarea, un flujo, una regla.'),
+          h('p.ayuda', 'Lo que te propone aparece acá y en su charla. Nada se crea hasta que lo apruebes.'),
+          h('button.btn', { onclick: function () { App.Agente.abrir(sec.id); } }, App.icono('charla'), 'Abrir la charla con ' + sec.nombre)),
+        h('div.creador-redactar', h('div.redactar', txt, enviar), h('div.pie-charla', h('div.ayuda', 'Cmd/Ctrl+Enter para mandárselo · se abre su charla'))));
+    } else {
+      colChat = h('div.creador-col.creador-chat',
+        h('div.creador-aviso-sec', App.icono('personas'), h('div', h('b', 'Ahora esto lo hace la secretaría'),
+          h('span', 'Contratá una y pedile a ella lo que necesites: contratar, armar flujos, programar tareas. Mientras tanto, seguís pudiendo armarla acá.')),
+          h('button.btn.chico', { onclick: function () { App.Ajustes.abrir('secretaria'); } }, 'Contratar secretaría')),
+        cuerpoChat,
+        h('div.creador-redactar', h('div.redactar', txt, enviar), h('div.pie-charla', selector, h('div.ayuda', 'Cmd/Ctrl+Enter para enviar · Podés pegar un texto largo'))));
+    }
 
     /* ---- derecha: borrador ---- */
     var cabBorrador = h('div.creador-cab'), listaTarjetas = h('div.creador-tarjetas'), errBox = h('div.creador-errores');
@@ -233,6 +255,7 @@ window.App = window.App || {};
       });
     }
     function mandar() {
+      if (sec) { mandarASecretaria(); return; }
       var t = txt.value.trim();
       if (!t || corriendo || enviando) return;
       enviando = true;
@@ -250,6 +273,14 @@ window.App = window.App || {};
         mensajes.pop();
         if (!cerrada) { pintarChat(); App.fallo(e); }
       });
+    }
+
+    /* con secretaría: el pedido va a su charla, que se abre (esta pantalla queda en Equipo › Propuestas) */
+    function mandarASecretaria() {
+      var t = txt.value.trim();
+      if (!t) return;
+      txt.value = ''; txt.style.height = '';
+      App.Agente.enviarEn(sec.id, App.Agente.sesion(sec.id) || App.uuid(), t);
     }
 
     /* ---------------- borrador ---------------- */
@@ -293,7 +324,7 @@ window.App = window.App || {};
       Object.keys(editando).forEach(function (id) { if (!tarjetas.some(function (x) { return x.id === id; })) delete editando[id]; });
       App.vaciar(listaTarjetas);
       if (!tarjetas.length) {
-        listaTarjetas.appendChild(h('div.vacio', 'Todavía no hay tarjetas. Contame y las voy armando.'));
+        listaTarjetas.appendChild(h('div.vacio', sec ? 'Todavía no hay propuestas. Pedile a ' + sec.nombre + ' lo que necesites y aparecen acá.' : 'Todavía no hay tarjetas. Contame y las voy armando.'));
       } else {
         TIPOS.forEach(function (tp) {
           if (filtro && filtro !== tp) return;
@@ -359,7 +390,7 @@ window.App = window.App || {};
           })) : null,
           faltan.length ? h('div.tb-faltan', h('b', 'Le falta'), faltan.map(function (f) {
             return h('div.tb-falta', h('span', f.pregunta || f.campo || String(f)),
-              h('button.btn.chico.fantasma', { type: 'button', onclick: function () { responderEnChat(t, f); } }, 'Responder en el chat'));
+              h('button.btn.chico.fantasma', { type: 'button', onclick: function () { responderEnChat(t, f); } }, sec ? 'Contestárselo a ' + sec.nombre : 'Responder en el chat'));
           })) : null,
           t.estado === 'error' && t.error ? h('div.error-txt', t.error) : null,
           t.origen ? h('blockquote.tb-origen', t.origen) : null),
@@ -575,9 +606,9 @@ window.App = window.App || {};
       return obj;
     }
 
-    pintarChat();
+    if (!sec) pintarChat();
     pintarBorrador();
-    sondear();
+    if (!sec) sondear();
     cargarBorrador();
   }
 
