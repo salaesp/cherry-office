@@ -212,6 +212,49 @@ Para la página móvil, si se hace: un **API acotado** solo para recados (`/movi
 aprobar o descartar propuestas, ver una entrega), no todo `/api`. Emparejamiento con QR desde Ajustes (token de 32 bytes,
 revocable, uno por dispositivo), `Host` y `Origin` controlados como en `servidor-dev.ts`, apagado por defecto.
 
+## Cambio de rumbo: los recados pasan a la charla (decidido el 2026-11-27)
+Después de R0, la persona vio que la sección Recados era casi una segunda charla con la secretaría (el hilo ya se guardaba
+como una charla suya). Se decide unirlo con la charla y abrirlo a todos los agentes. Bocetos:
+[bandeja-y-microfono.html](../bocetos/secretaria/bandeja-y-microfono.html) (lo que te espera en la Bandeja y el micrófono
+de la secretaría) y [recados.html](../bocetos/secretaria/recados.html) (las tarjetas y cómo decide).
+
+**Decisiones de la persona**
+1. **Se le habla a cualquier agente desde su charla** (Equipo), con texto o audio. La sección Recados se saca cuando
+   esté lo nuevo.
+2. **Tarjetas dentro de la charla:** debajo de la respuesta, lo que hizo: delegación (con los 45 segundos para deshacer),
+   pregunta con opciones, propuesta de acción.
+3. **Lo que te espera va a la Bandeja,** como siempre: en Bandeja › Hoy, una sección «Te esperan» arriba de «Para
+   revisar» junta las preguntas abiertas, las delegaciones propuestas, las propuestas de acción y los permisos, de todas
+   las charlas. Se contesta ahí o en la charla y queda resuelto en los dos lados. La insignia de la Bandeja las cuenta.
+4. **Del backend de recados se reusa** el procesamiento en segundo plano, la transcripción, los resultados con su estado
+   y la ventana para deshacer.
+5. **`delegar` y `preguntar` para todos los agentes,** solo cuando el mensaje lo escribió la persona en una charla.
+   Corriendo solos (encargos, tareas, pasos de flujo) no los tienen, salvo el coordinador en sus tareas programadas
+   («cada mañana repartí el trabajo»). Son distintas de lo que ya existe entre agentes: `consultar` (preguntarle algo a
+   un colega) y `pedir` / `quedo_esperando` (necesitar algo de un colega para el trabajo propio y esperarlo) siguen igual.
+   `delegar` es pasarle a un colega un pedido de la persona, cuyo resultado le llega a ella; `preguntar` es preguntarle a
+   la persona, con opciones.
+6. **`delegar` reemplaza a `encargar`** del coordinador: una sola forma de pasar trabajo. El coordinador conserva ver el
+   estado de la oficina (`estado_oficina`, `entregas`, `corridas`, `bloqueos`).
+7. **Las instrucciones van como mensaje de sistema** (`--append-system-prompt`) para todos, como ya quedó en R0.
+8. **Micrófono en el campo de escribir de cada charla:** grabás y se manda a ese agente. Se transcribe en la compu.
+9. **Micrófono flotante de la secretaría:** abajo a la derecha (en el celular, arriba de la barra), con su cara y «Hablale
+   a <nombre> · Secretaría». Siempre le habla a la secretaría, aunque haya otra charla abierta, y mientras graba dice para
+   quién es. Sin secretaría, ofrece contratarla.
+10. **Cada audio del micrófono flotante abre una charla nueva** con la secretaría. Cuando ella lo entiende (termina de
+    procesarlo), la app abre esa charla para seguir desde ahí.
+11. **La próxima versión sale cuando esté todo esto.**
+
+**Orden**
+- **U1.** Micrófono en el campo de escribir de todas las charlas (transcripción con el mismo transcriptor; el texto
+  transcripto se ve en el mensaje).
+- **U2.** `delegar` y `preguntar` en la charla para todos, con tarjetas en la charla; `encargar` sale y el coordinador
+  delega con las mismas reglas (también en sus tareas programadas).
+- **U3.** «Te esperan» en Bandeja › Hoy, con respuesta desde ahí.
+- **U4.** Micrófono flotante de la secretaría: charla nueva por audio y se abre al entenderlo.
+- **U5.** Sacar la sección Recados (ruta, riel, `recados.js`); los recados guardados quedan legibles como charlas de la
+  secretaría. Pasar las rutas de `/api/recados` a la charla o retirarlas, con la API y el README al día.
+
 ## Fases
 ### R0: recados en la app (la base) (hecho)
 Implementado como se describe en «Recados a la secretaría» de [backend/API.md](../backend/API.md). Cambios respecto de lo
