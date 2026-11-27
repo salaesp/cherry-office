@@ -3,7 +3,7 @@
 // persona las aprueba con un botón (`Creador.aplicar`). Nunca crea nada solo: las herramientas `proponer_*` solo escriben
 // tarjetas en SQLite. Las rutas (/api/creador/*) están en rutas-creador.ts.
 import { tiposTarjeta } from './actividad.js'
-import { cambiosAgenteDesde, conectoresValidos, contratar, despedir, editarAgente, nuevoAgenteDesde, ahoraISO } from './agentes.js'
+import { cambiosAgenteDesde, conectoresValidos, contratar, despedir, detalleAgente, editarAgente, nuevoAgenteDesde, ahoraISO } from './agentes.js'
 import { catalogoDe, disponible } from './conectores.js'
 import { mcpDe, normalizar, sanear } from './consultas.js'
 import { iso } from './entregas.js'
@@ -242,7 +242,7 @@ export const Creador = {
   idAgente: 'creador',
   prefijoMCP: 'mcp__hq__',
   /** Nombres cortos, en el orden de la tabla de §6. */
-  nombresCortos: ['ver_oficina', 'listar_conectores', ...tiposTarjeta.map((t) => 'proponer_' + t), 'marcar_faltante', 'descartar_tarjeta'],
+  nombresCortos: ['ver_oficina', 'ver_detalle', 'listar_conectores', ...tiposTarjeta.map((t) => 'proponer_' + t), 'marcar_faltante', 'descartar_tarjeta'],
   get nombresMCP(): string[] { return Creador.nombresCortos.map((n) => Creador.prefijoMCP + n) },
   /** Escrituras (proponer, marcar, descartar) por mensaje de la persona. */
   maxEscrituras: 80,
@@ -930,6 +930,75 @@ export const Creador = {
     return r
   },
 
+  // MARK: lo que ya existe (ver_detalle y el aviso de lo que un cambio quita)
+
+  /** La definición completa de algo que ya existe en la oficina (para sumarle cosas sin pisar lo que tiene). El agente
+   *  trae sus instrucciones (`prompt`) y su `description` del `.md`, sin el avatar. */
+  detalle(s: Servicios, carpeta: string, tipo: string, id: string): Obj | undefined {
+    let o: Oficina
+    try { o = OficinaStore.leer(carpeta) } catch { return undefined }
+    const copia = (x: unknown): Obj => JSON.parse(JSON.stringify(x)) as Obj
+    switch (tipo) {
+      case 'departamento': { const d = o.departamentos.find((x) => x.id === id); return d ? copia(d) : undefined }
+      case 'agente': {
+        const a = o.agentes.find((x) => x.id === id)
+        if (!a) return undefined
+        const r = copia(a)
+        for (const k of ['avatar', 'creado', 'escritura', 'reglas']) delete r[k]
+        const act = s.oficinas.activa()
+        if (act && act.carpeta === carpeta) {
+          try {
+            const d = detalleAgente(s.oficinas, id)
+            r.prompt = d.prompt
+            r.description = d.description
+          } catch {}
+        }
+        return r
+      }
+      case 'flujo': { const f = (o.flujos ?? []).find((x) => x.id === id); return f ? flujoJSON(f) : undefined }
+      case 'regla': { const x = (o.reglas ?? []).find((y) => y.id === id); return x ? copia(x) : undefined }
+      case 'tarea': { const x = (o.tareas ?? []).find((y) => y.id === id); return x ? copia(x) : undefined }
+      default: return undefined
+    }
+  },
+
+  /** Lo que hay hoy para comparar con un «modificar»: la definición o, para un conector, el de ese servidor del agente. */
+  actual(s: Servicios, carpeta: string, t: Tarjeta): Obj | undefined {
+    if (t.accion !== 'modificar' || t.objetivo === undefined) return undefined
+    if (t.tipo !== 'conector') return Creador.detalle(s, carpeta, t.tipo, t.objetivo)
+    const ag = Creador.detalle(s, carpeta, 'agente', t.objetivo)
+    const servidor = Creador.texto(objetoDe(t.datos).servidor)
+    const cs = Array.isArray(ag?.conectores) ? (ag.conectores as unknown[]).filter(esObjeto) : []
+    return servidor === undefined ? undefined : cs.find((c) => Creador.clave(String(c.servidor ?? '')) === Creador.clave(servidor))
+  },
+
+  /** Las listas se reemplazan enteras al modificar: lo que hoy está y con el cambio deja de estar, campo por campo (también
+   *  dentro de un objeto, como `limites.solo`). Cada elemento se reconoce por su nombre, servidor, texto o id. */
+  queQuita(actual: Obj, nuevos: Obj): { campo: string; quita: string[] }[] {
+    const clave = (x: unknown): string => {
+      if (typeof x === 'string') return Creador.compactar(x)
+      if (esObjeto(x)) for (const k of ['nombre', 'servidor', 'texto', 'id']) if (typeof x[k] === 'string') return Creador.compactar(x[k] as string)
+      return Creador.json(x)
+    }
+    const mostrar = (x: unknown): string => {
+      if (typeof x === 'string') return prefijo(x, 80)
+      if (esObjeto(x)) for (const k of ['nombre', 'servidor', 'texto', 'id']) if (typeof x[k] === 'string') return prefijo(x[k] as string, 80)
+      return prefijo(Creador.json(x), 80)
+    }
+    const out: { campo: string; quita: string[] }[] = []
+    const comparar = (campo: string, viejo: unknown, nuevo: unknown) => {
+      if (Array.isArray(viejo) && Array.isArray(nuevo)) {
+        const hay = new Set(nuevo.map(clave))
+        const quita = viejo.filter((x) => !hay.has(clave(x))).map(mostrar)
+        if (quita.length > 0) out.push({ campo, quita })
+      } else if (esObjeto(viejo) && esObjeto(nuevo)) {
+        for (const [k, v] of Object.entries(nuevo)) comparar(`${campo}.${k}`, viejo[k], v)
+      }
+    }
+    for (const [k, v] of Object.entries(nuevos)) comparar(k, actual[k], v)
+    return out
+  },
+
   conectoresJSON(catalogo: ServidorConector[] | undefined): Obj {
     if (!catalogo) {
       return {
@@ -978,6 +1047,18 @@ export class HerramientasCreador implements MCPHerramientas {
         inputSchema: { type: 'object', properties: {} },
       },
       {
+        name: 'ver_detalle',
+        description: 'La definición completa de algo que ya existe en la oficina: un agente (con sus instrucciones, límites y conectores con sus herramientas), un flujo (con todos los datos de cada paso), una tarea, una regla o un departamento. Miralo antes de modificarlo: al modificar, las listas (límites, conectores, pasos, chips) se reemplazan enteras, así que para sumar algo mandá lo que ya tiene más lo nuevo.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            tipo: { type: 'string', enum: ['agente', 'departamento', 'flujo', 'regla', 'tarea'] },
+            id: { type: 'string', description: 'el id (miralo con ver_oficina)' },
+          },
+          required: ['tipo', 'id'],
+        },
+      },
+      {
         name: 'listar_conectores',
         description: 'Los conectores de la cuenta de claude.ai (Calendar, Gmail, Drive…) con sus herramientas y si están disponibles.',
         inputSchema: { type: 'object', properties: {} },
@@ -1020,6 +1101,7 @@ export class HerramientasCreador implements MCPHerramientas {
   async llamar(nombre: string, argumentos: Obj): Promise<MCPResultado | undefined> {
     switch (nombre) {
       case 'ver_oficina': return this.verOficina()
+      case 'ver_detalle': return this.verDetalle(argumentos)
       case 'listar_conectores': return MCPResultados.ok(Creador.json(Creador.conectoresJSON(catalogoDe(this.s)?.servidores())))
       case 'marcar_faltante': return this.marcar(argumentos)
       case 'descartar_tarjeta': return this.descartar(argumentos)
@@ -1037,6 +1119,14 @@ export class HerramientasCreador implements MCPHerramientas {
     try { o = OficinaStore.leer(this.identidad.oficina) } catch { return MCPResultados.error('No pude leer la oficina.') }
     const ts = creadorDe(this.s).tarjetas.lista(this.identidad.oficina)
     return MCPResultados.ok(sanear(Creador.json(Creador.resumenOficina(o, ts))))
+  }
+
+  private verDetalle(args: Obj): MCPResultado {
+    const tipo = Creador.texto(args.tipo), id = Creador.texto(args.id)
+    if (tipo === undefined || id === undefined) return MCPResultados.error('Faltan «tipo» e «id».')
+    const d = Creador.detalle(this.s, this.identidad.oficina, tipo, id)
+    if (!d) return MCPResultados.error(`No hay ${tipo === 'tarea' || tipo === 'regla' ? 'una' : 'un'} ${sanear(tipo)} con el id «${sanear(id)}»: miralo con ver_oficina.`)
+    return MCPResultados.ok(sanear(Creador.json(d)))
   }
 
   private proponer(tipo: string, args: Obj): MCPResultado {
@@ -1059,7 +1149,14 @@ export class HerramientasCreador implements MCPHerramientas {
         carpeta: this.identidad.oficina, sid: this.identidad.sid, tipo, accion, objetivo: Creador.texto(args.objetivo), ref: Creador.texto(args.ref),
         origen: sanear(origen), datos,
       })
-      return MCPResultados.ok(sanear(Creador.json(tarjetaJSON(t))))
+      const r = tarjetaJSON(t)
+      // al modificar, las listas se reemplazan: si el cambio quita algo que hoy está, se lo decimos para que lo revise
+      const actual = Creador.actual(this.s, this.identidad.oficina, t)
+      const quita = actual ? Creador.queQuita(actual, objetoDe(t.datos)) : []
+      if (quita.length > 0) {
+        r.aviso = `Ojo: este cambio quita lo que hoy tiene en ${quita.map((q) => `${q.campo} (${q.quita.map((x) => `«${x}»`).join(', ')})`).join('; ')}. Al modificar, las listas se reemplazan enteras: si la idea era sumar, mirá ver_detalle y volvé a proponerla con ref ${t.id} y la lista completa (lo que ya tiene más lo nuevo). Si la idea era sacarlo, está bien así.`
+      }
+      return MCPResultados.ok(sanear(Creador.json(r)))
     } catch (e) {
       if (e instanceof ErrorAPI) return MCPResultados.error(sanear(e.mensaje))
       return MCPResultados.error('No pude guardar la tarjeta.')

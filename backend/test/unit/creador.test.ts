@@ -52,11 +52,11 @@ async function banco(agentes: string[] = []) {
 }
 
 describe('El Creador (en proceso)', () => {
-  test('las 10 herramientas, con prefijo mcp__hq__ y su esquema', async () => {
+  test('las 11 herramientas, con prefijo mcp__hq__ y su esquema', async () => {
     const { h } = await banco()
     const defs = h.definiciones as O[]
     expect(defs.map((d) => 'mcp__hq__' + d.name)).toEqual(Creador.nombresMCP)
-    expect(Creador.nombresMCP).toEqual(['ver_oficina', 'listar_conectores', 'proponer_departamento', 'proponer_agente', 'proponer_flujo', 'proponer_regla',
+    expect(Creador.nombresMCP).toEqual(['ver_oficina', 'ver_detalle', 'listar_conectores', 'proponer_departamento', 'proponer_agente', 'proponer_flujo', 'proponer_regla',
       'proponer_conector', 'proponer_tarea', 'marcar_faltante', 'descartar_tarjeta'].map((n) => `mcp__hq__${n}`))
     for (const d of defs) expect(d.inputSchema.type).toBe('object')
     expect(defs.find((d) => d.name === 'proponer_agente')!.inputSchema.required).toEqual(['accion', 'origen'])

@@ -43,6 +43,14 @@
 .tj-cambio-est { margin-left: auto; flex: none; font-size: 11.5px; color: var(--suave); }
 .tj-cambio-est.borrador, .tj-cambio-est.error { color: var(--peligro); }
 .tj-cambio-est.creada { color: var(--ok); }
+.tj-dif { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; background: var(--panel-2); border-radius: var(--radio-chico); padding: 7px 9px; }
+.tj-dif > b { font-size: 11.5px; font-weight: 600; color: var(--suave); }
+.tj-dif-fila { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: baseline; }
+.tj-dif-etq { color: var(--suave); }
+.tj-dif-antes { color: var(--suave); text-decoration: line-through; text-decoration-color: var(--linea-fuerte); overflow-wrap: anywhere; }
+.tj-dif-ahora { overflow-wrap: anywhere; }
+.tj-dif-flecha { color: var(--tenue); }
+@media (max-width: 520px) { .tj-dif-fila { grid-template-columns: 1fr; gap: 0; } .tj-dif-flecha { display: none; } }
 
 .tj { max-width: 100%; }
 .chat > .tj { align-self: stretch; }

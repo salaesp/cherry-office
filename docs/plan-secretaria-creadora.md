@@ -63,6 +63,19 @@ Para crear cosas se le habla a la secretaría. El Creador deja de ser un persona
    hoy, con un aviso arriba: «Ahora esto lo hace la secretaría» y «Contratar secretaría». Así ninguna oficina queda sin
    alguien que la arme.
 
+## Sumarle cosas a lo que ya existe (2026-11-27)
+`ver_oficina` es un resumen (de un agente, cuántos límites tiene, no cuáles) y al modificar las listas (límites,
+conectores, pasos, chips) se reemplazan enteras. Pedir «que Lucía también pueda contestar mails» podía dejarla sin los
+límites que tenía. Para que se pueda sumar sin pisar:
+1. **`ver_detalle({tipo, id})`**, herramienta nueva del Creador (y por lo tanto de la secretaría y, para tareas, de todos):
+   la definición completa de un agente (instrucciones, límites, conectores con sus herramientas), un flujo (todos los datos
+   de cada paso), una tarea, una regla o un departamento.
+2. **Instrucciones**: para sumar, mirar el detalle y mandar la lista completa (lo que ya tiene más lo nuevo).
+3. **Aviso al proponer**: si un «modificar» deja afuera algo que hoy está (`Creador.queQuita`), la respuesta de
+   `proponer_*` trae `aviso` con lo que quita, para que lo corrija con `ref`.
+4. **«Qué cambia» y «Ojo, se quita…»** en la tarjeta de la charla y en Propuestas: el backend manda `antes` (cómo está
+   hoy, con las instrucciones del agente que la interfaz no tiene) y `quita`.
+
 - **«Pedírselo a Sofía» desde el reporte** (ejemplo 4 del boceto): un botón que te arma el recado a partir de algo que
   ella leyó. Es comodidad; la seguridad ya la da la decisión 2.
 

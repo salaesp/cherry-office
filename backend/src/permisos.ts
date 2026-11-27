@@ -224,9 +224,9 @@ export const MemoriaSecretariaAgente = {
  *  delegar). Quien atiende la secretaría tiene todas (`Creador.nombresMCP`: también contratar, departamentos, reglas,
  *  conectores y flujos); los demás, solo proponer tareas programadas. */
 export const CambiosCharla = {
-  nombresSecretaria: ['ver_oficina', 'listar_conectores', 'proponer_departamento', 'proponer_agente', 'proponer_flujo', 'proponer_regla', 'proponer_conector',
+  nombresSecretaria: ['ver_oficina', 'ver_detalle', 'listar_conectores', 'proponer_departamento', 'proponer_agente', 'proponer_flujo', 'proponer_regla', 'proponer_conector',
     'proponer_tarea', 'marcar_faltante', 'descartar_tarjeta'],
-  nombresTodos: ['ver_oficina', 'proponer_tarea', 'marcar_faltante', 'descartar_tarjeta'],
+  nombresTodos: ['ver_oficina', 'ver_detalle', 'proponer_tarea', 'marcar_faltante', 'descartar_tarjeta'],
   /** ¿Puede cambiar la estructura de la oficina (contratar, departamentos…)? Hoy, solo quien atiende la secretaría. */
   estructura: (o: Oficina, agente: string) => o.secretaria !== undefined && o.secretaria.agente === agente,
   nombres: (o: Oficina, agente: string) => (CambiosCharla.estructura(o, agente) ? CambiosCharla.nombresSecretaria : CambiosCharla.nombresTodos),

@@ -99,6 +99,8 @@ window.App = window.App || {};
 
   /* lo que hay hoy en oficina.json para la tarjeta de modificar */
   function actualDe(t) {
+    /* el backend manda cómo está hoy (con las instrucciones del agente, que la interfaz no tiene) */
+    if (t.antes) return t.antes;
     var o = App.E.oficina || {}, obj = t.objetivo;
     if (!obj && t.tipo !== 'conector') return null;
     if (t.tipo === 'departamento') return App.depto(obj);
@@ -388,6 +390,10 @@ window.App = window.App || {};
           dif.length ? h('div.tb-dif', h('b', 'Qué cambia'), dif.map(function (x) {
             return h('div.tb-dif-fila', h('span.tb-dif-etq', x.etq), h('span.tb-antes', x.antes), h('span.tb-flecha', '→'), h('span.tb-ahora', x.ahora));
           })) : null,
+          /* las listas se reemplazan enteras: si el cambio quita algo que hoy está, se avisa (docs/plan-secretaria-creadora.md) */
+          t.quita && t.quita.length && t.estado !== 'creada' ? h('div.error-txt', 'Ojo, se quita lo que hoy tiene: ' + t.quita.map(function (q) {
+            return (ETIQUETAS[q.campo.split('.')[0]] || q.campo) + (q.campo.indexOf('.') > 0 ? ' (' + q.campo.split('.')[1] + ')' : '') + ': ' + q.quita.map(function (x) { return '«' + x + '»'; }).join(', ');
+          }).join(' · ')) : null,
           faltan.length ? h('div.tb-faltan', h('b', 'Le falta'), faltan.map(function (f) {
             return h('div.tb-falta', h('span', f.pregunta || f.campo || String(f)),
               h('button.btn.chico.fantasma', { type: 'button', onclick: function () { responderEnChat(t, f); } }, sec ? 'Contestárselo a ' + sec.nombre : 'Responder en el chat'));
@@ -622,7 +628,9 @@ window.App = window.App || {};
       return {
         titulo: tituloTarjeta(t), tipo: TIPO_UNO[t.tipo] || t.tipo, icono: TIPO_ICONO[t.tipo] || 'chispa',
         accion: ACCION_TXT[t.accion] || t.accion, estado: ESTADO_TXT[t.estado] || t.estado,
-        campos: (t.tipo === 'regla' ? [h('div.tb-texto', d.texto || '')] : camposClave(t)).filter(Boolean)
+        campos: (t.tipo === 'regla' ? [h('div.tb-texto', d.texto || '')] : camposClave(t)).filter(Boolean),
+        /* «Qué cambia» de un «modificar»: [{etq, antes, ahora}] */
+        dif: t.accion === 'modificar' && t.estado !== 'creada' ? diferencias(t) : []
       };
     } finally { tarjetasActuales = antes; }
   }

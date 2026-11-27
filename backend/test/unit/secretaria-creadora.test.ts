@@ -207,3 +207,54 @@ describe('toda oficina nueva viene con secretaría', () => {
     expect(o.agentes.find((a) => a.id === o.secretaria?.agente)?.nombre).toBe('Secretaría')
   })
 })
+
+describe('sumarle cosas a lo que ya existe', () => {
+  async function conLimites() {
+    const x = await preparar()
+    x.b.servicios.oficinas.modificar((o) => {
+      const n = o.agentes.find((a) => a.id === 'nico')!
+      n.limites = { solo: ['Contestar consultas de precios'], proponer: ['Mandar presupuestos'] }
+      n.conectores = [{ servidor: 'Gmail', leer: ['mcp__claude_ai_Gmail__search_threads'], actuar: [] }]
+    })
+    return x
+  }
+  const pedidoLimites = 'que Nico también pueda contestar mails de proveedores sin preguntarme'
+
+  test('ver_detalle trae la definición completa: instrucciones, límites y conectores con sus herramientas', async () => {
+    const { sb, chat } = await conLimites()
+    sb.llamadasMCP('sofia', [{ name: 'ver_detalle', arguments: { tipo: 'agente', id: 'nico' } }, { name: 'ver_detalle', arguments: { tipo: 'flujo', id: 'nada' } }])
+    await chat('MCP_LLAMAR ' + pedidoLimites)
+    const s = sb.salidasMCP('sofia') as any[]
+    const d = JSON.parse(s[0].result.content[0].text)
+    expect(d).toMatchObject({ id: 'nico', prompt: 'Sos nico.', limites: { solo: ['Contestar consultas de precios'], proponer: ['Mandar presupuestos'] } })
+    expect(d.conectores[0]).toMatchObject({ servidor: 'Gmail', leer: ['mcp__claude_ai_Gmail__search_threads'] })
+    expect(d.avatar).toBeUndefined()
+    expect(s[1].result.isError).toBe(true)
+  })
+
+  test('un «modificar» que quita algo de una lista avisa qué quita; con la lista completa, no', async () => {
+    const { sb, chat, tarjetas } = await conLimites()
+    const modificar = (solo: string[], ref?: string) => ({ name: 'proponer_agente', arguments: {
+      accion: 'modificar', objetivo: 'nico', origen: 'contestar mails de proveedores sin preguntarme', ...(ref ? { ref } : {}),
+      datos: { limites: { solo, proponer: ['Mandar presupuestos'] } } } })
+    sb.llamadasMCP('sofia', [modificar(['Contestar mails de proveedores']), modificar(['Contestar consultas de precios', 'Contestar mails de proveedores'], 't1')])
+    await chat('MCP_LLAMAR ' + pedidoLimites)
+    const s = (sb.salidasMCP('sofia') as any[]).map((x) => JSON.parse(x.result.content[0].text))
+    expect(s[0].aviso).toContain('limites.solo («Contestar consultas de precios»)')
+    expect(s[0].aviso).toContain('ver_detalle')
+    expect(s[1].aviso).toBeUndefined()
+    expect((await tarjetas()).cambios[0].datos.limites.solo).toEqual(['Contestar consultas de precios', 'Contestar mails de proveedores'])
+  })
+
+  test('la tarjeta de un «modificar» lleva cómo está hoy (antes) y lo que se quita, en la charla y en Propuestas', async () => {
+    const { sb, b, chat, tarjetas } = await conLimites()
+    sb.llamadasMCP('sofia', [{ name: 'proponer_agente', arguments: { accion: 'modificar', objetivo: 'nico', origen: 'contestar mails de proveedores sin preguntarme',
+      datos: { limites: { solo: ['Contestar mails de proveedores'], proponer: ['Mandar presupuestos'] } } } }])
+    await chat('MCP_LLAMAR ' + pedidoLimites)
+    const t = (await tarjetas()).cambios[0]
+    expect(t.antes).toMatchObject({ id: 'nico', prompt: 'Sos nico.', limites: { solo: ['Contestar consultas de precios'] } })
+    expect(t.quita).toEqual([{ campo: 'limites.solo', quita: ['Contestar consultas de precios'] }])
+    expect((await llamar(b, 'GET', '/api/creador/borrador')).obj.tarjetas[0].quita).toEqual(t.quita)
+    expect((await llamar(b, 'GET', '/api/charlas/pendientes')).obj.cambios[0].tarjetas[0].quita).toEqual(t.quita)
+  })
+})

@@ -17,7 +17,7 @@ import { creadorMD } from './plantillas.js'
 import { aplicarEleccion, eleccionCharla } from './agentes.js'
 import { atrapar, no405, type Query, type Resp, type SubRouter } from './router.js'
 import { maxMensaje } from './rutas-chat.js'
-import { agenteDeCharla } from './secretaria-creadora.js'
+import { agenteDeCharla, tarjetaConAntes } from './secretaria-creadora.js'
 import { registrarModulo, type Servicios } from './servicios.js'
 import { CajaCosto } from './stream.js'
 import { largo, uuidValido } from './validar.js'
@@ -179,7 +179,7 @@ export class CreadorRouter implements SubRouter {
     const ts = tarjetas.lista(act.carpeta, ['borrador', 'lista', 'creada', 'error'])
     // las que propuso quien atiende la secretaría en una charla llevan de qué charla vienen (secretaria-creadora.ts)
     const json = ts.map((t) => {
-      const x = tarjetaJSON(t)
+      const x = tarjetaConAntes(this.s, act.carpeta, t)
       const agente = agenteDeCharla(this.s, t)
       if (agente !== undefined) { x.deCharla = agente; x.charla = t.sid }
       return x

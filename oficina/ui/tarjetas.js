@@ -177,6 +177,15 @@ App.Tarjetas = (function () {
     return { titulo: d.nombre || d.texto || t.id, tipo: t.tipo, icono: 'chispa', accion: t.accion, estado: t.estado, campos: [] };
   }
   function abrirCreador() { App.Nav.ir('#/equipo/creador'); }
+  /* un cambio que quita algo que hoy está (las listas se reemplazan enteras): se avisa en rojo antes de aprobar */
+  var CAMPO_TXT = { limites: 'Límites', 'limites.solo': 'Hace solo', 'limites.proponer': 'Propone y espera', conectores: 'Conectores', pasos: 'Pasos', chips: 'Atajos',
+    sabeDe: 'Sabe de', leer: 'Puede leer', actuar: 'Puede hacer', dias: 'Días', permisos: 'Coordinación' };
+  function quitaEl(t, titulo) {
+    if (!t.quita || !t.quita.length || t.estado === 'creada') return null;
+    var partes = t.quita.map(function (q) { return (CAMPO_TXT[q.campo] || q.campo) + ': ' + q.quita.map(function (x) { return '«' + x + '»'; }).join(', '); });
+    return h('div.tj-nota.error', (titulo ? titulo + ' — ' : '') + 'Ojo, se quita lo que hoy tiene. ' + partes.join(' · '));
+  }
+  function recorte(s) { s = String(s == null ? '' : s); return s.length > 220 ? s.slice(0, 219) + '…' : s; }
   function aplicar(ts, op) {
     var quitar = ts.filter(function (t) { return t.accion === 'quitar'; });
     var conf = quitar.length ? App.confirmar(quitar.length === 1 ? '¿Quitar algo de la oficina?' : '¿Quitar ' + quitar.length + ' cosas de la oficina?',
@@ -228,13 +237,18 @@ App.Tarjetas = (function () {
       borr.forEach(function (t) {
         (t.faltantes || []).slice(0, 2).forEach(function (f) { cuerpo.push(h('div.tj-nota', 'Falta: ' + (f.pregunta || f.campo || String(f)))); });
       });
+      vivas.forEach(function (t) { var q = quitaEl(t, resumenDe(t, vivas).titulo); if (q) cuerpo.push(q); });
     } else {
       vivas.forEach(function (t) {
         var r = resumenDe(t, vivas);
         cuerpo.push(h('div.tj-cambio',
           h('div.tj-cambio-cab', App.icono(r.icono), h('span', r.accion + ' · ' + r.tipo), h('span.tj-cambio-est.' + t.estado, t.estado === 'lista' ? '' : r.estado)),
           h('div.tj-tit', r.titulo),
-          r.campos.length ? h('div.tj-cambio-campos', r.campos) : null,
+          /* un cambio muestra qué cambia (antes → ahora), para ver antes de aprobar si se pierde algo */
+          r.dif && r.dif.length ? h('div.tj-dif', h('b', 'Qué cambia'), r.dif.map(function (x) {
+            return h('div.tj-dif-fila', h('span.tj-dif-etq', x.etq), h('span.tj-dif-antes', recorte(x.antes)), h('span.tj-dif-flecha', '→'), h('span.tj-dif-ahora', recorte(x.ahora)));
+          })) : r.campos.length ? h('div.tj-cambio-campos', r.campos) : null,
+          quitaEl(t),
           t.estado === 'error' && t.error ? h('div.tj-nota.error', t.error) : null,
           t.origen ? h('blockquote.tb-origen', t.origen) : null));
       });
