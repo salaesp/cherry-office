@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App del celular</title>
+<style>
+/* Boceto para docs/plan-celular.md: la Oficina instalada en el celular, en modo reducido (solo por Tailscale).
+   Barra de abajo: Bandeja · Charlas · Trabajo · Más. Sin oficina pixel; el micrófono de la secretaría siempre a mano.
+   Colores de oficina/ui/estilo.css. Las caras salen de oficina/personajes/. */
+:root {
+  --fondo: #f2f0ec; --panel: #ffffff; --panel-2: #f8f7f4; --linea: #e4e1db; --linea-fuerte: #d3cfc7;
+  --texto: #1d1d1f; --suave: #6d6962; --tenue: #9a958d; --acento: #1d1d1f; --sobre-acento: #ffffff;
+  --peligro: #b3362c; --ok: #3b7a4b; --aviso: #a46a12;
+  --cal: #2f6db5; --cal-suave: #e8f0fa; --deleg: #a46a12; --deleg-suave: #fbf2e2;
+  --sombra: 0 1px 2px rgba(20,18,15,.06), 0 8px 24px rgba(20,18,15,.08);
+  --sombra-alta: 0 2px 6px rgba(20,18,15,.08), 0 24px 60px rgba(20,18,15,.18);
+  --f-texto: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --radio: 10px; --radio-chico: 7px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+  --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --acento: #f1f1f2; --sobre-acento: #1b1b1d;
+  --peligro: #e0675d; --ok: #6cbf80; --aviso: #e0a84a;
+  --cal: #7fb0ea; --cal-suave: #1f2b3a; --deleg: #e0a84a; --deleg-suave: #352a18;
+  --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35); --sombra-alta: 0 2px 6px rgba(0,0,0,.35), 0 24px 60px rgba(0,0,0,.5);
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+  --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --acento: #f1f1f2; --sobre-acento: #1b1b1d;
+  --peligro: #e0675d; --ok: #6cbf80; --aviso: #e0a84a;
+  --cal: #7fb0ea; --cal-suave: #1f2b3a; --deleg: #e0a84a; --deleg-suave: #352a18;
+  --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35); --sombra-alta: 0 2px 6px rgba(0,0,0,.35), 0 24px 60px rgba(0,0,0,.5);
+  color-scheme: dark }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--fondo); color: var(--texto); font: 14px/1.5 var(--f-texto); -webkit-font-smoothing: antialiased; }
+.pagina { max-width: 1240px; margin: 0 auto; padding: 28px 16px 60px; }
+h1 { font-size: 24px; margin: 0 0 6px; text-wrap: balance; }
+.intro { color: var(--suave); max-width: 76ch; margin: 0 0 22px; }
+.fila { display: flex; flex-wrap: wrap; gap: 28px 22px; justify-content: center; }
+.pieza { width: 300px; }
+.pieza h2 { font-size: 15px; margin: 0 0 2px; }
+.pieza .que { font-size: 12.5px; color: var(--suave); margin: 0 0 10px; min-height: 6em; }
+
+/* ---------- el teléfono ---------- */
+.tel { width: 300px; height: 620px; border-radius: 38px; padding: 9px; background: #111; box-shadow: var(--sombra-alta); }
+.pant { position: relative; width: 100%; height: 100%; border-radius: 30px; overflow: hidden; background: var(--fondo); display: flex; flex-direction: column; font-size: 13.5px; }
+.estado { height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 22px 0 26px; font-size: 12px; font-weight: 600; }
+.estado i { width: 70px; height: 20px; border-radius: 12px; background: #111; display: block; }
+.cab { flex: none; padding: 6px 16px 10px; display: flex; align-items: center; gap: 10px; }
+.cab h3 { font-size: 22px; margin: 0; letter-spacing: -.02em; flex: 1; }
+.cab .of { font-size: 11px; color: var(--tenue); display: block; font-weight: 500; letter-spacing: 0; }
+.cab.chica { border-bottom: 1px solid var(--linea); background: var(--panel); padding: 6px 12px 8px; }
+.cab.chica h3 { font-size: 15px; }
+.cab.chica small { display: block; font-size: 11px; color: var(--ok); font-weight: 500; }
+.atras { width: 28px; height: 28px; display: grid; place-items: center; color: var(--suave); font-size: 20px; }
+.cuerpo { flex: 1; overflow: hidden; padding: 0 12px; display: flex; flex-direction: column; gap: 8px; }
+.seccion { font-size: 11px; font-weight: 600; color: var(--tenue); text-transform: uppercase; letter-spacing: .05em; margin: 6px 4px 0; }
+
+/* barra de abajo */
+.barra { flex: none; height: 62px; padding-bottom: 12px; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--panel); border-top: 1px solid var(--linea); }
+.barra span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 10px; color: var(--tenue); position: relative; }
+.barra span.on { color: var(--texto); font-weight: 600; }
+.barra svg { width: 20px; height: 20px; }
+.barra b { position: absolute; top: 4px; left: 50%; margin-left: 4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--peligro); color: #fff; font-size: 10px; line-height: 16px; text-align: center; }
+
+/* tarjetas */
+.tj { background: var(--panel); border: 1px solid var(--linea); border-radius: 12px; padding: 10px 12px; box-shadow: var(--sombra); }
+.tj .de { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--suave); margin-bottom: 4px; }
+.tj .de b { color: var(--texto); }
+.tj .de .t { margin-left: auto; color: var(--tenue); font-size: 11px; }
+.tj p { margin: 0 0 8px; }
+.tj.preg { border-left: 3px solid var(--cal); }
+.tj.perm { border-left: 3px solid var(--aviso); }
+.tj.flujo { border-left: 3px solid var(--ok); }
+.cara { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: var(--panel-2); flex: none; }
+.cara.g { width: 40px; height: 40px; }
+.ops { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 13px; border-radius: 9px; border: 1px solid var(--linea-fuerte); background: var(--panel); font: inherit; font-size: 13px; font-weight: 500; color: var(--texto); }
+.btn.p { background: var(--acento); border-color: var(--acento); color: var(--sobre-acento); }
+.btn.w { flex: 1; }
+.btn.r { color: var(--peligro); }
+.code { font: 11.5px/1.4 ui-monospace, Menlo, monospace; background: var(--panel-2); border: 1px solid var(--linea); border-radius: 6px; padding: 5px 7px; margin: 0 0 8px; color: var(--suave); }
+.mini { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--linea); border-radius: 12px; padding: 9px 12px; }
+.mini .tx { flex: 1; min-width: 0; }
+.mini .tx b { display: block; font-size: 13px; }
+.mini .tx span { display: block; font-size: 12px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini .chev { color: var(--tenue); }
+.ins { flex: none; font-size: 11px; height: 20px; padding: 0 7px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--linea); color: var(--suave); display: inline-flex; align-items: center; }
+.ins.ok { color: var(--ok); } .ins.av { color: var(--aviso); }
+
+/* lista de charlas */
+.busca { height: 34px; border-radius: 10px; background: var(--panel); border: 1px solid var(--linea); display: flex; align-items: center; padding: 0 10px; color: var(--tenue); font-size: 13px; gap: 6px; }
+.lista { background: var(--panel); border: 1px solid var(--linea); border-radius: 12px; overflow: hidden; }
+.cont { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--linea); }
+.cont:last-child { border-bottom: 0; }
+.cont .tx { flex: 1; min-width: 0; }
+.cont .tx b { font-size: 13.5px; }
+.cont .tx em { font-style: normal; font-size: 11px; color: var(--tenue); margin-left: 4px; }
+.cont .tx span { display: block; font-size: 12px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cont .lado { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: 11px; color: var(--tenue); }
+.cont .lado i { font-style: normal; min-width: 18px; height: 18px; border-radius: 9px; background: var(--cal); color: #fff; font-size: 10.5px; line-height: 18px; text-align: center; padding: 0 5px; }
+.trab { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-right: 4px; animation: lat 1.4s ease-in-out infinite; }
+@keyframes lat { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .trab { animation: none; } }
+
+/* charla */
+.chat { flex: 1; overflow: hidden; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.msg { max-width: 84%; padding: 7px 10px; border-radius: 14px; font-size: 13px; line-height: 1.4; }
+.msg.yo { align-self: flex-end; background: var(--acento); color: var(--sobre-acento); border-bottom-right-radius: 4px; }
+.msg.el { align-self: flex-start; background: var(--panel); border: 1px solid var(--linea); border-bottom-left-radius: 4px; }
+.msg.audio { display: flex; align-items: center; gap: 8px; }
+.onda { display: flex; align-items: center; gap: 2px; height: 16px; }
+.onda i { width: 2px; border-radius: 1px; background: currentColor; opacity: .7; }
+.deleg { align-self: stretch; background: var(--deleg-suave); border: 1px solid var(--linea); border-radius: 10px; padding: 8px 10px; font-size: 12px; }
+.deleg b { color: var(--deleg); }
+.deleg .ops { margin-top: 6px; }
+.deleg .btn { height: 28px; font-size: 12px; }
+.escribir { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 10px 20px; background: var(--panel); border-top: 1px solid var(--linea); }
+.escribir .in { flex: 1; height: 36px; border-radius: 18px; border: 1px solid var(--linea-fuerte); padding: 0 14px; display: flex; align-items: center; color: var(--tenue); font-size: 16px; }
+.redondo { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--acento); color: var(--sobre-acento); flex: none; }
+.redondo svg { width: 18px; height: 18px; }
+
+/* micrófono de la secretaría */
+.mic { position: absolute; right: 14px; bottom: 76px; width: 54px; height: 54px; border-radius: 50%; background: var(--acento); box-shadow: var(--sombra-alta); display: grid; place-items: center; }
+.mic img { position: absolute; top: -8px; left: -8px; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--fondo); object-fit: cover; }
+.mic svg { width: 22px; height: 22px; color: var(--sobre-acento); }
+
+/* revisar */
+.doc { flex: 1; background: var(--panel); margin: 0 12px; border: 1px solid var(--linea); border-radius: 12px; padding: 14px; overflow: hidden; font-size: 12.5px; line-height: 1.55; }
+.doc h4 { font-size: 15px; margin: 0 0 6px; }
+.doc p { margin: 0 0 8px; color: var(--suave); }
+.doc mark { background: var(--deleg-suave); color: var(--texto); border-radius: 3px; padding: 0 2px; }
+.pie { flex: none; padding: 10px 12px 20px; display: flex; flex-direction: column; gap: 8px; }
+.nota { height: 36px; border-radius: 10px; border: 1px solid var(--linea-fuerte); background: var(--panel); padding: 0 12px; display: flex; align-items: center; color: var(--tenue); font-size: 13px; }
+
+/* trabajo */
+.corr { background: var(--panel); border: 1px solid var(--linea); border-radius: 12px; padding: 10px 12px; }
+.corr .t1 { display: flex; align-items: center; gap: 8px; }
+.corr .t1 b { flex: 1; font-size: 13px; }
+.pasos { display: flex; gap: 4px; margin: 8px 0 4px; }
+.pasos i { flex: 1; height: 5px; border-radius: 3px; background: var(--linea); }
+.pasos i.h { background: var(--ok); } .pasos i.a { background: var(--aviso); }
+.corr small { font-size: 11.5px; color: var(--suave); }
+.tarea { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--linea); }
+.tarea:last-child { border-bottom: 0; }
+.tarea .tx { flex: 1; min-width: 0; }
+.tarea .tx b { font-size: 13px; display: block; }
+.tarea .tx span { font-size: 11.5px; color: var(--suave); }
+.play { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--linea-fuerte); display: grid; place-items: center; color: var(--texto); }
+.play svg { width: 13px; height: 13px; }
+
+/* más */
+.hoja { position: absolute; left: 0; right: 0; bottom: 0; background: var(--panel); border-radius: 18px 18px 0 0; box-shadow: var(--sombra-alta); padding: 8px 0 74px; }
+.hoja .asa { width: 36px; height: 4px; border-radius: 2px; background: var(--linea-fuerte); margin: 0 auto 8px; }
+.op { display: flex; align-items: center; gap: 12px; padding: 11px 18px; font-size: 14px; }
+.op svg { width: 18px; height: 18px; color: var(--suave); }
+.op small { margin-left: auto; color: var(--tenue); font-size: 12px; }
+.op.sep { border-top: 1px solid var(--linea); }
+.velo { position: absolute; inset: 0; background: rgba(0,0,0,.28); }
+.compu { margin: 6px 18px 0; font-size: 11.5px; color: var(--tenue); }
+
+/* bloqueo / notificación */
+.bloqueo { background: linear-gradient(170deg, #38485e, #1d2431 60%, #141821); color: #fff; }
+.hora { text-align: center; margin-top: 34px; }
+.hora b { font-size: 62px; font-weight: 300; letter-spacing: -.02em; display: block; line-height: 1; }
+.hora span { font-size: 13px; opacity: .8; }
+.noti { margin: 0 10px 8px; border-radius: 16px; background: rgba(255,255,255,.16); backdrop-filter: blur(10px); padding: 10px 12px; font-size: 12.5px; line-height: 1.35; }
+.noti .ap { display: flex; align-items: center; gap: 7px; font-size: 11px; opacity: .85; margin-bottom: 3px; }
+.noti .ap i { width: 16px; height: 16px; border-radius: 4px; background: #f2f0ec; display: grid; place-items: center; color: #1d1d1f; font-style: normal; font-size: 10px; font-weight: 700; }
+.noti .ap em { margin-left: auto; font-style: normal; }
+.noti b { display: block; }
+.noti .acc { display: flex; gap: 6px; margin-top: 8px; }
+.noti .acc span { flex: 1; text-align: center; padding: 6px; border-radius: 10px; background: rgba(255,255,255,.18); font-weight: 600; }
+.notis { margin-top: auto; padding-bottom: 26px; }
+
+/* instalar */
+.inst { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 26px 22px; gap: 10px; }
+.ico { width: 76px; height: 76px; border-radius: 18px; background: var(--panel); border: 1px solid var(--linea); box-shadow: var(--sombra); display: grid; place-items: center; overflow: hidden; }
+.ico img { width: 64px; height: 64px; image-rendering: pixelated; }
+.inst h4 { font-size: 18px; margin: 4px 0 0; }
+.inst p { color: var(--suave); font-size: 12.5px; margin: 0; }
+.pasos-i { align-self: stretch; text-align: left; background: var(--panel); border: 1px solid var(--linea); border-radius: 12px; padding: 4px 0; margin-top: 4px; }
+.pasos-i div { display: flex; gap: 10px; padding: 8px 12px; font-size: 12.5px; }
+.pasos-i div .n { width: 20px; height: 20px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--linea); display: grid; place-items: center; font-size: 11px; flex: none; }
+.ts { font-size: 11.5px; color: var(--tenue); display: flex; align-items: center; gap: 6px; }
+.ts i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+.fuera { max-width: 760px; margin: 34px auto 0; background: var(--panel); border: 1px solid var(--linea); border-radius: 12px; padding: 16px 18px; }
+.fuera h2 { font-size: 15px; margin: 0 0 6px; }
+.fuera p { margin: 0; color: var(--suave); font-size: 13px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-bandeja" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h5l1.5 2.5h5L16 13h5"/><path d="M5.5 5h13L21 13v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5z"/></symbol>
+  <symbol id="i-charlas" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+  <symbol id="i-reloj" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></symbol>
+  <symbol id="i-enviar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></symbol>
+  <symbol id="i-sol" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></symbol>
+  <symbol id="i-carpeta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18z"/></symbol>
+  <symbol id="i-reunion" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5M10.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5"/></symbol>
+  <symbol id="i-edificio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20V5l8-2v17M12 8l8 2v10M2.5 20h19M7 8h2M7 12h2M7 16h2M15 13h2M15 16h2"/></symbol>
+  <symbol id="i-campana" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-compu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="12" rx="1.5"/><path d="M8.5 20h7M12 16.5V20"/></symbol>
+</svg>
+
+<div class="pagina">
+  <h1>La Oficina en el celular</h1>
+  <p class="intro">Boceto para <code>docs/plan-celular.md</code>. Es la misma app, instalada desde el navegador y abierta por Tailscale,
+    pero con menos cosas: enterarte, contestar, aprobar y hablarle a alguien. Sin la oficina pixel. Abajo hay cuatro pestañas:
+    <b>Bandeja · Charlas · Trabajo · Más</b>. El micrófono de la secretaría está siempre a mano, salvo dentro de una charla,
+    que ya tiene el suyo.</p>
+
+  <div class="fila">
+
+  <!-- 1. Bandeja -->
+  <div class="pieza">
+    <h2>1 · Bandeja (pantalla de inicio)</h2>
+    <p class="que">Arriba, lo que traba a alguien, con botones grandes para resolverlo sin abrir nada. Abajo, lo que es para leer.</p>
+    <div class="tel"><div class="pant">
+      <div class="estado">9:41<i></i>●●●</div>
+      <div class="cab"><h3><span class="of">Prospera</span>Hoy</h3></div>
+      <div class="cuerpo">
+        <div class="seccion">Te esperan · 3</div>
+        <div class="tj preg">
+          <div class="de"><img class="cara" src="../../oficina/personajes/marce-cara.png" alt=""><b>Marce</b> pregunta<span class="t">10 min</span></div>
+          <p>¿El informe va con o sin las devoluciones de octubre?</p>
+          <div class="ops"><span class="btn">Con devoluciones</span><span class="btn">Sin</span><span class="btn">…</span></div>
+        </div>
+        <div class="tj perm">
+          <div class="de"><img class="cara" src="../../oficina/personajes/nicolas-cara.png" alt=""><b>Nicolás</b> necesita permiso<span class="t">2 min</span></div>
+          <div class="code">enviar mail a proveedores@…</div>
+          <div class="ops"><span class="btn p w">Permitir</span><span class="btn w">Una vez</span><span class="btn r">No</span></div>
+        </div>
+        <div class="mini"><img class="cara" src="../../oficina/personajes/patricia-cara.png" alt=""><div class="tx"><b>Alta de cliente · te toca aprobar</b><span>Flujo · paso 3 de 4</span></div><span class="chev">›</span></div>
+        <div class="seccion">Para leer</div>
+        <div class="mini"><img class="cara" src="../../oficina/personajes/sofia-cara.png" alt=""><div class="tx"><b>Sofía entregó «Propuesta Q1»</b><span>Para revisar · 4 páginas</span></div><span class="chev">›</span></div>
+      </div>
+      <div class="mic"><img src="../../oficina/personajes/betty-cara.png" alt=""><svg><use href="#i-mic"/></svg></div>
+      <div class="barra">
+        <span class="on"><svg><use href="#i-bandeja"/></svg>Bandeja<b>3</b></span>
+        <span><svg><use href="#i-charlas"/></svg>Charlas</span>
+        <span><svg><use href="#i-reloj"/></svg>Trabajo</span>
+        <span><svg><use href="#i-menu"/></svg>Más</span>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 2. Charlas -->
+  <div class="pieza">
+    <h2>2 · Charlas</h2>
+    <p class="que">Como un chat: cada agente es un contacto. El punto verde indica quién está trabajando. Las reuniones se pueden leer acá; para llamar a una nueva hay que ir a la compu.</p>
+    <div class="tel"><div class="pant">
+      <div class="estado">9:41<i></i>●●●</div>
+      <div class="cab"><h3>Charlas</h3></div>
+      <div class="cuerpo">
+        <div class="busca">⌕ Buscar</div>
+        <div class="lista">
+          <div class="cont"><img class="cara g" src="../../oficina/personajes/betty-cara.png" alt=""><div class="tx"><b>Betty</b><em>Secretaría</em><span>Listo, le avisé a Nicolás lo del mail.</span></div><div class="lado">9:38<i>1</i></div></div>
+          <div class="cont"><img class="cara g" src="../../oficina/personajes/marce-cara.png" alt=""><div class="tx"><b>Marce</b><em>Ventas</em><span><span class="trab"></span>Armando el informe…</span></div><div class="lado">9:31</div></div>
+          <div class="cont"><img class="cara g" src="../../oficina/personajes/nicolas-cara.png" alt=""><div class="tx"><b>Nicolás</b><em>Compras</em><span>Espera tu permiso para enviar</span></div><div class="lado">9:39</div></div>
+          <div class="cont"><img class="cara g" src="../../oficina/personajes/sofia-cara.png" alt=""><div class="tx"><b>Sofía</b><em>Comercial</em><span>Te dejé la propuesta en la bandeja</span></div><div class="lado">ayer</div></div>
+          <div class="cont"><img class="cara g" src="../../oficina/personajes/patricia-cara.png" alt=""><div class="tx"><b>Patricia</b><em>Administración</em><span>Cerré la conciliación de noviembre</span></div><div class="lado">ayer</div></div>
+          <div class="cont"><img class="cara g" src="../../oficina/personajes/don-armando-cara.png" alt=""><div class="tx"><b>Don Armando</b><em>Dirección</em><span>Reunión: plan 2027 · 3 decisiones</span></div><div class="lado">lun</div></div>
+        </div>
+      </div>
+      <div class="mic"><img src="../../oficina/personajes/betty-cara.png" alt=""><svg><use href="#i-mic"/></svg></div>
+      <div class="barra">
+        <span><svg><use href="#i-bandeja"/></svg>Bandeja<b>3</b></span>
+        <span class="on"><svg><use href="#i-charlas"/></svg>Charlas</span>
+        <span><svg><use href="#i-reloj"/></svg>Trabajo</span>
+        <span><svg><use href="#i-menu"/></svg>Más</span>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 3. Una charla -->
+  <div class="pieza">
+    <h2>3 · Una charla</h2>
+    <p class="que">Pantalla completa, sin barra abajo. Escribís o mantenés apretado el micrófono para grabar. Las tarjetas de delegar y preguntar se ven igual que en la compu.</p>
+    <div class="tel"><div class="pant">
+      <div class="estado">9:41<i></i>●●●</div>
+      <div class="cab chica"><span class="atras">‹</span><img class="cara" style="width:32px;height:32px" src="../../oficina/personajes/betty-cara.png" alt=""><div style="flex:1"><h3>Betty</h3><small>Secretaría · disponible</small></div></div>
+      <div class="chat">
+        <div class="msg yo audio"><svg width="14" height="14"><use href="#i-play"/></svg><span class="onda"><i style="height:6px"></i><i style="height:12px"></i><i style="height:9px"></i><i style="height:15px"></i><i style="height:7px"></i><i style="height:11px"></i><i style="height:14px"></i><i style="height:6px"></i><i style="height:10px"></i><i style="height:13px"></i><i style="height:5px"></i></span>0:12</div>
+        <div class="msg yo" style="opacity:.75;font-size:12px">«Decile a Nicolás que mande el pedido a los proveedores hoy, y que Marce me pase el informe antes de las 5.»</div>
+        <div class="msg el">Dale. Le paso las dos cosas:</div>
+        <div class="deleg"><b>→ Nicolás</b> · mandar el pedido a proveedores hoy<br><span style="color:var(--suave)">Arranca en 32 s</span>
+          <div class="ops"><span class="btn">Deshacer</span><span class="btn">Ver</span></div></div>
+        <div class="deleg"><b>→ Marce</b> · informe de ventas antes de las 17 h<br><span style="color:var(--ok)">Pasado ✓</span></div>
+        <div class="msg el">Listo, le avisé a Nicolás lo del mail. Cuando lo mande te va a pedir permiso.</div>
+      </div>
+      <div class="escribir"><span class="in">Escribile a Betty…</span><span class="redondo"><svg><use href="#i-mic"/></svg></span></div>
+    </div></div>
+  </div>
+
+  <!-- 4. Revisar -->
+  <div class="pieza">
+    <h2>4 · Revisar una entrega</h2>
+    <p class="que">Se lee el documento y abajo se aprueba o se pide un retoque, escrito o por audio. Los retoques sobre el texto mismo se hacen en la compu.</p>
+    <div class="tel"><div class="pant">
+      <div class="estado">9:41<i></i>●●●</div>
+      <div class="cab chica"><span class="atras">‹</span><div style="flex:1"><h3>Propuesta Q1</h3><small style="color:var(--suave)">De Sofía · para revisar</small></div><span class="ins">1/4</span></div>
+      <div style="height:10px"></div>
+      <div class="doc">
+        <h4>Propuesta comercial · primer trimestre</h4>
+        <p><b style="color:var(--texto)">Objetivo.</b> Recuperar las tres cuentas que bajaron su volumen en el segundo semestre y sumar dos distribuidores en la zona norte.</p>
+        <p><b style="color:var(--texto)">Precio.</b> Se mantiene la lista de octubre con un <mark>descuento del 8 %</mark> por pago anticipado y del 4 % por volumen…</p>
+        <p><b style="color:var(--texto)">Plazos.</b> La primera ronda de visitas arranca la semana del 12 de enero. Marce acompaña las dos primeras…</p>
+        <p style="color:var(--tenue)">⋯</p>
+      </div>
+      <div class="pie">
+        <div class="nota">Pedir un retoque…<span style="margin-left:auto"><svg width="16" height="16" style="color:var(--suave)"><use href="#i-mic"/></svg></span></div>
+        <div class="ops"><span class="btn w">Pedir retoque</span><span class="btn p w">Aprobar</span></div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 5. Trabajo -->
+  <div class="pieza">
+    <h2>5 · Trabajo (solo operar)</h2>
+    <p class="que">Muestra qué está corriendo y por dónde va. Se puede correr una tarea ahora, pausarla o arrancar un flujo. Crear o editar tareas y flujos se hace en la compu.</p>
+    <div class="tel"><div class="pant">
+      <div class="estado">9:41<i></i>●●●</div>
+      <div class="cab"><h3>Trabajo</h3><span class="btn" style="height:30px">Arrancar flujo</span></div>
+      <div class="cuerpo">
+        <div class="seccion">En curso</div>
+        <div class="corr"><div class="t1"><b>Alta de cliente · Ferretería Sur</b><span class="ins av">Te toca</span></div>
+          <div class="pasos"><i class="h"></i><i class="h"></i><i class="a"></i><i></i></div><small>Paso 3 de 4 · aprobación tuya</small></div>
+        <div class="corr"><div class="t1"><b>Cierre semanal</b><span class="ins ok"><span class="trab"></span>Corre</span></div>
+          <div class="pasos"><i class="h"></i><i class="h"></i><i></i></div><small>Patricia · conciliando cuentas</small></div>
+        <div class="seccion">Tareas programadas</div>
+        <div class="lista">
+          <div class="tarea"><div class="tx"><b>Parte del día</b><span>Todos los días · 8:30 · Betty</span></div><span class="play"><svg><use href="#i-play"/></svg></span></div>
+          <div class="tarea"><div class="tx"><b>Revisar stock</b><span>Lun y jue · 9:00 · Nicolás</span></div><span class="play"><svg><use href="#i-play"/></svg></span></div>
+          <div class="tarea"><div class="tx"><b>Seguimiento de cobranzas</b><span style="color:var(--aviso)">En pausa</span></div><span class="play"><svg><use href="#i-play"/></svg></span></div>
+        </div>
+      </div>
+      <div class="mic"><img src="../../oficina/personajes/betty-cara.png" alt=""><svg><use href="#i-mic"/></svg></div>
+      <div class="barra">
+        <span><svg><use href="#i-bandeja"/></svg>Bandeja<b>3</b></span>
+        <span><svg><use href="#i-charlas"/></svg>Charlas</span>
+        <span class="on"><svg><use href="#i-reloj"/></svg>Trabajo</span>
+        <span><svg><use href="#i-menu"/></svg>Más</span>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 6. Más -->
+  <div class="pieza">
+    <h2>6 · Más</h2>
+    <p class="que">Una hoja que sube desde abajo con lo poco que queda. El resto, como contratar, departamentos, flujos, el Creador o los ajustes, se hace en la compu.</p>
+    <div class="tel"><div class="pant">
+      <div class="estado">9:41<i></i>●●●</div>
+      <div class="cab"><h3>Trabajo</h3></div>
+      <div class="cuerpo" style="opacity:.5"><div class="corr" style="height:80px"></div><div class="corr" style="height:80px"></div></div>
+      <div class="velo"></div>
+      <div class="hoja">
+        <div class="asa"></div>
+        <div class="op"><svg><use href="#i-sol"/></svg>Parte del día</div>
+        <div class="op"><svg><use href="#i-carpeta"/></svg>Archivos<small>solo leer</small></div>
+        <div class="op"><svg><use href="#i-reunion"/></svg>Reuniones<small>solo leer</small></div>
+        <div class="op sep"><svg><use href="#i-campana"/></svg>Avisos en este teléfono<small>Prendidos</small></div>
+        <div class="op"><svg><use href="#i-edificio"/></svg>Cambiar de oficina<small>Prospera</small></div>
+        <div class="compu">Contratar, departamentos, flujos, el Creador y los ajustes están en la compu.</div>
+      </div>
+      <div class="barra" style="position:absolute;left:0;right:0;bottom:0">
+        <span><svg><use href="#i-bandeja"/></svg>Bandeja<b>3</b></span>
+        <span><svg><use href="#i-charlas"/></svg>Charlas</span>
+        <span><svg><use href="#i-reloj"/></svg>Trabajo</span>
+        <span class="on"><svg><use href="#i-menu"/></svg>Más</span>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 7. Notificaciones -->
+  <div class="pieza">
+    <h2>7 · Avisos (fase 3)</h2>
+    <p class="que">Los avisos llegan con el teléfono bloqueado. Un permiso se puede contestar desde la notificación; lo demás abre la app en la pantalla que corresponde.</p>
+    <div class="tel"><div class="pant bloqueo">
+      <div class="estado">9:41<i></i>●●●</div>
+      <div class="hora"><b>9:41</b><span>viernes 27 de noviembre</span></div>
+      <div class="notis">
+        <div class="noti"><div class="ap"><i>O</i>OFICINA<em>ahora</em></div><b>Nicolás necesita permiso</b>Enviar mail a proveedores@…
+          <div class="acc"><span>Permitir</span><span>No</span></div></div>
+        <div class="noti"><div class="ap"><i>O</i>OFICINA<em>10 min</em></div><b>Marce pregunta</b>¿El informe va con o sin las devoluciones de octubre?</div>
+        <div class="noti"><div class="ap"><i>O</i>OFICINA<em>1 h</em></div><b>Sofía entregó «Propuesta Q1»</b>Para revisar</div>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 8. Instalar -->
+  <div class="pieza">
+    <h2>8 · Primera vez: instalar</h2>
+    <p class="que">Si la abrís en el navegador y no está instalada, aparece una vez una tarjeta que explica cómo agregarla a la pantalla de inicio. En iPhone es la única forma de recibir avisos.</p>
+    <div class="tel"><div class="pant">
+      <div class="estado">9:41<i></i>●●●</div>
+      <div class="inst">
+        <div class="ico"><img src="../../oficina/personajes/betty-cara.png" alt=""></div>
+        <h4>Oficina en tu celular</h4>
+        <p>Agregala a la pantalla de inicio para abrirla como una app y recibir avisos.</p>
+        <div class="pasos-i">
+          <div><b class="n">1</b><span>Tocá <b>Compartir</b> ⬆︎ (iPhone) o el menú ⋮ (Android)</span></div>
+          <div><b class="n">2</b><span><b>Agregar a inicio</b> o <b>Instalar app</b></span></div>
+          <div><b class="n">3</b><span>Abrila desde el ícono y prendé los avisos</span></div>
+        </div>
+        <span class="btn p" style="align-self:stretch;margin-top:4px">Entendido</span>
+        <span class="btn" style="align-self:stretch;border-color:transparent;background:transparent">Seguir en el navegador</span>
+        <div class="ts"><i></i>Conectado por Tailscale · alfred</div>
+      </div>
+    </div></div>
+  </div>
+
+  </div>
+
+  <div class="fuera">
+    <h2>Qué no está en el celular</h2>
+    <p>La oficina pixel; contratar, editar y vestir agentes; permisos y conectores; departamentos; el Creador; el editor de flujos;
+      llamar a reunión; editar memoria y conocimiento; WhatsApp; Ajustes; importar y exportar. Nada de esto se borra: en el
+      celular se oculta, y si entrás por un link a una de esas pantallas te lleva a la Bandeja.</p>
+  </div>
+</div>
+</body>
+</html>
