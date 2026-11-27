@@ -8,7 +8,7 @@
 //                             con systemd, en una unidad aparte (`systemd-run`); si no, en su propia sesión (setsid).
 //
 // La salida del script queda en `<datos>/actualizar-web.log` y su código de salida en `actualizar-web.fin`.
-import { execFile, spawn } from 'node:child_process'
+import { execFile, execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { atrapar, no405, type Query, type RespuestaAPI, type SubRouter } from './router.js'
@@ -31,16 +31,24 @@ export function crearActualizador(op: OpcionesActualizador): ActualizadorWeb | u
   const env = op.env ?? process.env
   if (env.HQ_SIN_ACTUALIZACIONES === '1' || process.platform === 'win32') return undefined
   if (!fs.existsSync(path.join(op.repo, '.git')) || !fs.existsSync(path.join(op.repo, 'actualizar.sh'))) return undefined
-  return new ActualizadorWeb(op)
+  try {
+    return new ActualizadorWeb(op)
+  } catch {
+    return undefined   // git no está o el clon no tiene commits
+  }
 }
 
 export class ActualizadorWeb implements SubRouter {
   private readonly env: NodeJS.ProcessEnv
   private readonly log: string
   private readonly fin: string
+  /** El commit con el que arrancó este proceso: el `git pull` cambia el del disco antes de reiniciar, y la página tiene que
+   *  recargarse recién cuando responde el servidor nuevo. */
+  private readonly arranque: string
 
   constructor(private readonly op: OpcionesActualizador) {
     this.env = op.env ?? process.env
+    this.arranque = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: op.repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
     this.log = path.join(op.datosDir, 'actualizar-web.log')
     this.fin = path.join(op.datosDir, 'actualizar-web.fin')
   }
@@ -89,10 +97,10 @@ export class ActualizadorWeb implements SubRouter {
   }
 
   async estado() {
-    const [commit, version, fecha, rama] = await Promise.all([
-      this.git(['rev-parse', 'HEAD']),
-      this.git(['describe', '--tags', '--always']),
-      this.git(['log', '-1', '--format=%cI']),
+    const commit = this.arranque
+    const [version, fecha, rama] = await Promise.all([
+      this.git(['describe', '--tags', '--always', commit]),
+      this.git(['log', '-1', '--format=%cI', commit]),
       this.git(['rev-parse', '--abbrev-ref', 'HEAD']),
     ])
     const locales = (await this.git(['status', '--porcelain', '--untracked-files=no'])) !== ''
@@ -103,7 +111,7 @@ export class ActualizadorWeb implements SubRouter {
       remoto = await this.git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'])
       const [origen, ...resto] = remoto.split('/')
       await this.git(['fetch', '--quiet', origen!, resto.join('/')], 30_000)
-      const log = await this.git(['log', '--format=%h%x09%cI%x09%s', 'HEAD..@{u}'])
+      const log = await this.git(['log', '--format=%h%x09%cI%x09%s', `${commit}..@{u}`])
       nuevos = log === '' ? [] : log.split('\n').map((l) => {
         const [c, f, ...t] = l.split('\t')
         return { commit: c!, fecha: f!, titulo: t.join('\t') }
