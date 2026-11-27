@@ -19,7 +19,8 @@ npm run dist:win     # release/Oficina-Setup-<versión>.exe (también se puede a
 ```
 
 La versión de las releases sale de `package.json` (`version`).
-`build/icon.png` se genera en una Mac con `swift scripts/make-icon.swift build/icono.svg build/icon.png`.
+`build/icon.png`, `build/icono.svg` y los íconos del celular (`../oficina/iconos/`) salen de `node scripts/make-icon.mjs`
+(el edificio pixel, dibujado celda por celda en el script).
 
 ## Datos
 Los mismos que usaba la app Swift de Mac hasta la 0.7, así que actualizar no pierde nada: en Mac,
