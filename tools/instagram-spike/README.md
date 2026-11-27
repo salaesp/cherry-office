@@ -143,7 +143,11 @@ se pudo conectar) o `raro` (otra cosa: mirá el `.txt`).
   Instagram rechazó la forma del pedido, no la cantidad.
 - **La misma máquina (una Raspberry en casa, sin monitor), diagnóstico con Node:** las cuatro variantes fallan. Hasta
   el HTML del perfil y la portada redirigen (302) al login; la portada solo deja la cookie `mid`, sin `csrftoken`.
-  Electron no arranca sin entorno gráfico. Siguiente paso: el diagnóstico con Chromium headless.
+  Electron no arranca sin entorno gráfico.
+- **La misma Raspberry, Chromium headless del sistema:** el navegador también termina en el login
+  (`/accounts/login/?next=…&is_from_rle`) y la API pedida desde la página da 404. Desde esa IP Instagram exige sesión
+  incluso a un navegador real. `is_from_rle` parece indicar un freno por límite de pedidos, que podría venir de las
+  pruebas del mismo día: falta volver a probar una sola vez después de 24 h sin pedidos.
 
 ## Qué hay que verificar (y anotar en el informe de abajo)
 1. **¿Anda?** `npm start -- <una cuenta pública que conozcas>`: ¿da `ok`? Si da otra cosa, mirá el `.txt`.
