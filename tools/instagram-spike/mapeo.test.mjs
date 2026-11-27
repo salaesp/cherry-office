@@ -99,3 +99,10 @@ test('ordenar: fijadas primero y después de la más nueva a la más vieja', asy
   ])
   assert.deepEqual(r.map((p) => p.codigo), ['c', 'b', 'a', 'd'])
 })
+
+test('metricasReel: alcance aproximado e interacción sobre vistas', async () => {
+  const { metricasReel } = await import('./mapeo.mjs')
+  assert.deepEqual(metricasReel({ likes: 100, comentarios: 11, reproducciones: 4786 }, 9007),
+    { reproducciones: 4786, alcanceAproxPct: 53.1, interaccionVistasPct: 2.3, interaccionSeguidoresPct: 1.23 })
+  assert.equal(metricasReel({ likes: 5, comentarios: 0, reproducciones: null }, 100).interaccionVistasPct, null)
+})

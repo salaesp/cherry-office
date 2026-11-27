@@ -187,3 +187,21 @@ export function mapearPerfilApify(d, posts) {
     hayMas: (sinNegativo(d.postsCount) ?? 0) > lista.length,
   }
 }
+
+// MARK: - métricas de un reel
+
+/**
+ * Lo que se puede medir de un reel desde afuera. `alcanceAproxPct` = reproducciones ÷ seguidores (no es el alcance real,
+ * que solo ve la dueña: una persona puede verlo varias veces). `interaccionVistasPct` = (likes + comentarios) ÷
+ * reproducciones: de los que lo vieron, cuántos reaccionaron.
+ */
+export function metricasReel(p, seguidores) {
+  const inter = (p.likes ?? 0) + (p.comentarios ?? 0)
+  const v = p.reproducciones
+  return {
+    reproducciones: v,
+    alcanceAproxPct: v !== null && seguidores ? +(100 * v / seguidores).toFixed(1) : null,
+    interaccionVistasPct: v ? +(100 * inter / v).toFixed(1) : null,
+    interaccionSeguidoresPct: seguidores ? +(100 * inter / seguidores).toFixed(2) : null,
+  }
+}

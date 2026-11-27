@@ -1,0 +1,4 @@
+# Lo que instala npm y lo que junta el spike (lecturas, videos, modelos y la clave de Apify en datos/.apify-token)
+node_modules/
+datos/
+informe-resumen.json

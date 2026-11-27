@@ -137,6 +137,50 @@ Ya se verificó (en el contenedor, sin gastar): el formato de Apify se pasa bien
 respuesta de prueba armada según el esquema publicado del actor) y la API responde y se informa bien un error de clave.
 Falta una corrida real con tu clave.
 
+## Desarmar los reels para analizarlos
+`reels.mjs` toma la última lectura de Apify de una cuenta y, por cada reel: baja el video, saca imágenes con ffmpeg
+(los segundos 0 a 3 sueltos y en una tira, `gancho.jpg`, y 12 cuadros de todo el reel, `reel.jpg`), transcribe lo que
+se dice con Whisper en esta compu (con el segundo de cada frase) y arma `ficha.md` con todo junto y sus métricas:
+reproducciones, **alcance aproximado** (reproducciones ÷ seguidores; el alcance real solo lo ve la dueña) e
+**interacción sobre vistas** ((likes + comentarios) ÷ reproducciones), duración, día y hora, audio y texto. No gasta
+crédito de Apify: usa los links que vinieron en la lectura, que **vencen en horas o pocos días**; si dice que venció,
+volvé a leer la cuenta.
+
+Hace falta una lectura con publicaciones (los datos del perfil no traen los links de video), ffmpeg y `npm ci`:
+
+```bash
+sudo apt install -y ffmpeg
+```
+
+```bash
+npm ci
+```
+
+Probar con uno solo, el de más reproducciones:
+
+```bash
+npm run reels -- cherryglow.ar --max 1
+```
+
+Todos los de la lectura, u otro en particular:
+
+```bash
+npm run reels -- cherryglow.ar
+```
+
+```bash
+npm run reels -- cherryglow.ar --codigo DAbc123
+```
+
+Queda en `datos/<cuenta>/reels/`: una carpeta por reel (`ficha.md`, `gancho.jpg`, `reel.jpg`, `seg-0..3.jpg`,
+`video.mp4`, `datos.json`) y `indice.md` con todos, de más a menos reproducciones. La primera vez baja el modelo de
+Whisper (unos 80 MB) a `datos/modelos`. `--sin-audio` saltea la transcripción.
+
+Ya se verificó (en el contenedor, con un video sintético servido localmente): baja el video, saca las imágenes en los
+segundos correctos, carga Whisper y transcribe (unos 5 s para 9 s de audio en el contenedor; en la Raspberry va a ser
+más lento), y arma la ficha y el índice; un link roto se informa y sigue con el resto. Sin voz, Whisper puede inventar
+alguna palabra suelta. Falta probarlo con un reel real.
+
 ## Qué deja en `datos/`
 | Archivo | Qué tiene |
 |---|---|

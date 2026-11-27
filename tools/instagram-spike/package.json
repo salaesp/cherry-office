@@ -15,9 +15,11 @@
     "test": "node --test mapeo.test.mjs",
     "borrar": "node -e \"require('node:fs').rmSync('datos',{recursive:true,force:true});console.log('datos/ borrado')\"",
     "diagnostico:navegador": "node diagnostico-navegador.mjs",
-    "apify": "node apify.mjs"
+    "apify": "node apify.mjs",
+    "reels": "node reels.mjs"
   },
   "dependencies": {
-    "playwright-core": "^1.50.0"
+    "playwright-core": "^1.50.0",
+    "@huggingface/transformers": "4.3.2"
   }
 }
