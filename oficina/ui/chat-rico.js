@@ -143,6 +143,11 @@
   function cargarImagen(rel) {
     if (!cacheImg[rel]) {
       cacheImg[rel] = App.api.get('/api/oficina/archivo', { ruta: rel }).then(function (c) {
+        // el backend manda los .svg como texto: se convierten acá en imagen
+        if (!c.base64 && typeof c.texto === 'string' && ext(rel) === 'svg' && !c.truncado) {
+          var src = svgComoImagen(c.texto);
+          if (src) return src;
+        }
         if (!c.base64) throw new Error('sin vista');
         return 'data:' + c.mime + ';base64,' + c.base64;
       });
