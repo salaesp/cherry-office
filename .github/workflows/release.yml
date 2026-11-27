@@ -180,6 +180,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.etiqueta || github.ref_name }}
+          MANUAL: ${{ inputs.etiqueta }}
           VERSION: ${{ steps.version.outputs.version }}
           FILE: desktop/release/${{ steps.dmg.outputs.name }}
           ZIP: desktop/release/${{ steps.zip.outputs.zip }}
@@ -194,6 +195,9 @@ jobs:
               gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Oficina $VERSION" \
                 --notes "Borrador generado por el build automático. Completar las notas antes de publicar." || true
             fi
+          elif [ -n "$MANUAL" ]; then
+            # relanzada a mano sobre un borrador que ya existía: que apunte a este commit (la etiqueta se crea al publicar)
+            gh release edit "$TAG" --target "$GITHUB_SHA" || true
           fi
           gh release upload "$TAG" "$FILE" "$ZIP" desktop/release/appcast.xml --clobber
 
@@ -276,6 +280,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.etiqueta || github.ref_name }}
+          MANUAL: ${{ inputs.etiqueta }}
           VERSION: ${{ steps.version.outputs.version }}
           FILE: desktop/release/${{ steps.exe.outputs.name }}
         run: |
@@ -288,6 +293,9 @@ jobs:
               gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Oficina $VERSION" \
                 --notes "Borrador generado por el build automático. Completar las notas antes de publicar." || true
             fi
+          elif [ -n "$MANUAL" ]; then
+            # relanzada a mano sobre un borrador que ya existía: que apunte a este commit (la etiqueta se crea al publicar)
+            gh release edit "$TAG" --target "$GITHUB_SHA" || true
           fi
           # latest.yml y el .blockmap: los lee electron-updater en las apps instaladas
           gh release upload "$TAG" "$FILE" "$FILE.blockmap" desktop/release/latest.yml --clobber
@@ -316,7 +324,7 @@ jobs:
       - name: Armar el APK
         working-directory: android
         run: |
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug testDebugUnitTest --no-daemon
           cp app/build/outputs/apk/debug/app-debug.apk "../${{ steps.version.outputs.name }}"
 
       - name: Guardar como artefacto
@@ -331,6 +339,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.etiqueta || github.ref_name }}
+          MANUAL: ${{ inputs.etiqueta }}
           VERSION: ${{ steps.version.outputs.version }}
           FILE: ${{ steps.version.outputs.name }}
         run: |
@@ -343,5 +352,8 @@ jobs:
               gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Oficina $VERSION" \
                 --notes "Borrador generado por el build automático. Completar las notas antes de publicar." || true
             fi
+          elif [ -n "$MANUAL" ]; then
+            # relanzada a mano sobre un borrador que ya existía: que apunte a este commit (la etiqueta se crea al publicar)
+            gh release edit "$TAG" --target "$GITHUB_SHA" || true
           fi
           gh release upload "$TAG" "$FILE" --clobber
