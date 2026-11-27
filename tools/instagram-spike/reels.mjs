@@ -51,13 +51,36 @@ if (max > 0) elegidos = elegidos.slice(0, max)
 
 // MARK: - video
 
+const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+const vencido = 'el link del video venció: volvé a leer la cuenta con npm run apify (los links duran horas o pocos días)'
+const causa = (e) => [e?.message, e?.cause?.code, e?.cause?.message].filter(Boolean).join(' · ')
+
+/** Baja el video con fetch y, si la conexión falla, reintenta con curl (que maneja mejor IPv6/IPv4 y algunos cortes). */
 async function bajar(url, destino) {
   if (fs.existsSync(destino) && fs.statSync(destino).size > 0) return 'ya estaba'
-  const r = await fetch(url, { signal: AbortSignal.timeout(120000) })
-  if (r.status === 403 || r.status === 410) throw new Error('el link del video venció: volvé a leer la cuenta con npm run apify (los links duran horas o pocos días)')
+  const tam = () => `${(fs.statSync(destino).size / 1e6).toFixed(1)} MB`
+  let r
+  try {
+    r = await fetch(url, { headers: { 'User-Agent': UA, 'Referer': 'https://www.instagram.com/', 'Accept': '*/*' }, signal: AbortSignal.timeout(120000) })
+  } catch (e) {
+    console.log(`  fetch falló (${causa(e)}); pruebo con curl…`)
+    const tmp = `${destino}.parcial`
+    try {
+      const code = execFileSync('curl', ['-sS', '-L', '--max-time', '180', '-A', UA, '-e', 'https://www.instagram.com/', '-o', tmp, '-w', '%{http_code}', url], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+      if (code === '403' || code === '410') { fs.rmSync(tmp, { force: true }); throw new Error(vencido) }
+      if (code !== '200') { fs.rmSync(tmp, { force: true }); throw new Error(`curl tampoco pudo (status ${code})`) }
+      fs.renameSync(tmp, destino)
+      return `${tam()} (con curl)`
+    } catch (e2) {
+      fs.rmSync(tmp, { force: true })
+      if (e2.message === vencido || e2.message.startsWith('curl tampoco')) throw e2
+      throw new Error(`curl tampoco pudo: ${(e2.stderr?.toString() || e2.message).trim().split('\n')[0]}`)
+    }
+  }
+  if (r.status === 403 || r.status === 410) throw new Error(vencido)
   if (!r.ok) throw new Error(`no se pudo bajar el video (status ${r.status})`)
   fs.writeFileSync(destino, Buffer.from(await r.arrayBuffer()))
-  return `${(fs.statSync(destino).size / 1e6).toFixed(1)} MB`
+  return tam()
 }
 
 const duracionDe = (video) => Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', video], { encoding: 'utf8' }).trim())
@@ -190,7 +213,7 @@ for (const p of elegidos) {
     filas.push({ p, m, dur })
     console.log(`  ficha: ${path.relative(process.cwd(), path.join(dir, 'ficha.md'))}`)
   } catch (e) {
-    console.log(`  ${e.message}`)
+    console.log(`  ${causa(e)}`)
   }
 }
 
