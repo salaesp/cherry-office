@@ -469,13 +469,14 @@
     var esSecretaria = !!(App.secretaria && App.secretaria() && App.secretaria().id === a.id);
     var invitacion = (esSecretaria ? 'Pedile algo a ' : 'Escribile a ') + a.nombre + '…';
     var txt = h('textarea.campo', { rows: 1, placeholder: invitacion, maxlength: esSecretaria ? 60000 : 20000 });
-    var enviar = h('button.btn.primario.icono', { title: 'Enviar (Enter)', onclick: mandar }, App.icono('enviar'));
-    var parar = h('button.btn.peligro.icono', { style: { display: 'none' }, onclick: function () { detener(a.id); } }, App.icono('parar'));
-    var adj = App.Adjuntos();
+    /* un solo botón grande (como WhatsApp): con la caja vacía graba un audio; con algo escrito o adjunto, envía */
+    var enviar = h('button.btn.primario.icono.redactar-accion', { title: 'Enviar (Enter)', onclick: function () { if (modoMic()) grabar(); else mandar(); } });
+    var parar = h('button.btn.peligro.icono.redactar-parar', { style: { display: 'none' }, onclick: function () { detener(a.id); } }, App.icono('parar'));
+    var adj = App.Adjuntos({ alCambiar: function () { accion(); } });
     adj.zona(cuerpo); adj.zona(pie, txt);
     txt.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); mandar(); } });
     function ajustarAlto() { txt.style.height = 'auto'; txt.style.height = Math.min(160, txt.scrollHeight + 2) + 'px'; }
-    txt.addEventListener('input', function () { borradores[a.id] = txt.value; ajustarAlto(); });
+    txt.addEventListener('input', function () { borradores[a.id] = txt.value; ajustarAlto(); accion(); });
     if (borradores[a.id]) { txt.value = borradores[a.id]; setTimeout(ajustarAlto, 0); }
     /* lo que se compartió desde otra app del celular (compartir.js): queda listo para revisar y mandar */
     if (compartido && compartido.id === a.id) {
@@ -486,10 +487,22 @@
     var claveEleccion = function () { return sesiones[a.id] || 'nueva:' + a.id; };
     var selector = App.SelectorCharla({ modelo: a.modelo, esfuerzo: a.esfuerzo, valor: eleccionDe(claveEleccion()),
       alCambiar: function (v) { guardarEleccion(claveEleccion(), v); } });
-    var mic = App.Grabadora.puede() ? h('button.btn.icono.btn-mic', { title: 'Grabar un audio para ' + a.nombre, onclick: grabar }, App.Grabadora.icono()) : null;
-    /* como en Claude o ChatGPT: una sola caja con el texto arriba y, abajo, adjuntar a la izquierda y micrófono + enviar a la derecha */
+    var puedeGrabar = App.Grabadora.puede();
+    function modoMic() { return puedeGrabar && !txt.value.trim() && !adj.hay(); }
+    var ultimoModo = null;
+    function accion() {
+      var mic = modoMic();
+      if (mic === ultimoModo) return;
+      ultimoModo = mic;
+      App.vaciar(enviar).appendChild(mic ? App.Grabadora.icono() : App.icono('flechaArriba'));
+      enviar.classList.toggle('es-mic', mic);
+      enviar.setAttribute('aria-label', mic ? 'Grabar un audio para ' + a.nombre : 'Enviar');
+      if (mic) enviar.title = 'Grabar un audio para ' + a.nombre; else if (enviar.title.indexOf('Grabar') === 0) enviar.title = 'Enviar (Enter)';
+    }
     adj.boton.classList.add('fantasma');
-    var redactar = h('div.redactar.caja', txt, h('div.redactar-barra', adj.boton, h('span.redactar-hueco'), mic, parar, enviar));
+    /* la píldora con el clip y el texto; al costado, Detener (si está trabajando) y el botón grande */
+    var redactar = h('div.redactar.pildora', h('div.redactar-caja', adj.boton, txt), parar, enviar);
+    accion();
     /* grabar: la franja reemplaza al campo; al mandar, se transcribe en la compu y sale como «(nota de voz) …» */
     function grabar() {
       var franja, g = App.Grabadora.crear({ alTiempo: function (sg) { franja.tiempo(sg); }, alTope: terminar });
@@ -562,7 +575,7 @@
       cuerpo.scrollTop = cuerpo.scrollHeight;
       /* con el agente trabajando se puede seguir escribiendo (queda en cola) y aparece «Detener» */
       var ocup = !!enCurso[a.id];
-      enviar.title = ocup ? 'Dejar en cola (Enter): sale cuando ' + a.nombre + ' termine' : 'Enviar (Enter)';
+      if (!modoMic()) enviar.title = ocup ? 'Dejar en cola (Enter): sale cuando ' + a.nombre + ' termine' : 'Enviar (Enter)';
       txt.placeholder = ocup ? 'Dejalo en cola…' : invitacion;
       parar.style.display = ocup ? '' : 'none';
       parar.disabled = !!cancelando[a.id];
@@ -585,7 +598,7 @@
       adj.leer().then(function (archivos) {
         txt.value = ''; txt.style.height = '';
         delete borradores[id];
-        adj.vaciar();
+        adj.vaciar(); accion();
         var m = { t: t, nombres: nombres, archivos: archivos, eleccion: eleccion, sesion: sesion, guardar: adj.guardarEnBiblioteca };
         // el agente está ocupado: queda en la cola y sale solo cuando termine
         if (enCurso[id]) { (colas[id] = colas[id] || []).push(m); repintar(id); }

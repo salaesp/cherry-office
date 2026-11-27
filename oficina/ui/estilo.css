@@ -256,16 +256,16 @@ select.campo { padding-right: 26px; }
 .redactar { display: flex; gap: 8px; align-items: flex-end; }
 .redactar textarea { min-height: 38px; max-height: 160px; resize: none; }
 .redactar .btn { height: 38px; }
-/* la caja de la charla: texto arriba, botones abajo (adjuntar a la izquierda; micrófono y enviar a la derecha) */
-.redactar.caja { flex-direction: column; align-items: stretch; gap: 2px; padding: 6px 8px 8px; border: 1px solid var(--linea-fuerte); border-radius: 18px; background: var(--panel); transition: border-color .12s, box-shadow .12s; }
-.redactar.caja:focus-within { border-color: var(--suave); box-shadow: 0 0 0 2px var(--foco); }
-.redactar.caja textarea, .redactar.caja textarea:focus { border: 0; box-shadow: none; background: transparent; min-height: 40px; padding: 6px 6px 2px; }
-.redactar-barra { display: flex; align-items: center; gap: 6px; }
-.redactar-hueco { flex: 1; }
-.redactar.caja .btn { height: 32px; width: 32px; padding: 0; border-radius: 50%; }
-.redactar.caja .btn.fantasma, .redactar.caja .btn-mic { border-color: transparent; background: transparent; color: var(--suave); }
-.redactar.caja .btn.fantasma:hover, .redactar.caja .btn-mic:hover { background: var(--panel-2); color: var(--texto); }
-.redactar.caja .btn svg { width: 17px; height: 17px; }
+/* la charla: una píldora con el clip y el texto, y al costado un botón grande que es micrófono (vacía) o enviar (con algo escrito) */
+.redactar.pildora { align-items: flex-end; gap: 8px; }
+.redactar-caja { flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 2px; min-height: 44px; padding: 3px 6px 3px 4px; border: 1px solid var(--linea); border-radius: 22px; background: var(--panel); transition: border-color .12s, box-shadow .12s; }
+.redactar-caja:focus-within { border-color: var(--suave); box-shadow: 0 0 0 2px var(--foco); }
+.redactar-caja textarea, .redactar-caja textarea:focus { flex: 1; border: 0; box-shadow: none; background: transparent; min-height: 36px; padding: 8px 6px; }
+.redactar-caja .btn { width: 36px; height: 36px; padding: 0; border-radius: 50%; border-color: transparent; background: transparent; color: var(--suave); flex: none; }
+.redactar-caja .btn:hover { background: var(--panel-2); color: var(--texto); }
+.redactar-caja .btn svg { width: 18px; height: 18px; }
+.redactar.pildora > .btn { width: 44px; height: 44px; padding: 0; border-radius: 50%; flex: none; }
+.redactar.pildora > .btn svg { width: 19px; height: 19px; }
 /* debajo del cuadro de texto de una charla: el selector de modelo y esfuerzo y la ayuda */
 .pie-charla { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
 .pie-charla .ayuda { margin-top: 0; flex: 1; min-width: 160px; }
