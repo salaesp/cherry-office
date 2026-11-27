@@ -1065,6 +1065,83 @@ button.adjunto:hover { background: var(--panel-2); }
 .interruptor:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--foco); }
 .interruptor-txt { font-size: 13px; cursor: pointer; user-select: none; }
 @media (prefers-reduced-motion: reduce) { .interruptor, .interruptor-bola { transition: none; } }
+.interruptor:disabled { opacity: .45; cursor: default; }
+/* segmento: opciones cortas pegadas en una barra */
+.elegir-segmento { display: inline-flex; flex: none; border: 1px solid var(--linea-fuerte); border-radius: var(--radio-chico); overflow: hidden; max-width: 100%; }
+.elegir-segmento.ancho { display: flex; }
+.elegir-segmento.ancho .seg-op { flex: 1; justify-content: center; }
+.seg-op { display: inline-flex; align-items: center; height: 28px; padding: 0 11px; border: 0; border-left: 1px solid var(--linea-fuerte); background: var(--panel);
+  color: var(--suave); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.seg-op:first-child { border-left: 0; }
+.seg-op:hover { color: var(--texto); background: var(--panel-2); }
+.seg-op.sel { background: var(--acento); color: var(--sobre-acento); font-weight: 500; }
+.seg-op:disabled { cursor: default; opacity: .5; }
+.seg-op:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--foco); }
+/* renglón: marca · título y resumen de una línea · control */
+.renglon { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--linea); min-height: 48px; }
+.renglon:first-child { border-top: 0; }
+.renglon.tocable { cursor: pointer; }
+.renglon.tocable:hover .renglon-tit { text-decoration: underline; text-decoration-color: var(--linea-fuerte); text-underline-offset: 3px; }
+.renglon-txt { flex: 1; min-width: 0; }
+.renglon-tit { font-weight: 500; }
+.renglon-sub { color: var(--suave); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.renglon-sub.error { color: var(--peligro); white-space: normal; }
+.renglon-ctl { display: flex; align-items: center; gap: 8px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.renglon-chev { color: var(--tenue); display: inline-flex; transition: transform .15s ease; }
+.renglon.abierto .renglon-chev { transform: rotate(180deg); }
+.renglon-marca { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none; background: var(--panel-2); border: 1px solid var(--linea); color: var(--suave); }
+.renglon-marca svg { width: 15px; height: 15px; }
+.renglon-abierto { margin: 0 0 8px 42px; padding: 10px 12px; border-radius: var(--radio-chico); background: var(--panel-2); border: 1px solid var(--linea); display: grid; gap: 10px; }
+.renglon-par { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.renglon-par > .renglon-etq { color: var(--suave); font-size: 12px; width: 56px; flex: none; }
+.nota-chica { color: var(--tenue); font-size: 11.5px; }
+.renglon-marca.wa { color: var(--wa, #2e8a57); background: var(--wa-suave, #e6f4ec); border-color: transparent; }
+.renglon-marca.mail { color: var(--mail, #b3542c); background: var(--mail-suave, #fbeee7); border-color: transparent; }
+.renglon-marca.cal { color: var(--cal, #2f6db5); background: var(--cal-suave, #e8f0fa); border-color: transparent; }
+.chip.chip-quitar { cursor: default; height: 28px; }
+/* ficha › Permisos y Habilidades */
+.perm .renglon-sub { white-space: normal; }
+.perm-grupo { margin: 4px 0 10px; }
+.perm-grupo-tit { font-size: 12px; color: var(--suave); margin: 0 0 5px; }
+.renglon-marca.chica { width: 26px; height: 26px; border-radius: 7px; }
+.renglon-marca.chica svg { width: 13px; height: 13px; }
+.renglon-chev.girado { transform: rotate(180deg); }
+.btn .renglon-chev svg { width: 13px; height: 13px; }
+/* Ajustes › WhatsApp: el punto de conexión, la lista de chats y el buscador */
+.wa-punto { width: 10px; height: 10px; border-radius: 50%; background: var(--aviso); flex: none; margin: 0 4px; }
+.wa-punto.on { background: var(--ok); }
+.wa-buscar { width: 100%; height: 34px; }
+.wa-lista { margin-top: 4px; }
+.wa-chat { display: flex; align-items: center; gap: 10px; padding: 7px 4px; border-top: 1px solid var(--linea); min-height: 44px; }
+.wa-chat:first-child { border-top: 0; }
+.wa-chat.tocable { cursor: pointer; border-radius: var(--radio-chico); }
+.wa-chat.tocable:hover { background: var(--panel-2); }
+.wa-chat-txt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wa-chat-txt b { font-weight: 500; }
+.wa-chat-txt span { color: var(--suave); font-size: 12px; margin-left: 6px; }
+.wa-chat-h { color: var(--tenue); font-size: 11.5px; white-space: nowrap; }
+.wa-ini { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: none; font-weight: 700; font-size: 12px; color: var(--suave); background: var(--panel-2); border: 1px solid var(--linea); }
+.wa-ini svg { width: 14px; height: 14px; }
+.wa-ini.t0, .wa-ini.t1, .wa-ini.t2, .wa-ini.t3, .wa-ini.t4 { color: #fff; border-color: transparent; }
+.wa-ini.t0 { background: #5b8fcf; } .wa-ini.t1 { background: #4f9a66; } .wa-ini.t2 { background: #9277bd; } .wa-ini.t3 { background: #c18a3a; } .wa-ini.t4 { background: #c0675d; }
+.wa-mas { margin-top: 6px; }
+.wa-sub-tit { font-size: 11px; font-weight: 600; color: var(--tenue); text-transform: uppercase; letter-spacing: .04em; margin: 12px 0 2px; }
+.wa-modelo { flex-wrap: wrap; }
+.wa-modelo .elegir-desliz { flex: 1 1 280px; max-width: 380px; }
+/* Ajustes › Secretaría: cabeza (quién atiende) y la línea de estado con las últimas revisiones como puntos */
+.sec-cabeza { display: flex; align-items: center; gap: 10px; padding: 4px 0 12px; flex-wrap: wrap; }
+.sec-cabeza .retrato { width: 40px; height: 40px; border-radius: 10px; }
+.sec-cabeza .renglon-txt { min-width: 160px; }
+.sec-nombre { font-weight: 600; font-size: 15px; }
+.sec-estado { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 6px 6px 12px; border-radius: var(--radio-chico); background: var(--panel-2); border: 1px solid var(--linea); font-size: 12px; color: var(--suave); margin-bottom: 4px; }
+.sec-estado b { color: var(--texto); font-weight: 600; }
+.sec-estado-esp { flex: 1; }
+.sec-puntos { display: inline-flex; gap: 3px; align-items: center; }
+.sec-puntos i { width: 7px; height: 7px; border-radius: 50%; background: var(--linea-fuerte); display: block; }
+.sec-puntos i.algo { background: var(--ok); } .sec-puntos i.urgente { background: var(--peligro); } .sec-puntos i.falla { background: var(--aviso); }
+.sec-puntos i.corre { background: var(--acento); animation: latido 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .sec-puntos i.corre { animation: none; } }
+@media (max-width: 560px) { .renglon-abierto { margin-left: 0; } }
 .opcion-ui { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; padding: 9px 12px; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--panel); cursor: pointer; font: inherit; color: inherit; }
 .opcion-ui:hover { border-color: var(--linea-fuerte); }
 .opcion-ui.sel { border-color: var(--acento); box-shadow: inset 0 0 0 1px var(--acento); }

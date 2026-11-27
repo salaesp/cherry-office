@@ -4,7 +4,8 @@
    POST /api/whatsapp/desvincular, PUT /api/whatsapp/ajustes (transcripción: modelo e idioma), POST /api/whatsapp/chats,
    PUT /api/whatsapp/chats/:jid (en un grupo, `solo`: a quiénes se lee). «Leer todos los chats individuales» (`leerTodos` en
    PUT /api/whatsapp/ajustes): para un negocio que no tiene agendados a quienes le escriben; cada chat individual nuevo se
-   elige solo (`auto`) desde su primer mensaje. */
+   elige solo (`auto`) desde su primer mensaje. Conectado: una sola lista con los chats que se leen; el buscador encuentra
+   también los demás (con «Leer») y agrega números que no están, y «Elegir más chats» despliega el resto. */
 (function () {
   var h = App.h;
   var api = function () { return App.api; };
@@ -17,9 +18,8 @@
   ];
 
   function pintar(crear) {
-    var vivo = true, reloj = null, datos = null, filtro = '';
-    var actualizar = h('button.btn.chico', { onclick: function () { cargar(); } }, App.icono('recargar'), 'Actualizar');
-    var hj = crear({ titulo: 'WhatsApp', ancho: 720, acciones: [actualizar], alCerrar: function () { vivo = false; clearTimeout(reloj); } });
+    var vivo = true, reloj = null, datos = null;
+    var hj = crear({ titulo: 'WhatsApp', ancho: 720, alCerrar: function () { vivo = false; clearTimeout(reloj); } });
     var cont = h('div'), err = h('div.error-txt');
     App.add(hj.cuerpo, cont, err);
     if (!hj.enVentana) App.add(hj.pie, h('button.btn.primario', { onclick: hj.cerrar }, 'Listo'));
@@ -29,7 +29,13 @@
       return api().get('/api/whatsapp').then(function (r) {
         if (!vivo) return;
         datos = r; err.textContent = '';
-        dibujar();
+        /* si estás escribiendo (el buscador, un campo), no se redibuja: se espera a la próxima vuelta */
+        var foco = document.activeElement;
+        var escribiendo = foco && cont.contains(foco) && /^(INPUT|TEXTAREA)$/.test(foco.tagName);
+        if (!escribiendo || !foco.value) {
+          redibujar();
+          if (escribiendo && foco.classList.contains('wa-buscar')) { var nb = cont.querySelector('.wa-buscar'); if (nb) nb.focus({ preventScroll: true }); }
+        }
         clearTimeout(reloj);
         // mientras vincula o sincroniza, se vuelve a preguntar seguido
         var tr = r.transcriptor && r.transcriptor.estado;
@@ -108,182 +114,208 @@
       }).catch(function () {});
     }
 
-    /* ---- conectado ---- */
+    /* ---- conectado ----
+       Arriba el número y el estado (Actualizar y Desvincular en «⋯»); qué se lee (los que elegís o todos los individuales);
+       una sola lista con los chats que se leen y un buscador que también encuentra los demás chats y agrega números; «Elegir
+       más chats» despliega el resto; las notas de voz en tres renglones. */
+    var buscarTxt = '', verMas = false;
     function dibujarConectado() {
-      var elegidos = datos.chats.filter(function (c) { return c.elegido && !c.auto; });
+      var conectado = datos.estado === 'conectado';
+      var sub = [conectado ? 'En línea' : 'Reconectando…'];
+      if (datos.sincronizando) sub.push('trayendo tus chats' + (datos.sincronizando.progreso != null ? ' (' + datos.sincronizando.progreso + ' %)' : ''));
+      else if (datos.telefonoVisto) sub.push('teléfono visto ' + App.hace(datos.telefonoVisto));
+      if (datos.retencionDias) sub.push('guarda ' + datos.retencionDias + ' días');
+      var mas = h('button.btn.icono', { title: 'Más opciones', onclick: function (ev) {
+        App.menu(ev.currentTarget, [
+          { texto: 'Actualizar', icono: 'recargar', accion: function () { cargar(); } },
+          '-',
+          { texto: 'Desvincular y borrar todo', icono: 'papelera', peligro: true, nota: 'cierra la sesión y borra los mensajes', accion: function () { desvincular(false); } }]);
+      } }, App.icono('puntos'));
       var autos = datos.chats.filter(function (c) { return c.elegido && c.auto; });
-      var estado = datos.estado === 'conectado' ? 'Conectado' : 'Reconectando…';
+      var elegidos = datos.chats.filter(function (c) { return c.elegido; });
       App.add(cont,
-        h('div.ajuste', h('div', h('div.ajuste-tit', estado + (datos.numero ? ' con ' + datos.numero : '')),
-          h('div.ajuste-ayuda', datos.sincronizando
-            ? 'Trayendo la lista de chats' + (datos.sincronizando.progreso != null ? ' (' + datos.sincronizando.progreso + ' %)' : '') + '… Los mensajes viejos no se guardan.'
-            : 'Se guarda lo que llega a los chats elegidos, desde que los elegís, y se borra a los ' + datos.retencionDias + ' días.')),
-          h('div.ajuste-control', h('span.insignia' + (datos.estado === 'conectado' ? '.ok' : ''), datos.estado === 'conectado' ? 'En línea' : 'Esperando'))),
-        datos.cifrado ? null : h('div.ayuda', { style: { color: 'var(--peligro)' } }, 'Ojo: en esta compu la sesión se guarda sin cifrar.'),
+        h('div.sec-cabeza',
+          h('span.wa-punto' + (conectado ? '.on' : '')),
+          h('div.renglon-txt', h('div.sec-nombre', datos.numero || 'WhatsApp'), h('div.renglon-sub', sub.join(' · '))),
+          mas),
+        datos.cifrado ? null : h('div.ayuda', { style: { color: 'var(--peligro)', marginTop: 0 } }, 'Ojo: en esta compu la sesión se guarda sin cifrar.'),
         lineaTelefono(),
-        App.seccion('Chats que se leen', elegidos.length ? elegidos.map(filaElegido) : h('div.ajuste-ayuda', datos.leerTodos ? 'No elegiste ninguno a mano: se leen los que entran solos (abajo).' : 'Todavía no elegiste ninguno. Elegilos de la lista de abajo o agregá uno por número.'),
-          { cuenta: elegidos.length ? String(elegidos.length) : '', ayuda: 'Para que un agente los lea, activá «Puede leer WhatsApp» en su ficha.' }),
-        App.seccion('Todos los mensajes que llegan', leerTodos(autos), { cuenta: autos.length ? String(autos.length) : '' }),
-        App.seccion('Notas de voz e imágenes', notasDeVoz()),
-        App.seccion('Agregar por número', formNumero()),
-        App.seccion('Elegir de tus chats', listaChats()),
-        pieDesvincular());
+        App.seccion('Qué se lee', [leerTodos(autos), h('div.nota-chica', { style: { marginTop: '5px' } },
+          datos.leerTodos ? 'Cada chat individual se empieza a leer solo con el primer mensaje. Los grupos se eligen a mano.' : 'Los grupos siempre se eligen a mano.')]),
+        App.seccion('Chats', listaChats(), { cuenta: elegidos.length ? String(elegidos.length) : '' }),
+        App.seccion('Notas de voz', notasDeVoz()));
     }
 
     /* WhatsApp desvincula un dispositivo si el teléfono no se conecta en 14 días. La captura no lo sabe directo: toma como indicio
-       la última actividad propia que vio (un mensaje tuyo en cualquier chat). Por eso es una estimación. */
+       la última actividad propia que vio (un mensaje tuyo en cualquier chat). Por eso es una estimación, y solo se avisa cerca del límite. */
     function lineaTelefono() {
       if (!datos.telefonoVisto) return null;
       var dias = (Date.now() / 1000 - datos.telefonoVisto) / 86400;
-      var tarde = dias >= 12;
-      return h('div.ayuda', { style: { margin: '4px 0 10px', color: tarde ? 'var(--peligro)' : '' } },
-        'El teléfono se vio por última vez ' + App.hace(datos.telefonoVisto) + ' (es una estimación: se mira tu última actividad en WhatsApp).' +
-        (tarde ? ' Si pasan 14 días sin que el teléfono se conecte, WhatsApp cierra la sesión de la oficina: abrí WhatsApp en el teléfono.' : ''));
-    }
-
-    function filaElegido(c) {
-      var cuantos = c.solo ? c.solo.length : 0;
-      var sub = [c.grupo ? 'Grupo' + (c.participantes ? ' · ' + c.participantes + ' participantes' : '') + (cuantos ? ' · se lee a ' + cuantos + (cuantos === 1 ? ' persona' : ' personas') : '') : (c.numero || ''), c.ultimo ? App.hace(c.ultimo) : null].filter(Boolean).join(' · ');
-      return h('div.ajuste', { style: { display: 'block' } },
-        h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
-          h('div', { style: { flex: 1 } }, h('div.ajuste-tit', c.nombre), h('div.ajuste-ayuda', sub)),
-          h('button.btn.chico', { onclick: function () { editar(c); } }, App.icono('lapiz'), 'Editar'),
-          h('button.btn.chico.fantasma', { title: 'Dejar de leer', onclick: function () { quitar(c); } }, App.icono('papelera'))),
-        c.nota ? h('div.ajuste-ayuda', { style: { marginTop: '4px', fontStyle: 'italic' } }, 'Nota: ' + c.nota) : null);
+      if (dias < 12) return null;
+      return h('div.ayuda', { style: { margin: '0 0 8px', color: 'var(--peligro)' } },
+        'El teléfono no se conecta desde ' + App.hace(datos.telefonoVisto) + ' (estimado). Si pasan 14 días, WhatsApp cierra la sesión de la oficina: abrí WhatsApp en el teléfono.');
     }
 
     /* «Leer todos los chats individuales»: para un negocio (WhatsApp Business o no) al que le escriben números que no tiene
        agendados. Cada chat individual se elige solo con el primer mensaje que llega; los grupos se siguen eligiendo a mano. */
-    var filtroAuto = '';
     function leerTodos(autos) {
-      var ck = h('input', { type: 'checkbox', checked: !!datos.leerTodos });
+      var sel;
       var poner = function (si) {
         api().put('/api/whatsapp/ajustes', { leerTodos: si }).then(function (r) {
           datos = r; redibujar();
           App.guardado(si ? 'Desde ahora se lee cualquier chat individual que te escriba.' : 'Ya no se leen todos los chats: quedan los que elegiste.');
-        }).catch(function (e) { err.textContent = e.message; ck.checked = !si; });
+        }).catch(function (e) { err.textContent = e.message; sel.poner(si ? 'elijo' : 'todos'); });
       };
-      ck.addEventListener('change', function () {
-        if (ck.checked) return poner(true);
-        if (!autos.length) return poner(false);
-        App.confirmar('¿Dejar de leer todos los chats?', 'Se dejan de leer los ' + autos.length + ' chats que entraron solos y se borran sus mensajes. Los que elegiste o editaste se quedan.', 'Dejar de leer', true)
-          .then(function (si) { if (si) poner(false); else ck.checked = true; });
-      });
-      var partes = [
-        App.ajuste('Leer todos los chats individuales',
-          'Para un negocio al que le escriben números que no tenés agendados (por ejemplo, clientes por WhatsApp Business). Cada chat individual se empieza a leer solo desde el primer mensaje que te mandan; no se leen los mensajes de antes. Los grupos se siguen eligiendo a mano.',
-          h('label.ajuste-check', ck, h('span', 'Leer todos')))
-      ];
-      if (datos.leerTodos) {
-        partes.push(h('div.ajuste-ayuda', { style: { margin: '-4px 0 8px' } },
-          'Ojo: así todo lo que te escriba cualquiera pasa por Claude. Si sacás un chat de esta lista, no se vuelve a leer solo. Para darle nombre o una nota, tocá «Editar»: pasa a la lista de arriba.'));
-        if (!autos.length) partes.push(h('div.ajuste-ayuda', 'Todavía no entró ninguno: aparecen acá a medida que te escriben.'));
-        else {
-          var caja = h('div');
-          var buscar = autos.length > 8 ? h('input.campo', { placeholder: 'Buscar por nombre o número', value: filtroAuto, style: { width: '100%', marginBottom: '8px' } }) : null;
-          var llenar = function () {
-            App.vaciar(caja);
-            var q = filtroAuto.trim().toLowerCase();
-            var vistos = autos.filter(function (c) { return !q || [c.nombre, c.agenda, c.pista, c.numero].some(function (x) { return x && String(x).toLowerCase().indexOf(q) >= 0; }); });
-            vistos.slice(0, 30).forEach(function (c) { caja.appendChild(filaElegido(c)); });
-            if (vistos.length > 30) caja.appendChild(h('div.ajuste-ayuda', 'Y ' + (vistos.length - 30) + ' más: buscá para encontrarlos.'));
-            if (q && !vistos.length) caja.appendChild(h('div.ajuste-ayuda', 'Nada con «' + filtroAuto + '».'));
-          };
-          if (buscar) buscar.addEventListener('input', function () { filtroAuto = buscar.value; llenar(); });
-          llenar();
-          partes.push(buscar, caja);
-        }
-      }
-      return h('div', partes);
+      sel = App.elegir({ forma: 'segmento', ancho: true, etiqueta: 'Qué chats se leen', valor: datos.leerTodos ? 'todos' : 'elijo',
+        opciones: [{ valor: 'elijo', titulo: 'Solo los chats que elijo' },
+          { valor: 'todos', titulo: 'Todos los individuales', sub: 'Para un negocio al que le escriben números que no tenés agendados. Todo lo que te escriban pasa por Claude.' }],
+        alCambiar: function (v) {
+          if (v === 'todos') return poner(true);
+          if (!autos.length) return poner(false);
+          App.confirmar('¿Dejar de leer todos los chats?', 'Se dejan de leer los ' + autos.length + ' chats que entraron solos y se borran sus mensajes. Los que elegiste o editaste se quedan.', 'Dejar de leer', true)
+            .then(function (si) { if (si) poner(false); else sel.poner('todos'); });
+        } });
+      return sel;
     }
 
-    /* transcribir las notas de voz en esta compu (Whisper, sin mandar el audio a ningún lado) */
-    function notasDeVoz() {
-      var t = datos.transcriptor || { estado: 'apagado' };
-      var ck = h('input', { type: 'checkbox', checked: datos.transcribir });
-      ck.addEventListener('change', function () {
-        api().put('/api/whatsapp/ajustes', { transcribir: ck.checked }).then(function (r) {
-          datos = r; redibujar();
-          App.guardado(ck.checked ? 'Las notas de voz nuevas se van a transcribir.' : 'Ya no se transcriben las notas de voz.');
-        }).catch(function (e) { err.textContent = e.message; ck.checked = !ck.checked; });
-      });
-      var estado = !datos.transcribir ? null
-        : t.estado === 'cargando' ? (t.progreso != null && t.progreso < 100 ? 'Bajando el modelo de transcripción (' + t.progreso + ' %)…' : 'Preparando la transcripción…')
-        : t.estado === 'trabajando' ? 'Transcribiendo…'
-        : t.estado === 'listo' ? 'Lista para transcribir.'
-        : t.estado === 'sin_motor' ? 'La transcripción no está disponible en esta instalación' + (t.error ? ' (' + t.error + ')' : '') + '.'
-        : 'Se prende sola cuando llega una nota de voz.';
-      var guardar = function (cambio, aviso) {
-        api().put('/api/whatsapp/ajustes', cambio).then(function (r) { datos = r; redibujar(); App.guardado(aviso); })
-          .catch(function (e) { err.textContent = e.message; redibujar(); });
-      };
-      var modelos = datos.modelos || [], idiomas = datos.idiomas || [];
-      var selModelo = modelos.length ? App.elegir({
-        forma: 'lista', etiqueta: 'Modelo de transcripción', valor: datos.modelo,
-        opciones: modelos.map(function (m) {
-          return { valor: m.id, titulo: m.nombre, sub: (m.id === 'rapido' ? 'Más liviano, se equivoca más. ' : m.id === 'mejor' ? 'Entiende mejor, tarda más y usa más memoria. ' : 'Lo habitual. ') + 'Descarga de unos ' + m.mb + ' MB la primera vez.' };
-        }),
-        alCambiar: function (v) { if (v !== datos.modelo) guardar({ modelo: v }, 'Modelo cambiado: se usa desde la próxima nota de voz.'); }
-      }) : null;
-      var selIdioma = idiomas.length ? App.elegir({
-        forma: 'chips', etiqueta: 'Idioma de los audios', valor: datos.idioma,
-        opciones: idiomas.map(function (i) { return { valor: i.id, titulo: i.nombre }; }),
-        alCambiar: function (v) { if (v !== datos.idioma) guardar({ idioma: v }, 'Idioma cambiado: se usa desde la próxima nota de voz.'); }
-      }) : null;
-      return h('div',
-        App.ajuste('Transcribir las notas de voz', 'En tu compu, sin mandar el audio a ningún lado. La primera vez baja el modelo; mientras transcribe usa bastante memoria y después se apaga sola. Así los agentes entienden lo que dicen los audios.',
-          h('label.ajuste-check', ck, h('span', 'Transcribir'))),
-        estado ? h('div.ajuste-ayuda', { style: { margin: '-4px 0 8px', color: t.estado === 'sin_motor' ? 'var(--peligro)' : '' } }, estado) : null,
-        selModelo ? h('div', { style: { margin: '8px 0' } }, h('label.etiqueta-campo', 'Modelo'), selModelo) : null,
-        selIdioma ? h('div', { style: { margin: '8px 0' } }, h('label.etiqueta-campo', 'Idioma de los audios'), selIdioma,
-          h('div.ajuste-ayuda', { style: { marginTop: '4px' } }, 'Si te hablan en otros idiomas, «Detectar automáticamente» adivina el de cada audio (se puede equivocar en los muy cortos).')) : null,
-        h('div.ajuste-ayuda', 'Las imágenes de los chats elegidos se guardan cifradas y los agentes las pueden mirar (por ejemplo, la foto de una orden médica).'));
+    function inicial(nombre) { var m = /[\p{L}\p{N}]/u.exec(String(nombre || '')); return m ? m[0].toUpperCase() : '#'; }
+    function marcaChat(c) {
+      var n = 0; String(c.jid || c.nombre || '').split('').forEach(function (ch) { n = (n * 31 + ch.charCodeAt(0)) % 997; });
+      return h('span.wa-ini.t' + (n % 5), c.grupo ? App.icono('personas') : inicial(c.nombre));
+    }
+    function cuandoCorto(t) { return t ? App.hace(t).replace(/^hace /, '') : ''; }
+
+    /* Un chat que se lee: nombre, nota o resumen, cuándo escribió y «⋯» (editar, dejar de leer). Tocarlo lo edita. */
+    function filaElegido(c) {
+      var cuantos = c.solo ? c.solo.length : 0;
+      var sub = c.nota ? '«' + c.nota + '»'
+        : c.grupo ? 'grupo' + (cuantos ? ' · se lee a ' + cuantos + (c.participantes ? ' de ' + c.participantes : '') + (cuantos === 1 ? ' persona' : ' personas') : c.participantes ? ' · ' + c.participantes + ' participantes' : '')
+        : c.numero || '';
+      if (c.auto) sub = 'entró solo' + (sub ? ' · ' + sub : '');
+      return h('div.wa-chat.tocable', { onclick: function () { editar(c); } },
+        marcaChat(c),
+        h('div.wa-chat-txt', h('b', c.nombre), sub ? h('span', sub) : null),
+        h('span.wa-chat-h', cuandoCorto(c.ultimo)),
+        h('button.btn.chico.fantasma.icono', { title: 'Más opciones', onclick: function (ev) {
+          ev.stopPropagation();
+          App.menu(ev.currentTarget, [
+            { texto: 'Editar', icono: 'lapiz', nota: c.grupo ? 'nombre, nota y a quiénes se lee' : 'nombre y nota', accion: function () { editar(c); } },
+            '-',
+            { texto: 'Dejar de leer', icono: 'papelera', peligro: true, accion: function () { quitar(c); } }]);
+        } }, App.icono('puntos')));
     }
 
-    function formNumero() {
-      var num = h('input.campo', { placeholder: '+54 9 11 5555-1234', inputmode: 'tel', style: { flex: '1 1 160px' } });
-      var nom = h('input.campo', { placeholder: 'Nombre (p. ej. Mamá)', style: { flex: '1 1 140px' } });
-      var btn = h('button.btn', { onclick: function () {
-        err.textContent = ''; btn.disabled = true;
-        api().post('/api/whatsapp/chats', { numero: num.value, nombre: nom.value }).then(function (r) {
-          App.guardado('Se lee ' + r.chat.nombre + ' desde ahora.');
-          num.value = ''; nom.value = '';
-          return cargar();
-        }).catch(function (e) { err.textContent = e.message; }).then(function () { btn.disabled = false; });
-      } }, App.icono('mas'), 'Agregar');
-      return h('div', h('div.ajuste-ayuda', { style: { marginBottom: '6px' } }, 'Para alguien que todavía no aparece en la lista. Con el código de país.'),
-        h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } }, num, nom, btn));
+    /* Un chat que todavía no se lee: «Leer» lo elige (pide nombre y nota) */
+    function filaChat(c) {
+      var sub = c.grupo ? 'grupo' + (c.participantes ? ' · ' + c.participantes + ' participantes' : '') : c.sinNumero ? 'número desconocido todavía' : (c.numero || '');
+      return h('div.wa-chat',
+        marcaChat(c),
+        h('div.wa-chat-txt', h('b', c.nombre), sub ? h('span', sub) : null),
+        h('span.wa-chat-h', cuandoCorto(c.ultimo)),
+        c.sinNumero ? null : h('button.btn.chico', { onclick: function () { elegir(c); } }, 'Leer'));
     }
 
+    /* La lista: sin buscar, los chats que se leen y «Elegir más chats» (despliega los demás); buscando, de todos, y si
+       parece un número que no está, «Agregar». */
     function listaChats() {
-      var caja = h('div');
-      var buscar = h('input.campo', { placeholder: 'Buscar por nombre o número', value: filtro, style: { width: '100%', marginBottom: '8px' } });
-      buscar.addEventListener('input', function () { filtro = buscar.value; llenar(); });
+      var caja = h('div.wa-lista');
+      var buscar = h('input.campo.wa-buscar', { type: 'search', placeholder: 'Buscar en tus chats o escribir un número…', value: buscarTxt });
+      buscar.addEventListener('input', function () { buscarTxt = buscar.value; llenar(); });
+      function coincide(c, q) { return [c.nombre, c.agenda, c.pista, c.numero].some(function (x) { return x && String(x).toLowerCase().indexOf(q) >= 0; }); }
+      function poner(lista, tope, fila) {
+        lista.slice(0, tope).forEach(function (c) { caja.appendChild(fila(c)); });
+        if (lista.length > tope) caja.appendChild(h('div.ajuste-ayuda', { style: { padding: '6px 0' } }, 'Y ' + (lista.length - tope) + ' más: buscá para encontrarlos.'));
+      }
       function llenar() {
         App.vaciar(caja);
-        var q = filtro.trim().toLowerCase();
-        var todos = datos.chats.filter(function (c) { return !c.elegido; });
-        var vistos = todos.filter(function (c) {
-          if (!q) return true;
-          return [c.nombre, c.agenda, c.pista, c.numero].some(function (x) { return x && String(x).toLowerCase().indexOf(q) >= 0; });
-        });
-        if (!todos.length) { caja.appendChild(h('div.ajuste-ayuda', datos.sincronizando ? 'Trayendo tus chats…' : 'Todavía no llegó ningún chat. Aparecen a medida que WhatsApp los manda.')); return; }
-        vistos.slice(0, 60).forEach(function (c) { caja.appendChild(filaChat(c)); });
-        if (vistos.length > 60) caja.appendChild(h('div.ajuste-ayuda', 'Y ' + (vistos.length - 60) + ' más: buscá para encontrarlos.'));
-        if (!vistos.length) caja.appendChild(h('div.ajuste-ayuda', 'Nada con «' + filtro + '».'));
+        var q = buscarTxt.trim().toLowerCase();
+        var elegidos = datos.chats.filter(function (c) { return c.elegido && !c.auto; }).concat(datos.chats.filter(function (c) { return c.elegido && c.auto; }));
+        var resto = datos.chats.filter(function (c) { return !c.elegido; });
+        if (!q) {
+          if (elegidos.length) poner(elegidos, 40, filaElegido);
+          else caja.appendChild(h('div.ajuste-ayuda', { style: { padding: '6px 0' } }, datos.leerTodos ? 'Todavía no entró ninguno: aparecen acá a medida que te escriben.' : 'Todavía no se lee ningún chat. Elegí cuáles abajo o buscá uno.'));
+          var boton = h('button.btn.chico.fantasma.wa-mas', { onclick: function () { verMas = !verMas; llenar(); } },
+            App.icono(verMas ? 'cerrar' : 'mas'), verMas ? 'Ocultar los demás chats' : 'Elegir más chats' + (resto.length ? ' (' + resto.length + ')' : ''));
+          caja.appendChild(boton);
+          if (verMas) {
+            if (!resto.length) caja.appendChild(h('div.ajuste-ayuda', datos.sincronizando ? 'Trayendo tus chats…' : 'No hay más chats. Aparecen a medida que WhatsApp los manda.'));
+            else { caja.appendChild(h('div.wa-sub-tit', 'Tus otros chats')); poner(resto, 60, filaChat); }
+          }
+          return;
+        }
+        var ve = elegidos.filter(function (c) { return coincide(c, q); }), vr = resto.filter(function (c) { return coincide(c, q); });
+        ve.forEach(function (c) { caja.appendChild(filaElegido(c)); });
+        if (vr.length) { if (ve.length) caja.appendChild(h('div.wa-sub-tit', 'Otros chats')); poner(vr, 40, filaChat); }
+        var digitos = q.replace(/[^\d]/g, '');
+        if (digitos.length >= 6 && !/[a-z]/i.test(q) && !datos.chats.some(function (c) { return String(c.numero || '').replace(/[^\d]/g, '') === digitos; })) {
+          caja.appendChild(h('div.wa-chat.tocable', { onclick: function () { agregarNumero(buscarTxt.trim()); } },
+            h('span.wa-ini', App.icono('mas')), h('div.wa-chat-txt', h('b', 'Agregar ' + buscarTxt.trim()), h('span', 'No está en tus chats: con el código de país')),
+            h('button.btn.chico', { onclick: function (ev) { ev.stopPropagation(); agregarNumero(buscarTxt.trim()); } }, 'Agregar')));
+        } else if (!ve.length && !vr.length) caja.appendChild(h('div.ajuste-ayuda', { style: { padding: '6px 0' } }, 'Nada con «' + buscarTxt.trim() + '». Para alguien que no aparece, escribí su número con el código de país.'));
       }
       llenar();
       return h('div', buscar, caja);
     }
 
-    function filaChat(c) {
-      var sub = c.grupo ? 'Grupo' + (c.participantes ? ' · ' + c.participantes + ' participantes' : '')
-        : c.sinNumero ? 'Número desconocido todavía' : (c.numero || '');
-      return h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px solid var(--borde, rgba(0,0,0,.08))' } },
-        h('div', { style: { flex: 1, minWidth: 0 } },
-          h('div', { style: { fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, c.nombre),
-          h('div.ajuste-ayuda', sub + (c.ultimo ? ' · ' + App.hace(c.ultimo) : ''))),
-        c.sinNumero ? null : h('button.btn.chico', { onclick: function () { elegir(c); } }, 'Elegir'));
+    /* Agregar por número a alguien que todavía no aparece en la lista */
+    function agregarNumero(numero) {
+      var hj2 = App.hoja({ titulo: 'Leer un número', ancho: 420 });
+      var num = h('input.campo', { value: numero, inputmode: 'tel', placeholder: '+54 9 11 5555-1234' });
+      var nom = h('input.campo', { placeholder: 'Nombre (p. ej. Mamá)' });
+      var err2 = h('div.error-txt');
+      var ok = h('button.btn.primario', { onclick: function () {
+        ok.disabled = true; err2.textContent = '';
+        api().post('/api/whatsapp/chats', { numero: num.value, nombre: nom.value }).then(function (r) {
+          App.guardado('Se lee ' + r.chat.nombre + ' desde ahora.');
+          buscarTxt = ''; hj2.cerrar(); return cargar();
+        }).catch(function (e) { err2.textContent = e.message; ok.disabled = false; });
+      } }, 'Empezar a leer');
+      App.add(hj2.cuerpo, h('label.etiqueta-campo', 'Número, con el código de país'), num,
+        h('label.etiqueta-campo', { style: { marginTop: '12px' } }, 'Nombre'), nom,
+        h('div.ajuste-ayuda', { style: { marginTop: '4px' } }, 'Es el que ven los agentes.'), err2);
+      App.add(hj2.pie, h('button.btn', { onclick: hj2.cerrar }, 'Cancelar'), ok);
+      setTimeout(function () { nom.focus(); }, 0);
+    }
+
+    /* transcribir las notas de voz en esta compu (Whisper, sin mandar el audio a ningún lado) */
+    function notasDeVoz() {
+      var t = datos.transcriptor || { estado: 'apagado' };
+      var guardar = function (cambio, aviso) {
+        api().put('/api/whatsapp/ajustes', cambio).then(function (r) { datos = r; redibujar(); App.guardado(aviso); })
+          .catch(function (e) { err.textContent = e.message; redibujar(); });
+      };
+      var estado = !datos.transcribir ? 'El audio no sale de tu compu; así los agentes entienden los audios'
+        : t.estado === 'cargando' ? (t.progreso != null && t.progreso < 100 ? 'Bajando el modelo (' + t.progreso + ' %)…' : 'Preparando la transcripción…')
+        : t.estado === 'trabajando' ? 'Transcribiendo…'
+        : t.estado === 'listo' ? 'Lista para transcribir · el audio no sale de tu compu'
+        : t.estado === 'sin_motor' ? 'No está disponible en esta instalación' + (t.error ? ' (' + t.error + ')' : '')
+        : 'Se prende sola cuando llega una nota de voz';
+      var filas = [App.renglon({ titulo: 'Transcribirlas en tu compu', sub: estado, subError: datos.transcribir && t.estado === 'sin_motor',
+        control: App.interruptor(datos.transcribir, function (si) {
+          guardar({ transcribir: si }, si ? 'Las notas de voz nuevas se van a transcribir.' : 'Ya no se transcriben las notas de voz.');
+        }, 'Transcribir las notas de voz') })];
+      if (!datos.transcribir) return filas;
+      var modelos = datos.modelos || [], idiomas = datos.idiomas || [];
+      if (modelos.length) {
+        var DESC = { rapido: 'más liviano, se equivoca más', normal: 'lo habitual', mejor: 'entiende mejor, tarda más y usa más memoria' };
+        filas.push(h('div.renglon.wa-modelo', h('div.renglon-txt', h('div.renglon-tit', 'Modelo')),
+          App.elegir({ forma: 'deslizador', etiqueta: 'Modelo de transcripción', valor: datos.modelo,
+            opciones: modelos.map(function (m) { return { valor: m.id, titulo: m.nombre, sub: (DESC[m.id] ? DESC[m.id] + '. ' : '') + 'Baja unos ' + m.mb + ' MB la primera vez.' }; }),
+            alCambiar: function (v) { if (v !== datos.modelo) guardar({ modelo: v }, 'Modelo cambiado: se usa desde la próxima nota de voz.'); } })));
+      }
+      var hayAuto = idiomas.some(function (i) { return i.id === 'auto'; });
+      if (hayAuto && idiomas.length === 2) {
+        var fijo = idiomas.filter(function (i) { return i.id !== 'auto'; })[0];
+        filas.push(App.renglon({ titulo: 'Detectar el idioma', sub: datos.idioma === 'auto' ? 'Adivina el de cada audio (se puede equivocar en los muy cortos)' : 'Apagado: todo en ' + fijo.nombre.toLowerCase(),
+          control: App.interruptor(datos.idioma === 'auto', function (si) {
+            guardar({ idioma: si ? 'auto' : fijo.id }, 'Idioma cambiado: se usa desde la próxima nota de voz.');
+          }, 'Detectar el idioma de los audios') }));
+      } else if (idiomas.length) {
+        filas.push(App.renglon({ titulo: 'Idioma', control: App.elegir({ forma: 'segmento', etiqueta: 'Idioma de los audios', valor: datos.idioma,
+          opciones: idiomas.map(function (i) { return { valor: i.id, titulo: i.nombre }; }),
+          alCambiar: function (v) { if (v !== datos.idioma) guardar({ idioma: v }, 'Idioma cambiado: se usa desde la próxima nota de voz.'); } }) }));
+      }
+      return filas;
     }
 
     /* ---- elegir / editar / quitar ---- */

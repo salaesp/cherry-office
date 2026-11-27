@@ -220,7 +220,8 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
       pila.splice(pila.indexOf(obj), 1);
       if (op.alCerrar) op.alCerrar();
     }
-    setTimeout(function () { var f = caja.querySelector('[autofocus]') || caja.querySelector('input,textarea,select'); if (f) f.focus(); }, 30);
+    /* el primer campo para escribir (no una hora ni un buscador de una lista larga, que se llevarían la vista hacia abajo) */
+    setTimeout(function () { var f = caja.querySelector('[autofocus]') || caja.querySelector('input:not([type=time]):not([type=search]):not([type=checkbox]):not([type=radio]):not([type=range]),textarea,select'); if (f) f.focus({ preventScroll: true }); }, 30);
     return obj;
   };
   App.hojaAbierta = function () { return pila.length > 0; };
@@ -393,10 +394,12 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
      forma 'deslizador': las opciones van en orden (de menos a más) sobre una barra; las marcadas `aparte: true` (p. ej.
      «El de Claude Code») no son un punto de la escala y van como chip al lado.
      forma 'interruptor': para dos opciones, una pastilla que se prende o apaga (como en el celular). La primera opción es
-     «prendido» y la segunda «apagado»; al lado se lee el nombre de la elegida. */
+     «prendido» y la segunda «apagado»; al lado se lee el nombre de la elegida (con `sinTexto`, solo la pastilla).
+     forma 'segmento': pocas opciones cortas pegadas en una barra (una sola elegida), p. ej. «No · Leer · Actuar». */
   App.elegir = function (op) {
     if (op.forma === 'deslizador') return deslizador(op);
     if (op.forma === 'interruptor') return interruptor(op);
+    if (op.forma === 'segmento') return segmento(op);
     var forma = op.forma || (op.opciones.some(function (o) { return o.sub; }) ? 'lista' : 'chips');
     var valor = op.multiple ? (op.valor || []).slice() : op.valor;
     var es = function (v) { return op.multiple ? valor.indexOf(v) >= 0 : valor === v; };
@@ -422,6 +425,41 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
     el.poner = function (v) { valor = op.multiple ? (v || []).slice() : v; pintar(); };
     return el;
   };
+  function segmento(op) {
+    var valor = op.valor;
+    var bs = op.opciones.map(function (o) {
+      return h('button.seg-op', { type: 'button', title: o.sub || '', disabled: !!op.desactivado, onclick: function () {
+        if (o.valor === valor) return;
+        valor = o.valor; pintar();
+        if (op.alCambiar) op.alCambiar(valor);
+      } }, o.titulo);
+    });
+    function pintar() {
+      bs.forEach(function (b, i) { var si = op.opciones[i].valor === valor; b.classList.toggle('sel', si); b.setAttribute('aria-pressed', si ? 'true' : 'false'); });
+    }
+    pintar();
+    var el = h('div.elegir.elegir-segmento' + (op.ancho ? '.ancho' : ''), { role: 'group', 'aria-label': op.etiqueta || '' }, bs);
+    el.valor = function () { return valor; };
+    el.poner = function (v) { valor = v; pintar(); };
+    return el;
+  }
+  /* Interruptor solo (sin texto al lado) para un sí/no: App.interruptor(prendido, alCambiar(bool), etiqueta, desactivado?) */
+  App.interruptor = function (si, alCambiar, etiqueta, desactivado) {
+    var el = interruptor({ opciones: [{ valor: true, titulo: '' }, { valor: false, titulo: '' }], valor: !!si, alCambiar: alCambiar, etiqueta: etiqueta, sinTexto: true });
+    if (desactivado) el.querySelector('button').disabled = true;
+    return el;
+  };
+  /* Renglón de ajuste compacto: marca opcional · título y una línea de resumen · control a la derecha.
+     op: {marca?: nodo, titulo, sub?: texto o nodo, subError?: bool, control?: nodo o lista, alTocar?, abierto?: bool (muestra el chevrón)} */
+  App.renglon = function (op) {
+    var chev = op.abierto === undefined ? null : h('span.renglon-chev', App.icono('abajo'));
+    var el = h('div.renglon' + (op.alTocar ? '.tocable' : '') + (op.abierto ? '.abierto' : ''), op.alTocar ? { onclick: op.alTocar } : null,
+      op.marca || null,
+      h('div.renglon-txt', h('div.renglon-tit', op.titulo), op.sub ? h('div.renglon-sub' + (op.subError ? '.error' : ''), op.sub) : null),
+      op.control ? h('div.renglon-ctl', { onclick: function (ev) { ev.stopPropagation(); } }, op.control) : null,
+      chev);
+    return el;
+  };
   function interruptor(op) {
     var si = op.opciones[0], no = op.opciones[1];
     var valor = op.valor;
@@ -440,7 +478,7 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
     }
     boton.addEventListener('click', cambiar);
     texto.addEventListener('click', cambiar);   // tocar el texto también lo cambia, como una etiqueta
-    var el = h('div.elegir.elegir-interruptor', boton, texto);
+    var el = h('div.elegir.elegir-interruptor', boton, op.sinTexto ? null : texto);
     pintar();
     el.valor = function () { return valor; };
     el.poner = function (v) { valor = v; pintar(); };
