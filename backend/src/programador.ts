@@ -420,8 +420,11 @@ export class Programador implements ProgramadorEntregas {
   /** «Hacelo ahora» de un pendiente de reunión: una corrida única (no queda en `oficina.json`) con id de tarea
    *  `encargo:<reunión>:<n>`. */
   encargar(act: OficinaActiva, def: AgenteDef, p: { reunion: string; pendiente: number; nombre: string; consigna: string }): Promise<Ejecucion> {
-    return this.encargarLibre(act, def, { id: Programador.idEncargo(p.reunion, p.pendiente), nombre: p.nombre, consigna: p.consigna })
+    return this.encargarLibre(act, def, { id: Programador.idEncargo(p.reunion, p.pendiente), nombre: p.nombre, consigna: p.consigna, sistema: Programador.sistemaPendiente })
   }
+
+  /** Lo que recibe como mensaje de sistema un pendiente de reunión (el mensaje es el pendiente, `consignaEncargo`). */
+  static readonly sistemaPendiente = '# Pendiente de reunión\nEl mensaje es un pendiente que salió de una reunión. Hacelo ahora. Si producís un documento, guardalo en `archivos/entregables/` y decí al final qué archivo dejaste.'
 
   /** Una corrida única con un id de tarea cualquiera (`encargo:`, `flujo:`, `accion:`, `coord:`, `parte:`): misma maquinaria
    *  que una tarea. `actuar`: herramientas de conectores de actuar que esta corrida puede usar. `sistema`: instrucciones que

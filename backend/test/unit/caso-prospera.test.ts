@@ -349,7 +349,8 @@ describe('Caso Próspera de punta a punta (en proceso)', () => {
     expect(await esperar(() => esperaEn(3, 'esperando_aprobacion'), 15)).toBe(true)
     const plan = sb.llamadas.filter((l) => Sandbox.valor(l, '--agent') === 'don-armando').at(-1)!
     const consigna = plan.at(-1) ?? ''
-    expect(consigna).toContain('Paso 4 de 6: Plan de edición')
+    expect(Sandbox.valor(plan, '--append-system-prompt')).toContain('Paso 4 de 6: Plan de edición')   // va como mensaje de sistema
+    expect(consigna).toContain('Paso 4: Plan de edición')
     expect(consigna).toContain('Grabada')
     expect(consigna).toContain(`archivos/entregables/persona/${cid}-2/clase7.txt`)
     expect(consigna).toContain('hola sofia')
@@ -409,10 +410,10 @@ describe('Caso Próspera de punta a punta (en proceso)', () => {
     expect(ej.status, JSON.stringify(ej.obj)).toBe(202)
     expect(await esperar(async () => (await accionDe()).estado === 'hecha', 15)).toBe(true)
     expect(await estado()).toBe('esperando_persona')
-    const correAccion = sb.llamadasConPrompt('exactamente esto').at(-1)!
+    const correAccion = sb.llamadasConPrompt('Acción aprobada (').at(-1)!
     expect(Sandbox.reglas(correAccion)).toContain(crear)
     // la corrida del paso de flujo, en cambio, no tenía la herramienta de actuar
-    const correPaso = sb.llamadasConPrompt('Paso 1 de 2')[0]!
+    const correPaso = sb.llamadas.filter((l) => (Sandbox.valor(l, '--append-system-prompt') ?? '').includes('Paso 1 de 2'))[0]!
     expect(Sandbox.reglas(correPaso)).not.toContain(crear)
     // tres cosas distintas, tres orígenes y una sola corrida abierta
     const origenes = new Set(((await get('/api/entregas')).obj.entregas as O[]).map((x) => x.origen))

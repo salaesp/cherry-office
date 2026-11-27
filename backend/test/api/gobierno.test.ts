@@ -338,11 +338,14 @@ describe('Gobierno: instrucciones, conectores y acciones', () => {
     expect(str(a.resultado).includes('hola marce') && typeof a.ejecucion === 'number').toBe(true)
     expect(str((await entregaDe(f, id)).estado)).toBe('revisada')
 
-    const l = conPrompt(f, 'exactamente esto').at(-1)!
+    const l = conPrompt(f, 'Crear la reunión del lunes').at(-1)!
     expect(Sandbox.reglas(l).includes(crearCal), 'la herramienta aprobada va en --allowedTools').toBe(true)
     expect(Sandbox.reglas(l).includes(leerCal)).toBe(true)
     const msg = l.at(-1)!
-    expect(msg.includes('Ana aprobó') && msg.includes('Crear la reunión del lunes') && msg.includes('2026-11-16')).toBe(true)
+    expect(msg.includes('Crear la reunión del lunes') && msg.includes('2026-11-16')).toBe(true)
+    // las reglas van como mensaje de sistema; en la charla queda solo la acción
+    expect((Sandbox.valor(l, '--append-system-prompt') ?? '').normalize('NFC')).toContain('Ana aprobó la acción del mensaje. Ejecutá exactamente eso')
+    expect(msg).not.toContain('Ejecutá exactamente')
     // en la lista, la entrega del resultado tiene origen «accion»
     const origenes = (await entregas(f)).map((x) => str(x.origen))
     expect(origenes.includes('accion') && origenes.includes('propuesta')).toBe(true)

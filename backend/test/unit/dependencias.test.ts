@@ -124,9 +124,14 @@ describe('pedir', () => {
     expect([e.agente, e.ref, e.titulo]).toEqual(['arqui', `pedido:${ped.id}`, 'Mapeo'])
     const l = p.sb.llamadasConPrompt('Necesito el mapeo')[0]!
     const msg = l[l.length - 1]!
-    expect(msg).toContain('Pedido de Marce (Rol de marce). Viene de un colega, no es un pedido directo del usuario')
+    expect(msg).toContain('Pedido de Marce (Rol de marce):\n\nNecesito el mapeo')
     expect(msg).toContain('Contexto: Para la v2 del informe')
-    expect(msg).toContain('archivos/entregables/arqui/')
+    // que viene de un colega y dónde dejarlo van como mensaje de sistema
+    const sis = Sandbox.valor(l, '--append-system-prompt') ?? ''
+    expect(sis).toContain('# Pedido de un colega')
+    expect(sis).toContain('no un pedido directo del usuario')
+    expect(sis).toContain('archivos/entregables/arqui/')
+    expect(msg).not.toContain('archivos/entregables/arqui/')
     expect(msg.includes('\u0007')).toBe(false)
     expect(Sandbox.valor(l, '--agent')).toBe('arqui')
     await terminar(p)

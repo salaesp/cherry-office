@@ -253,18 +253,19 @@ export const Acciones = {
     if (!actuarDe(s, act.oficina, def).includes(ac.herramienta)) throw new ErrorAPI(409, 'El agente ya no tiene asignada esa herramienta para actuar.')
     const jefe = act.oficina.duenio.trim()
     const aprueba = jefe === '' ? 'La persona' : jefe
-    const consigna = `${aprueba} aprobó esta acción. Ejecutá exactamente esto con la herramienta ${ac.herramienta} y estos argumentos, y no hagas nada más:
+    // las reglas van como mensaje de sistema; en la charla queda solo la acción aprobada
+    const sistema = `# Acción aprobada
+${aprueba} aprobó la acción del mensaje. Ejecutá exactamente eso con la herramienta ${ac.herramienta} y esos argumentos, y no hagas nada más. Cuando termine, contá en una o dos frases qué hizo la herramienta.`
+    const consigna = `Acción aprobada (${ac.herramienta}):
 
 Resumen: ${ac.resumen}
-Argumentos (JSON): ${ac.detalle}
-
-Cuando termine, contá en una o dos frases qué hizo la herramienta.`
+Argumentos (JSON): ${ac.detalle}`
     const prog = s.huecos.programador as Programador | undefined
     if (!prog) throw new ErrorAPI(500, 'No pude ejecutar la acción.')
     s.entregas.marcar(act.carpeta, entrega.id, 'revisada')
     store.actualizar(id, 'ejecutando')
     try {
-      return await prog.encargarLibre(act, def, { id: Programador.prefijoAccion + String(id), nombre: 'Acción aprobada: ' + ac.resumen, consigna, actuar: [ac.herramienta] })
+      return await prog.encargarLibre(act, def, { id: Programador.prefijoAccion + String(id), nombre: 'Acción aprobada: ' + ac.resumen, consigna, sistema, actuar: [ac.herramienta] })
     } catch (e) {
       store.actualizar(id, 'pendiente')
       s.entregas.marcar(act.carpeta, entrega.id, 'sin_revisar')
