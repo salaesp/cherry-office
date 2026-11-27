@@ -45,8 +45,22 @@ export const iso = (t: number) => new Date(t * 1000).toISOString()
 
 export const TextoEntrega = {
   maxTexto: 100_000,
+  /** Una línea para la lista: sin las marcas de markdown que se verían como texto. Los títulos terminan en «:» y las
+   *  viñetas seguidas se separan con «·». */
   resumen(t: string): string {
-    const s = unaLinea(t)
+    const partes: string[] = []
+    let viniaAntes = false
+    for (const crudo of t.split(/\r\n|\n/)) {
+      if (crudo.trim() === '') continue
+      const titulo = /^\s*#{1,6}\s+/.test(crudo)
+      const vinieta = /^\s*([-*•]|\d+[.)])\s+/.test(crudo)
+      let l = crudo.replace(/^\s*(#{1,6}\s+|[-*•]\s+(\[[ xX]\]\s+)?|\d+[.)]\s+|>\s?)/, '').replace(/\*\*(.+?)\*\*|__(.+?)__/g, '$1$2').trim()
+      if (l === '') continue
+      if (titulo && !/[:.?!]$/.test(l)) l += ':'
+      partes.push((partes.length ? (vinieta && viniaAntes ? ' · ' : ' ') : '') + l)
+      viniaAntes = vinieta
+    }
+    const s = unaLinea(partes.join('')).replace(/\s+/g, ' ')
     return largo(s) > 280 ? prefijo(s, 279) + '…' : s
   },
   /** Título corto a partir de un pedido de chat. */

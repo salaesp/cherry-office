@@ -138,6 +138,29 @@
 .rep-agenda .e { padding: 4px 0 4px 10px; border-left: 2px solid var(--cal-suave); min-width: 0; overflow-wrap: anywhere; }
 .prop-md p { display: inline; margin: 0; }
 
+.imp-cifras { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.imp-cifra { display: grid; gap: 1px; padding: 10px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--panel); min-width: 0; }
+.imp-cifra b { font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.imp-cifra span { font-size: 12px; color: var(--suave); }
+.imp-cifra small { font-size: 11px; color: var(--tenue); }
+@media (max-width: 520px) { .imp-cifras { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.imp-fichas { display: flex; flex-wrap: wrap; gap: 6px; }
+.imp-ficha { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px 0 4px; border-radius: 15px; border: 1px solid var(--linea-fuerte); background: var(--panel); cursor: pointer; font-size: 13px; }
+.imp-ficha:hover { background: var(--panel-2); }
+.imp-ficha .rep-ini { width: 22px; height: 22px; font-size: 10px; }
+.imp-pie { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; font-size: 12px; color: var(--suave); border-top: 1px solid var(--linea); padding-top: 10px; }
+
+/* cualquier entrega en texto: un poco más de aire y jerarquía */
+.entrega-doc.md > p:first-child { font-size: 15px; line-height: 1.5; }
+.entrega-doc.md h1, .entrega-doc.md h2 { font-size: 17px; margin: 20px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--linea); }
+.entrega-doc.md h3 { font-size: 15px; margin: 16px 0 4px; }
+.entrega-doc.md > :first-child { margin-top: 2px; }
+.entrega-doc.md li + li { margin-top: 3px; }
+.entrega-doc.md li::marker { color: var(--tenue); }
+.entrega-doc.md blockquote { margin: 8px 0; padding: 4px 0 4px 12px; border-left: 3px solid var(--linea-fuerte); color: var(--suave); }
+.entrega-doc.md hr { border: 0; border-top: 1px solid var(--linea); margin: 14px 0; }
+.entrega-doc.md strong { font-weight: 600; }
+
 /* departamentos: misión bajo cada fila */
 /* departamentos: una tarjeta por sala; nombre y misión se leen como texto y se editan en el lugar */
 .dep-tarjeta { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start; padding: 12px 12px 12px 14px; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--panel); position: relative; overflow: hidden; }

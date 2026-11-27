@@ -25,6 +25,12 @@ test('relativos: solo lo de adentro de la oficina, sin notas internas ni rutas c
   }
 })
 
+test('el resumen saca las marcas de markdown: títulos con «:» y viñetas separadas con «·»', () => {
+  expect(TextoEntrega.resumen('Gastaste **$ 10**.\n\n## Lo más grande\n- Súper: $ 6\n- Nafta: $ 4\n\n> Lo separo por tarjeta.'))
+    .toBe('Gastaste $ 10. Lo más grande: Súper: $ 6 · Nafta: $ 4 Lo separo por tarjeta.')
+  expect(TextoEntrega.resumen('Hecho.\n1. uno\n2) dos\n- [x] tres')).toBe('Hecho. uno · dos · tres')
+})
+
 test('resumen y título recortan y aplanan saltos de línea', () => {
   expect(TextoEntrega.resumen('uno\n\ndos\r\ntres  ')).toBe('uno dos tres')
   const largo = 'a'.repeat(400)
