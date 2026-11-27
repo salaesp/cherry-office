@@ -229,8 +229,16 @@ export class Delegaciones {
   private readonly timers = new Map<number, NodeJS.Timeout>()
   /** `oficina \u001f agente \u001f sid` de los mensajes de la persona que corren ahora. */
   private readonly charlas = new Set<string>()
+  private cerrando = false
 
   constructor(private readonly s: Servicios, readonly store: TarjetasStore) {}
+
+  /** Al cerrar el backend: no se lanza nada más (la base se cierra después). Lo que esperaba se retoma al arrancar. */
+  detener() {
+    this.cerrando = true
+    for (const h of this.timers.values()) clearTimeout(h)
+    this.timers.clear()
+  }
 
   private static clave(oficina: string, agente: string, sid: string) { return `${oficina}\u001f${agente}\u001f${sid}` }
   /** `/api/chat` avisa que empieza a responderle a la persona (y que terminó): solo entonces existen las herramientas. */
@@ -287,9 +295,15 @@ export class Delegaciones {
   }
 
   private agendar(t: Tarjeta) {
+    if (this.cerrando) return
     clearTimeout(this.timers.get(t.id))
     const empieza = typeof t.datos.empieza === 'number' ? t.datos.empieza : 0
-    const h = setTimeout(() => { this.timers.delete(t.id); this.lanzar(t.id).catch(() => {}) }, Math.max(0, empieza * 1000 - Date.now()))
+    const h = setTimeout(() => {
+      this.timers.delete(t.id)
+      if (this.cerrando) return
+      // red de seguridad: si la base ya se cerró (u otro error), no dejar un rechazo sin manejar
+      this.lanzar(t.id).catch((e) => { if (!this.cerrando) this.s.log.error(`delegar: no pude lanzar la tarjeta ${t.id}: ${e instanceof Error ? e.message : String(e)}`) })
+    }, Math.max(0, empieza * 1000 - Date.now()))
     h.unref?.()
     this.timers.set(t.id, h)
   }
@@ -627,6 +641,7 @@ export function instalar(s: Servicios) {
   s.oficinas.alOlvidar.push((dir) => d.store.borrarOficina(dir))
   s.alArrancar.push(() => { const c = s.oficinas.activa()?.carpeta; if (c) d.reanudar(c) })
   s.alAbrir.push(async (a) => d.reanudar(a.carpeta))
+  s.alCerrar.unshift(() => d.detener())
 }
 
 registrarModulo('delegar', 79, instalar)

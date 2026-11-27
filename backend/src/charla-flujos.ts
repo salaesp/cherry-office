@@ -102,8 +102,16 @@ export class FlujosCharla {
   /** El temporizador más largo (los programados a varios días se vuelven a revisar). */
   static readonly maxEspera = 6 * 3600
   private readonly timers = new Map<number, NodeJS.Timeout>()
+  private cerrando = false
 
   constructor(private readonly s: Servicios, private readonly d: Delegaciones) {}
+
+  /** Al cerrar la app: no lanza nada más (lo programado se retoma al volver a abrir). */
+  detener() {
+    this.cerrando = true
+    for (const h of this.timers.values()) clearTimeout(h)
+    this.timers.clear()
+  }
 
   private get motor(): MotorFlujos {
     const m = motorDe(this.s)
@@ -131,16 +139,18 @@ export class FlujosCharla {
   }
 
   private agendar(t: Tarjeta) {
+    if (this.cerrando) return
     clearTimeout(this.timers.get(t.id))
     const empieza = typeof t.datos.empieza === 'number' ? t.datos.empieza : 0
     const falta = Math.max(0, empieza - ahoraSeg())
     const h = setTimeout(() => {
       this.timers.delete(t.id)
+      if (this.cerrando) return
       let x: Tarjeta | undefined
       try { x = this.d.store.una(t.id) } catch { return }   // la base ya se cerró
       if (!x) return
       if (falta > FlujosCharla.maxEspera) this.agendar(x)
-      else this.lanzar(t.id).catch(() => {})
+      else this.lanzar(t.id).catch((e) => { if (!this.cerrando) this.s.log.error(`charla-flujos: no pude arrancar la tarjeta ${t.id}: ${e instanceof Error ? e.message : String(e)}`) })
     }, Math.min(falta, FlujosCharla.maxEspera) * 1000)
     h.unref?.()
     this.timers.set(t.id, h)
@@ -510,6 +520,7 @@ export function instalar(s: Servicios) {
   mcpDe(s)?.registrarHerramientas(herramientasFlujosCharla)
   s.alArrancar.push(() => { const c = s.oficinas.activa()?.carpeta; if (c) fc.reanudar(c) })
   s.alAbrir.push(async (a) => fc.reanudar(a.carpeta))
+  s.alCerrar.unshift(() => fc.detener())
 }
 
 registrarModulo('charla-flujos', 81, instalar)

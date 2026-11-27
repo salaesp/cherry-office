@@ -243,6 +243,36 @@ describe('Tareas programadas (API y programador)', () => {
     expect(t.corriendo).toBe(false)
   })
 
+  test('ia propia de la tarea: se guarda, se edita y se borra; sus corridas van con ese --model y --effort', async () => {
+    const f = await fix()
+    const r = await nueva(f, { consigna: 'Armá el informe', ia: { modelo: 'opus', esfuerzo: 'max', memoria: 'liviana' } })
+    expect(r.status, JSON.stringify(r.obj)).toBe(200)
+    expect(dict(r.obj.tarea).ia).toEqual({ modelo: 'opus', esfuerzo: 'max', memoria: 'liviana' })
+    expect(dict(lista(f.oficinaJSON().tareas)[0]).ia).toEqual({ modelo: 'opus', esfuerzo: 'max', memoria: 'liviana' })
+
+    expect((await f.post('/api/tareas/informe-diario/correr')).status).toBe(202)
+    await terminada(f, 'informe-diario')
+    const l = f.sb.llamadas.at(-1)!
+    expect(Sandbox.valor(l, '--model')).toBe('opus')
+    expect(Sandbox.valor(l, '--effort')).toBe('max')
+
+    // inválidos: 400
+    for (const ia of [{ modelo: 'gpt' }, { esfuerzo: 'turbo' }, { memoria: 'nada' }, 'opus']) {
+      expect((await f.patch('/api/tareas/informe-diario', { ia })).status, JSON.stringify(ia)).toBe(400)
+    }
+    // editar reemplaza la elección entera; null la saca (vuelven los del agente)
+    const e = await f.patch('/api/tareas/informe-diario', { ia: { esfuerzo: 'low' } })
+    expect(dict(e.obj.tarea).ia).toEqual({ esfuerzo: 'low' })
+    const sin = await f.patch('/api/tareas/informe-diario', { ia: null })
+    expect(dict(sin.obj.tarea).ia).toBeUndefined()
+    expect(dict(lista(f.oficinaJSON().tareas)[0]).ia).toBeUndefined()
+    expect((await f.post('/api/tareas/informe-diario/correr')).status).toBe(202)
+    await terminada(f, 'informe-diario', 2)
+    const l2 = f.sb.llamadas.at(-1)!
+    expect(Sandbox.valor(l2, '--model')).toBeUndefined()
+    expect(Sandbox.valor(l2, '--effort')).not.toBe('max')
+  })
+
   test('permisos pendientes: lo que la tarea no pudo hacer queda como pedido; al responder retoma la conversación y recién ahí entrega', async () => {
     const f = await fix()
     await nueva(f, { consigna: 'DENEGAR:git pull origin main' })
@@ -317,10 +347,13 @@ describe('Tareas programadas (API y programador)', () => {
     const primera = f.sb.llamadas.at(-1)!
     expect(primera.at(-1)).toBe('Armá el informe')
     expect((await f.post('/api/tareas/informe-diario/correr')).status).toBe(202)
-    await esperar(() => f.sb.llamadas.length > 1 && f.sb.llamadas.at(-1)!.at(-1)!.includes('La vez anterior'))
+    await esperar(() => f.sb.llamadas.length > 1 && f.sb.llamadas.at(-1)!.some((x) => x.includes('# La vez anterior')))
     const segunda = f.sb.llamadas.at(-1)!
-    expect(segunda.at(-1)!.startsWith('Armá el informe\n\n---\nLa vez anterior (')).toBe(true)
-    expect(segunda.at(-1)!.endsWith(':\nhola marce')).toBe(true)
+    // en la charla queda solo la consigna; lo de la vez anterior va como mensaje de sistema
+    expect(segunda.at(-1)).toBe('Armá el informe')
+    const sistema = segunda[segunda.indexOf('--append-system-prompt') + 1]!
+    expect(sistema).toContain('# La vez anterior\nEsta tarea ya corrió (')
+    expect(sistema.endsWith(':\nhola marce')).toBe(true)
     expect(segunda.includes('--session-id') && !segunda.includes('--resume')).toBe(true)
   })
 

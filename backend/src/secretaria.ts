@@ -703,9 +703,9 @@ export class ServicioSecretaria {
     const rev = this.store.crear({ oficina: act.carpeta, fuentes: materiales.map((x) => x.f.id), hasta, manual, parcial: materiales.some((x) => x.m.parcial) })
     const t = Date.now() / 1000
     for (const x of materiales) this.store.ponerUltima(act.carpeta, x.f.id, t)
-    const consigna = this.consigna(act.carpeta, act.oficina, def, materiales)
+    const { sistema, mensaje } = this.consigna(act.carpeta, act.oficina, def, materiales)
     try {
-      await prog.encargarLibre(act, def, { id: Programador.prefijoSecretaria + rev.id, nombre: 'Revisión de la secretaría', consigna })
+      await prog.encargarLibre(act, def, { id: Programador.prefijoSecretaria + rev.id, nombre: 'Revisión de la secretaría', consigna: mensaje, sistema })
     } catch (e) {
       this.store.terminar(rev.id, 'fallida', { error: e instanceof ErrorAPI ? e.mensaje : String(e) })
       if (manual) throw e
@@ -716,7 +716,10 @@ export class ServicioSecretaria {
     return this.store.una(rev.id)
   }
 
-  consigna(carpeta: string, o: Oficina, def: AgenteDef, materiales: { f: Fuente; fc: FuenteCfg; m: Material }[]): string {
+  /** Lo que recibe la revisión. `sistema`: quién es, qué hacer, cómo responder, sus propuestas recientes y qué anotar en la
+   *  memoria (va por `--append-system-prompt`, con sus reglas de siempre). `mensaje`: solo el material, lo nuevo de cada
+   *  fuente y lo que ya sabía; es lo que queda en su charla. */
+  consigna(carpeta: string, o: Oficina, def: AgenteDef, materiales: { f: Fuente; fc: FuenteCfg; m: Material }[]): { sistema: string; mensaje: string } {
     const persona = o.duenio === '' ? 'la persona' : o.duenio
     const ahora = new Date()
     const fecha = ahora.toLocaleString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
@@ -726,7 +729,8 @@ export class ServicioSecretaria {
       .filter((a) => a.agente === def.id && a.creada >= desde).slice(0, 30)
       .map((a) => `- ${prefijo(sanear(a.resumen), 200)} (${a.estado === 'descartada' ? `${persona} la descartó` : a.estado})`)
     const partes = [
-      `Sos ${def.nombre} y atendés la secretaría de ${persona}: revisás lo que le llega y le contás lo que le sirve saber. Hoy es ${fecha}.`,
+      '# Revisión de la secretaría',
+      `En esta conversación revisás lo que le llega a ${persona} y anotás lo que le sirve saber. El mensaje trae lo nuevo de cada fuente y lo que ya sabías. Hoy es ${fecha}.`,
       '',
       'Qué hacer:',
       '- Leé lo nuevo de cada fuente. Lo que dice «Ya revisado» es contexto: usalo para entender, no lo vuelvas a reportar.',
@@ -751,20 +755,25 @@ export class ServicioSecretaria {
       '',
       propuestas.length ? `Tus propuestas de los últimos 14 días:\n${propuestas.join('\n')}` : 'No propusiste nada en los últimos 14 días.',
     ]
+    const msj: string[] = [`Lo nuevo para revisar (${materiales.map((x) => x.f.nombre).join(', ')}):`]
     for (const x of materiales) {
-      partes.push('', `--- Fuente: ${x.f.nombre} ---`)
-      if (x.fc.indicacion) partes.push(`Indicación de ${persona} para esta fuente: ${x.fc.indicacion}`)
-      partes.push(x.m.texto)
-      if (x.m.parcial) partes.push('(Hay más mensajes nuevos: van en la próxima revisión.)')
+      msj.push('', `--- Fuente: ${x.f.nombre} ---`)
+      if (x.fc.indicacion) msj.push(`Indicación de ${persona} para esta fuente: ${x.fc.indicacion}`)
+      msj.push(x.m.texto)
+      if (x.m.parcial) msj.push('(Hay más mensajes nuevos: van en la próxima revisión.)')
     }
-    // la memoria privada (secretaria-memoria.ts): temas abiertos, fichas de quienes aparecen y qué anotar al terminar
+    // la memoria privada (secretaria-memoria.ts): lo que ya sabía va con el material; qué anotar al terminar, con las reglas
     const mem = memoriaSecretariaDe(this.s)
     if (mem) {
-      try { partes.push(...mem.seccionConsigna(carpeta, materiales.map((x) => x.m.texto).join('\n'), { persona, puedeActuar, modo: 'revision' })) } catch (e) {
+      try {
+        const m = mem.seccionConsigna(carpeta, materiales.map((x) => x.m.texto).join('\n'), { persona, puedeActuar, modo: 'revision' })
+        msj.push(...m.datos)
+        partes.push('', ...m.reglas)
+      } catch (e) {
         this.s.log.error(`secretaria: no pude leer la memoria para la consigna: ${e instanceof Error ? e.message : e}`)
       }
     }
-    return partes.join('\n')
+    return { sistema: partes.join('\n'), mensaje: msj.join('\n') }
   }
 
   /** Revisión de una corrida, si es de la secretaría. */
@@ -865,9 +874,9 @@ export class ServicioSecretaria {
       return this.store.crearReporte({ oficina: act.carpeta, manual, desde, revisiones: [], acciones: [], estado: 'salteado' })
     }
     const rep = this.store.crearReporte({ oficina: act.carpeta, manual, desde, revisiones: revs.map((r) => r.id), acciones: acciones.map((a) => a.id) })
-    const consigna = this.consignaReporte(act, def, desde, revs, acciones, ahora)
+    const { sistema, mensaje } = this.consignaReporte(act, def, desde, revs, acciones, ahora)
     try {
-      await prog.encargarLibre(act, def, { id: `${Programador.prefijoSecretaria}r${rep.id}`, nombre: 'Reporte de la secretaría', consigna })
+      await prog.encargarLibre(act, def, { id: `${Programador.prefijoSecretaria}r${rep.id}`, nombre: 'Reporte de la secretaría', consigna: mensaje, sistema })
     } catch (e) {
       this.store.terminarReporte(rep.id, 'fallida', { error: e instanceof ErrorAPI ? e.mensaje : String(e) })
       this.s.log.error(`secretaria: no pude lanzar el reporte: ${e instanceof Error ? e.message : e}`)
@@ -877,20 +886,23 @@ export class ServicioSecretaria {
     return this.store.reporte(rep.id)
   }
 
-  consignaReporte(act: OficinaActiva, def: AgenteDef, desde: number, revs: Revision[], acciones: AccionPropuesta[], ahora = new Date()): string {
+  /** Lo que recibe el reporte. `sistema`: cómo juntar las notas y el formato (va por `--append-system-prompt`). `mensaje`:
+   *  las notas de las revisiones, las propuestas del tramo y la memoria; es lo que queda en su charla. */
+  consignaReporte(act: OficinaActiva, def: AgenteDef, desde: number, revs: Revision[], acciones: AccionPropuesta[], ahora = new Date()): { sistema: string; mensaje: string } {
     const o = act.oficina
     const persona = o.duenio === '' ? 'la persona' : o.duenio
     const fecha = ahora.toLocaleString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
     const hora = (t: number) => new Date(t * 1000).toLocaleString('es-AR', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })
     const nombres: Record<string, string> = { whatsapp: 'WhatsApp', gmail: 'Gmail', calendario: 'Calendario' }
     const partes = [
-      `Sos ${def.nombre} y atendés la secretaría de ${persona}. Hoy es ${fecha}: es la hora del reporte.`,
+      '# Reporte de la secretaría',
+      `En esta conversación armás el reporte para ${persona}. Hoy es ${fecha}: es la hora del reporte. El mensaje trae tus notas de las revisiones, las propuestas del tramo y tu memoria.`,
       '',
       `Juntá en UN solo reporte lo que anotaste en tus revisiones desde el reporte anterior (${hora(desde)}). ${persona} lee solo este reporte, así que:`,
       '- Contá solo lo nuevo de este tramo. Si dos notas dicen lo mismo, va una vez. Si una nota posterior cambia o resuelve una anterior (por ejemplo, ya llegó lo que se esperaba), contá cómo quedó.',
       '- Una fuente sin novedades no se menciona: si Gmail no trajo nada, no digas nada de Gmail.',
       '- Las propuestas de este tramo ya se le muestran aparte, con su estado: no las repitas ni las vuelvas a proponer. No propongas acciones nuevas.',
-      '- Seguimiento: de los temas trabados de tu memoria (abajo), solo los que siguen sin resolverse según lo que sabés. Si una nota muestra que se resolvió, no lo pongas.',
+      '- Seguimiento: de los temas trabados de tu memoria (en el mensaje), solo los que siguen sin resolverse según lo que sabés. Si una nota muestra que se resolvió, no lo pongas.',
       '- Lo que ya se avisó como urgente en el momento (las notas lo dicen) no va otra vez como URGENTE: si sigue sin resolverse, va en Seguimiento.',
       '- En «Para hacer», si lo que contás es uno de los temas de tu memoria (abajo, cada uno empieza con su slug), terminá la línea con «(tema: <slug>)»: así se ve que lo seguís y la persona puede marcarlo hecho desde el reporte. Si no es un tema, sin el paréntesis. No pongas en «Para hacer» lo que tu memoria ya muestra como resuelto o descartado.',
       '- Podés leer tu memoria (memoria_*) y, si tenés el calendario, mirar lo de hoy y mañana para la Agenda. No escribas nada en ningún lado ni le mandes mensajes a nadie.',
@@ -909,27 +921,27 @@ export class ServicioSecretaria {
       '  - <qué se esperaba y de quién> — desde <DD/MM>',
       '  ## Agenda',
       '  - <día y hora, por ejemplo «hoy 17:00» o «vie 09:30»> — <evento>',
-      '',
     ]
+    const msj: string[] = [`Reporte desde ${hora(desde)}.`, '']
     if (revs.length) {
-      partes.push(`Tus notas de las revisiones (${revs.length}):`, '<notas_revisiones>')
+      msj.push(`Tus notas de las revisiones (${revs.length}):`, '<notas_revisiones>')
       for (const r of revs) {
-        partes.push(`[${hora(r.terminada ?? r.creada)} · ${r.fuentes.map((f) => nombres[f] ?? f).join(', ')}${r.urgente ? ' · lo urgente ya se avisó en el momento' : ''}]`)
-        partes.push(prefijo(sanear(r.notas ?? ''), 4000), '')
+        msj.push(`[${hora(r.terminada ?? r.creada)} · ${r.fuentes.map((f) => nombres[f] ?? f).join(', ')}${r.urgente ? ' · lo urgente ya se avisó en el momento' : ''}]`)
+        msj.push(prefijo(sanear(r.notas ?? ''), 4000), '')
       }
-      partes.push('</notas_revisiones>')
-    } else partes.push('No hubo notas nuevas en las revisiones de este tramo.')
+      msj.push('</notas_revisiones>')
+    } else msj.push('No hubo notas nuevas en las revisiones de este tramo.')
     if (acciones.length) {
-      partes.push('', `Propuestas de este tramo (ya se le muestran aparte):`)
-      for (const a of acciones) partes.push(`- ${prefijo(sanear(a.resumen), 200)} (${a.estado === 'descartada' ? `${persona} la descartó` : a.estado === 'hecha' ? 'aprobada y hecha' : a.estado})`)
+      msj.push('', `Propuestas de este tramo (ya se le muestran aparte):`)
+      for (const a of acciones) msj.push(`- ${prefijo(sanear(a.resumen), 200)} (${a.estado === 'descartada' ? `${persona} la descartó` : a.estado === 'hecha' ? 'aprobada y hecha' : a.estado})`)
     }
     const mem = memoriaSecretariaDe(this.s)
     if (mem) {
-      try { partes.push(...mem.seccionReporte(act.carpeta, ahora)) } catch (e) {
+      try { msj.push(...mem.seccionReporte(act.carpeta, ahora)) } catch (e) {
         this.s.log.error(`secretaria: no pude leer la memoria para el reporte: ${e instanceof Error ? e.message : e}`)
       }
     }
-    return partes.join('\n')
+    return { sistema: partes.join('\n'), mensaje: msj.join('\n') }
   }
 
   /** Contrata a quien atiende la secretaría, ya configurada: tiene su despacho al lado del de la persona, revisa los chats elegidos de
