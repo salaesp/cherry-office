@@ -804,10 +804,71 @@
   /* ---------------- notas ---------------- */
   function pintarNotas(a, cuerpo) {
     var notas = h('div', App.cargando('Trayendo sus notas…'));
-    cuerpo.appendChild(h('div', { style: { padding: '14px' } }, h('div.det-sec', h('h4', 'Lo que fue anotando'), notas)));
+    var seg = h('div', App.cargando('Trayendo lo que está siguiendo…'));
+    var fichas = h('div');
+    cuerpo.appendChild(h('div', { style: { padding: '14px' } },
+      h('div.det-sec', h('h4', 'Lo que está siguiendo'), seg),
+      h('div.det-sec', h('h4', 'Personas y cosas'), fichas),
+      h('div.det-sec', h('h4', 'Lo que fue anotando'), notas)));
     api.get('/api/agentes/' + encodeURIComponent(a.id) + '/conocimiento').then(function (r) {
       App.vaciar(notas).appendChild(App.htmlSeguro(h('div.md-doc.doc-panel.notas-doc'), App.markdown(r.texto || 'Todavía no anotó nada.')));
     }).catch(function (e) { App.vaciar(notas).appendChild(h('div.ayuda', e.message)); });
+    pintarSeguimiento(a, seg, fichas);
+  }
+
+  /* Seguimiento del agente (backend/src/seguimiento.ts): sus temas en seguimiento y sus fichas, en
+     conocimiento/agentes/<id>/. Los escribe el agente con sus herramientas; acá se ven y se pueden borrar. */
+  var ESTADOS_SEG = { abierto: 'Abierto', esperando: 'Esperando', resuelto: 'Resuelto', descartado: 'Descartado' };
+  function pintarSeguimiento(a, seg, fichas) {
+    var base = '/api/agentes/' + encodeURIComponent(a.id) + '/seguimiento';
+    var todos = false;
+    function verArchivo(ruta, titulo) {
+      api.get(base + '/archivo', { ruta: ruta }).then(function (r) {
+        var hj = App.hoja({ titulo: titulo, ancho: 600, clave: 'agente-seguimiento-ver' });
+        App.add(hj.cuerpo, h('pre', { style: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0, fontFamily: 'inherit', lineHeight: '1.55', fontSize: '13.5px' } }, r.texto));
+        App.add(hj.pie,
+          h('button.btn.fantasma', { onclick: function () {
+            hj.cerrar();
+            App.confirmar('¿Borrar «' + titulo + '»?', 'Se borra del seguimiento de ' + a.nombre + '. No se puede deshacer.', 'Borrar', true).then(function (si) {
+              if (!si) return;
+              api.del(base + '/archivo?ruta=' + encodeURIComponent(ruta)).then(function () { App.guardado('Borrado.'); cargar(); }).catch(App.fallo);
+            });
+          } }, App.icono('papelera'), 'Borrar'),
+          h('button.btn.primario', { onclick: hj.cerrar }, 'Cerrar'));
+      }).catch(App.fallo);
+    }
+    function filaBtn(contenido, onclick) {
+      return h('button', { onclick: onclick, style: { display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 0, borderBottom: '1px solid var(--linea)', padding: '8px 0', color: 'inherit', font: 'inherit', cursor: 'pointer' } }, contenido);
+    }
+    function cargar() {
+      api.get(base).then(function (r) {
+        var abiertos = r.temas.filter(function (t) { return t.estado === 'abierto' || t.estado === 'esperando'; });
+        var lista = todos ? r.temas : abiertos;
+        App.vaciar(seg);
+        if (!lista.length) seg.appendChild(h('div.ayuda', r.temas.length ? 'No tiene nada abierto.' : 'Todavía no está siguiendo nada. Lo arma solo cuando trabaja en algo que lleva tiempo o espera a alguien.'));
+        lista.forEach(function (t) {
+          var detalle = [ESTADOS_SEG[t.estado] || t.estado];
+          if (t.fecha) detalle.push(t.fecha);
+          if (t.proximo) detalle.push('próximo: ' + t.proximo);
+          if (t.personas.length) detalle.push('con ' + t.personas.join(', '));
+          seg.appendChild(filaBtn([
+            h('div', { style: { display: 'flex', gap: '6px', alignItems: 'center' } }, h('span', { style: { fontWeight: 500 } }, t.titulo),
+              t.trabado ? h('span.insignia.aviso', { title: 'Lleva días sin moverse o ya pasó su fecha' }, 'trabado') : null),
+            h('div.ayuda', { style: { margin: '2px 0 0' } }, detalle.join(' · '))], function () { verArchivo('temas/' + t.slug + '.md', t.titulo); }));
+        });
+        if (r.temas.length > abiertos.length || todos) {
+          seg.appendChild(h('button.btn.chico.fantasma', { style: { marginTop: '6px' }, onclick: function () { todos = !todos; cargar(); } },
+            todos ? 'Ver solo lo abierto' : 'Ver también lo resuelto (' + (r.temas.length - abiertos.length) + ')'));
+        }
+        App.vaciar(fichas);
+        if (!r.fichas.length) fichas.appendChild(h('div.ayuda', 'Sin fichas todavía.'));
+        r.fichas.forEach(function (f) {
+          fichas.appendChild(filaBtn([h('span', { style: { fontWeight: 500 } }, f.nombre), h('span.ayuda', { style: { marginLeft: '6px' } }, (f.tipo === 'cosa' ? 'cosa' : 'persona') + ' · ' + f.datos + (f.datos === 1 ? ' dato' : ' datos'))],
+            function () { verArchivo('fichas/' + f.slug + '.md', f.nombre); }));
+        });
+      }).catch(function (e) { App.vaciar(seg).appendChild(h('div.ayuda', e.message)); });
+    }
+    cargar();
   }
 
   /* ---------------- archivos que guardó (su carpeta de entregables) ---------------- */

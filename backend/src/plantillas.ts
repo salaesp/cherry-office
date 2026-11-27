@@ -98,6 +98,9 @@ export const lineaIndice = 'Al empezar leé `conocimiento/indice.md`: una línea
 /** Documenta la herramienta `anotar` (memoria.ts). Su presencia también marca una sección al día. */
 export const lineaAnotar = 'Si aprendés algo que la oficina tiene que recordar (un dato, un cambio, una preferencia de la persona), dejalo con anotar(tema, hecho): una línea, solo hechos, en un tema del índice si ya existe. No copies charlas enteras. Tus notas son para tu estado de trabajo; anotar es para lo que le sirve a todos.'
 
+/** Documenta el seguimiento de cada agente (seguimiento.ts). Su presencia también marca una sección al día. */
+export const lineaSeguimiento = 'Lo que estás siguiendo (un encargo en curso, algo que esperás de alguien, algo con fecha) llevalo con seguimiento(tema, …): estado, fecha, próximo paso y una nota por cada novedad. Al empezar mirá seguimientos() para ver lo que tenés abierto o trabado. Lo estable de una persona o cosa con la que trabajás (un cliente, un proveedor, un producto) va a su ficha con ficha_anotar. Queda en `conocimiento/agentes/<id>/` y lo ve toda la oficina: lo de un colega lo leés con «de». Si atendés la secretaría no tenés estas herramientas: usá tu memoria privada.'
+
 /** Formato de los entregables: lo que se ve en la app es HTML (se dibuja al costado de la charla); los archivos de Office
  *  (.pptx, .docx, .xlsx) son binarios que la app no sabe mostrar, así que solo se hacen si la persona los pide. Su presencia
  *  también marca una sección al día. */
@@ -116,11 +119,12 @@ Tu carpeta de trabajo es la raíz de la oficina; todas las rutas son relativas a
 - ${lineaConsultas}
 - ${lineaConocimiento}
 - ${lineaAnotar}
+- ${lineaSeguimiento}
 - ${lineaFormato}`
 }
 
 /** Al abrir una oficina: reescribe la sección de memoria de los `.md` de agente desactualizados (sin la línea de
- *  consultas, la de conocimiento, la de formato, la del índice o la de anotar). Solo toca desde la marca hasta el final. Idempotente. Devuelve cuántos reescribió. */
+ *  consultas, la de conocimiento, la de formato, la del índice, la de anotar o la de seguimiento). Solo toca desde la marca hasta el final. Idempotente. Devuelve cuántos reescribió. */
 export function actualizarMemoria(carpeta: string, ids: string[]): number {
   let n = 0
   for (const id of ids) {
@@ -132,7 +136,7 @@ export function actualizarMemoria(carpeta: string, ids: string[]): number {
       continue
     }
     const i = t.indexOf(marcaMemoria)
-    if (i < 0 || (t.includes(lineaConsultas) && t.includes(lineaConocimiento) && t.includes(lineaFormato) && t.includes(lineaIndice) && t.includes(lineaAnotar))) continue
+    if (i < 0 || (t.includes(lineaConsultas) && t.includes(lineaConocimiento) && t.includes(lineaFormato) && t.includes(lineaIndice) && t.includes(lineaAnotar) && t.includes(lineaSeguimiento))) continue
     try {
       const tmp = `${p}.tmp`
       fs.writeFileSync(tmp, t.slice(0, i) + seccionMemoria(id) + '\n')
