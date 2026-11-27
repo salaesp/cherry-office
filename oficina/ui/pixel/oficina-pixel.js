@@ -78,7 +78,8 @@ App.OficinaPixel = (function () {
   function anchoDepto(n) { return Math.max(4.6, 2.5 + Math.ceil(Math.max(n, 1) / 2) * 1.75); }
   function planificar(oficina, perfil) {
     var deptos = (oficina.departamentos || []).slice(), ag = oficina.agentes || [];
-    /* quien atiende la secretaría (departamento «recepcion», si la oficina no tiene uno con ese id) va al mostrador */
+    /* quien atiende la secretaría (departamento «recepcion», si la oficina no tiene uno con ese id) tiene su despacho
+       al lado del tuyo; la recepción queda para el mostrador del Creador y las visitas */
     var enRecepcion = [];
     var porDepto = {}; ag.forEach(function (a) {
       var hay = a.departamento && deptos.some(function (d) { return d.id === a.departamento; });
@@ -88,11 +89,13 @@ App.OficinaPixel = (function () {
     if (porDepto._sin) deptos.push({ id: '_sin', nombre: 'Sin departamento', color: '#9a9a9a' });
     var juegos = { tipo: 'juegos', nombre: 'Juegos y café', w: 7.6, color: '#d9b86a' };
     var fijas = [
-      { tipo: 'direccion', nombre: perfil && perfil.nombre ? 'Despacho de ' + perfil.nombre : 'Tu despacho', w: 4.6, color: '#8fae9a' },
+      { tipo: 'direccion', nombre: perfil && perfil.nombre ? 'Despacho de ' + perfil.nombre : 'Tu despacho', w: 4.6, color: '#8fae9a' }];
+    if (enRecepcion.length) fijas.push({ tipo: 'secretaria', nombre: 'Secretaría', w: 4.2, color: '#b9a27a', agentes: enRecepcion });
+    fijas.push(
       { tipo: 'reunion', nombre: 'Sala de reuniones', w: 6.6, color: '#9c88c0' },
-      { tipo: 'biblioteca', nombre: 'Biblioteca', w: 4.6, color: '#b39b7e' }];
+      { tipo: 'biblioteca', nombre: 'Biblioteca', w: 4.6, color: '#b39b7e' });
     var anchoFijas = fijas.reduce(function (s, r) { return s + r.w; }, juegos.w), maxAncho = Math.max(anchoFijas, 22);
-    var filas = [fijas], fila = [{ tipo: 'recepcion', nombre: (oficina.nombre || 'Oficina') + ' · Recepción', w: 4.2, color: null, agentes: enRecepcion }], ancho = 4.2;
+    var filas = [fijas], fila = [{ tipo: 'recepcion', nombre: (oficina.nombre || 'Oficina') + ' · Recepción', w: 4.2, color: null }], ancho = 4.2;
     deptos.forEach(function (d) {
       var n = (porDepto[d.id] || []).length, w = anchoDepto(n);
       if (ancho + w > maxAncho && fila.length) { filas.push(fila); fila = []; ancho = 0; }
@@ -136,10 +139,10 @@ App.OficinaPixel = (function () {
       paredY(LAT - WT, y0, y0 + PROF - WT, []);
       f.forEach(function (s, j) { if (j > 0) paredY(s.r[0] - WT, y0, y0 + PROF - WT, decorPared(s)); else if (s.tipo !== 'recepcion') decorPrimera(s); });
     });
-    salas.forEach(function (s) { ({ direccion: salaDireccion, reunion: salaReunion, biblioteca: salaBiblioteca, juegos: salaJuegos, recepcion: salaRecepcion, depto: salaDepto }[s.tipo])(s, perfil); });
+    salas.forEach(function (s) { ({ direccion: salaDireccion, reunion: salaReunion, biblioteca: salaBiblioteca, juegos: salaJuegos, recepcion: salaRecepcion, secretaria: salaSecretaria, depto: salaDepto }[s.tipo])(s, perfil); });
     EST = null;
   }
-  function decorPared(s) { var y0 = s.r[1]; return s.tipo === 'reunion' ? [['pizarra', y0 + 1.4, 3]] : s.tipo === 'depto' ? [['pizarra', y0 + 1.2, 3], ['cuadro', y0 + 3.8, 5, { color: s.color }]] : s.tipo === 'direccion' ? [['cuadro', y0 + 2.2, 5, { color: '#4a80c6' }]] : []; }
+  function decorPared(s) { var y0 = s.r[1]; return s.tipo === 'reunion' ? [['pizarra', y0 + 1.4, 3]] : s.tipo === 'depto' ? [['pizarra', y0 + 1.2, 3], ['cuadro', y0 + 3.8, 5, { color: s.color }]] : s.tipo === 'direccion' ? [['cuadro', y0 + 2.2, 5, { color: '#4a80c6' }]] : s.tipo === 'secretaria' ? [['cuadro', y0 + 2.6, 5, { color: '#c47a4a' }]] : []; }
   function decorPrimera(s) { }
   function silla(p, mira) { at(p.x + p.y + (mira === '+y' ? -.15 : .12), function () { M.sillaOficina(p.x - .2, p.y - .2, { mira: mira }); }, [p.x - .2, p.y - .2, p.x + .2, p.y + .2, 10]); }
   var EST_MON = { pensando: 'pensando', leyendo: 'herramienta', buscando: 'herramienta', consultando: 'herramienta', escribiendo: 'trabajando', trabajando: 'trabajando', armando: 'trabajando' };
@@ -241,13 +244,23 @@ App.OficinaPixel = (function () {
     put('mostrador', x0 + 1.0, y0 + 2.0, { mira: '+y' }); put('dispensador', x0 + 3.2, y0 + .3, {}); put('planta', x0 + .3, y0 + .35, { tipo: 'alta' });
     put('sillaVisita', x0 + .35, y0 + 3.9, { mira: '+x' }); put('sillaVisita', x0 + .35, y0 + 4.6, { mira: '+x' }); put('planta', x0 + 2.5, y0 + 5.0, { tipo: 'mediana' });
     recepcion = { x: x0 + 1.8, y: y0 + 2.9, sala: s };
-    /* al costado del mostrador, mirando a las visitas: quien atiende la secretaría (detrás, el frente alto la taparía) */
-    (s.agentes || []).slice(0, 2).forEach(function (a, i) {
-      var p = { x: x0 + 2.95, y: y0 + 1.55 + i * .75 };
-      silla(p, '+y');
-      puestos[a.id] = { x: p.x, y: p.y, mira: '+y', sala: s, aisle: { x: p.x, y: p.y + .6 } };
-    });
     recepcionYo = { x: x0 + 2.6, y: y0 + 3.3, mira: '-x', sit: false, sala: s };   // vos, recibiendo al lado del mostrador
+  }
+  /* el despacho de quien atiende la secretaría, pegado al tuyo: escritorio con monitor (uno por persona, hasta dos),
+     archiveros contra la pared y dos sillas para las visitas */
+  function salaSecretaria(s) {
+    var x0 = s.r[0], y0 = s.r[1], ag = (s.agentes || []).slice(0, 2), n = Math.max(ag.length, 1);
+    for (var i = 0; i < n; i++) escritorioSecretaria(x0 + (n === 1 ? 1.4 : .7 + i * 1.6), y0 + 2.3, ag[i], s);
+    put('archivero', x0 + .3, y0 + .2, { mira: '+y' }); put('archivero', x0 + .78, y0 + .2, { mira: '+y' });
+    put('planta', s.r[2] - .9, y0 + .35, { tipo: 'alta' });
+    put('sillaVisita', x0 + 1.5, y0 + 3.4, { mira: '-y' }); put('sillaVisita', x0 + 2.2, y0 + 3.4, { mira: '-y' });
+    put('muebleBajo', x0 + .25, y0 + 4.3, { mira: '+x' });
+  }
+  function escritorioSecretaria(x, y, a, s) {
+    put('escritorio', x, y, { mira: '+y', mat: 'blanco' });
+    at(50, function () { M.monitor(x + .45, y + .32, { mira: '-y', estado: estadoMonitor(a && a.id), t: T, luz: LUZ, seed: x * 3 }); M.tecladoMouse(x + .5, y + .12, { mira: '-y' }); M.papeles(x + .1, y + .2, {}); }, [x, y, x + 1.1, y + .6, 16]);
+    var p = { x: x + .55, y: y - .4 }; silla(p, '+y');
+    if (a) puestos[a.id] = { x: p.x, y: p.y, mira: '+y', sala: s, aisle: { x: x + 1.4, y: p.y } };
   }
   /* bandeja de entregas sobre tu escritorio: hojas del color del departamento de quien la hizo */
   function dibujarBandeja() {
@@ -392,8 +405,8 @@ App.OficinaPixel = (function () {
       f.hablar = false;
       if (f.modo === 'reunion') { irA(f, Object.assign({ sit: true }, f.home), 'puesto'); return; }
       if (f.modo === 'ocio' && bloqueado(id)) { irA(f, Object.assign({ sit: true }, f.home), 'puesto'); return; }
-      /* quien atiende la recepción no se va a pasear: se queda en el mostrador */
-      var enMostrador = f.home && f.home.sala && f.home.sala.tipo === 'recepcion';
+      /* quien atiende la secretaría no se va a pasear: se queda en su escritorio */
+      var enMostrador = f.home && f.home.sala && f.home.sala.tipo === 'secretaria';
       if (f.modo === 'puesto' && !f.ruta && !bloqueado(id) && spotsOcio.length && !reducido && !enMostrador) {
         if (!f.ocioDesde) f.ocioDesde = now + 15000 + (hashStr(id) % 30000);
         else if (now > f.ocioDesde) { var libre = spotsOcio.filter(function (s) { return !Object.keys(figs).some(function (k) { return figs[k].spot === s && figs[k].modo === 'ocio'; }); });
@@ -791,10 +804,13 @@ App.OficinaPixel = (function () {
     if (dir > 0) return k < 1 ? 1 : Math.floor(k + 1e-3) + 1;
     var n = Math.ceil(k - 1e-3) - 1; return n < 1 ? kMin : Math.max(n, kMin);
   }
+  /* zoom de la ruedita: inmediato, como siempre en la compu. Con una animación, cada muesca de una ruedita rápida
+     calculaba el paso desde el zoom a mitad de camino y apuntaba al mismo entero, así que la vista se quedaba trabada */
   function zoom(nk, px0, py0) {
     nk = acotarK(nk); if (Math.abs(nk - cam.k) < 1e-3) return;
-    if (nk <= kMin + 1e-3) { irCamara(encuadreGeneral(), 200); return; }
-    irCamara(anclar(nk, px0, py0, (px0 - cam.dx) / cam.kv, (py0 - cam.dy) / cam.kv), 160);
+    tween = null; inercia = null;
+    Object.assign(cam, nk <= kMin + 1e-3 ? encuadreGeneral() : anclar(nk, px0, py0, (px0 - cam.dx) / cam.kv, (py0 - cam.dy) / cam.kv));
+    moverCam();
   }
   function avanzarInercia(now) {
     var dt = Math.min(50, now - inercia.t); inercia.t = now;

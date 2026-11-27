@@ -276,7 +276,7 @@ export function conectoresParaFuentes(s: Servicios, def: AgenteDef, ids: string[
   return cambio ? actuales : undefined
 }
 
-export const promptSecretaria = (nombre: string) => `Sos ${nombre} y atendés la secretaría de la oficina, desde la recepción.
+export const promptSecretaria = (nombre: string) => `Sos ${nombre} y atendés la secretaría de la oficina, desde tu despacho al lado del de la persona que la dirige.
 
 Tu trabajo es estar al tanto de lo que le llega a la persona que dirige la oficina (chats de WhatsApp que eligió, sus mails y su calendario) y avisarle lo que le sirve saber, con sugerencias concretas que ella aprueba: agendar un turno, anotar un vencimiento, encargarle algo a un colega.
 
@@ -621,7 +621,7 @@ export class ServicioSecretaria {
     if (esVacia(entrega.texto) && !cfg?.reporteVacio) this.s.entregas.marcar(oficina, entrega.id, 'revisada')
   }
 
-  /** Contrata a quien atiende la secretaría, ya configurada: se sienta en la recepción, revisa los chats elegidos de
+  /** Contrata a quien atiende la secretaría, ya configurada: tiene su despacho al lado del de la persona, revisa los chats elegidos de
    *  WhatsApp y, si están conectados, Gmail y el calendario (con sus conectores asignados). */
   contratar(b: Obj): OficinaActiva {
     const act = this.s.oficinas.requerirActiva()

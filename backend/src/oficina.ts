@@ -304,7 +304,8 @@ export function validarMemoria(m: MemoriaOficina) {
 /** Validaciones extra de secciones que se portan después (tareas, flujos, reglas): se registran al portarlas. */
 export const validacionesExtra: ((o: Oficina) => void)[] = []
 
-/** «Departamento» fijo de la recepción: ahí se sienta quien atiende la secretaría (secretaria.ts), en el mostrador. No
+/** «Departamento» fijo de quien atiende la secretaría (secretaria.ts): el id quedó de cuando se sentaba en la
+ *  recepción; ahora tiene su despacho al lado del de la persona (sala «Secretaría» en la oficina pixel). No
  *  es una sala de `departamentos`; si la oficina tiene un departamento con este id, manda el de la oficina. */
 export const deptoRecepcion = 'recepcion'
 export const existeDepto = (o: Oficina, id: string) => id === deptoRecepcion || o.departamentos.some((d) => d.id === id)
