@@ -6,6 +6,22 @@ micrófono de la secretaría achicado. Lo que falta es que **se instale como app
 sentido en el teléfono**: enterarte, contestar, aprobar y hablarle a alguien. Armar y configurar la oficina queda en la
 compu.
 
+## 0. Cómo llega el celular a la oficina
+Siempre por **Tailscale** (https con certificado válido, que el navegador exige para el micrófono, y solo entran los
+dispositivos de la red). No hay relay propio ni login: si algún día hiciera falta (gente sin Tailscale), ver la
+«opción B» abajo.
+
+- **Server** (como ahora): `tailscale serve --bg 8765` y `HQ_HOSTS` con el nombre de la máquina (`actualizar.sh` lo pone).
+- **App de escritorio** (hecho): Ajustes › **Celular** prende el acceso. La app levanta el mismo `ServidorDev` en
+  `127.0.0.1` con el router de la ventana (un solo backend), busca el comando `tailscale`, lee el nombre de la máquina
+  (`tailscale status --json`), lo acepta como Host/Origin, corre `tailscale serve --bg <puerto>` y muestra la dirección
+  con un QR. Mientras está prendido evita que la compu se suspenda (`powerSaveBlocker`). Si falta algo (Tailscale sin
+  instalar o apagado, sin MagicDNS, HTTPS sin habilitar en la red) lo dice y lleva a donde se arregla. Se recuerda en
+  `userData/celular.json`. Código: `desktop/src/celular.ts`, `backend/src/tailscale.ts`, `oficina/ui/celular.js`.
+  Lo que hace falta del otro lado: Tailscale en la compu y en el celular, con la misma cuenta.
+- **Opción B (no hecha)**: un relay propio, uno solo para todas las instalaciones, con emparejamiento por QR y cifrado
+  de punta a punta (la clave en el QR). Solo si Tailscale resulta una barrera para quien la usa.
+
 ## 1. Qué conviene tener en el celular
 
 Criterio: cosas cortas, que destraban trabajo de los agentes o que se hacen mejor hablando.
@@ -29,7 +45,7 @@ tenés varias).
 
 ## 2. Cómo hacerlo
 
-### Fase 1 — Instalable (PWA)
+### Fase 1 — Instalable (PWA) · hecha
 Chico y sin riesgo; con esto ya aparece «Instalar app» / «Agregar a inicio».
 
 1. **`oficina/manifest.webmanifest`**: `name` «Oficina», `short_name`, `start_url: "/?movil=1#/bandeja"`, `scope: "/"`,
@@ -103,8 +119,8 @@ Guardar en IndexedDB el último Parte del día y las últimas charlas abiertas p
 «visto a las 14:32». Solo si se nota la falta.
 
 ## 3. Cosas a tener en cuenta
-- **Seguridad**: hoy la puerta es Tailscale (el servidor escucha en 127.0.0.1 y acepta solo los nombres de
-  `HQ_HOSTS`). Mientras sea así no hace falta login. Si algún día se expone con `tailscale funnel` o fuera del tailnet,
+- **Seguridad**: la puerta es Tailscale (el servidor escucha en 127.0.0.1 y acepta solo los nombres de
+  `HQ_HOSTS`, o el de la máquina en la app de escritorio). Mientras sea así no hace falta login. Si algún día se expone con `tailscale funnel` o fuera del tailnet,
   antes hay que agregar una autenticación (al menos un token por dispositivo).
 - **Audio en iPhone**: la grabadora arma WAV PCM con `AudioContext`, así que no depende del formato del navegador; hay
   que probar igual que el permiso del micrófono se recuerde en la app instalada.

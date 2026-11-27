@@ -269,6 +269,8 @@ App.Ajustes = (function () {
     { id: 'permisos', grupo: 'app', texto: 'Permisos de los agentes', icono: 'escudo', nota: modoPermisos,
       visible: function () { return !!(App.Permisos && (App.Permisos.pintarModo || App.Permisos.abrirModo)); }, pintar: permisos },
     { id: 'ia', grupo: 'app', texto: 'Modelos y consumo', icono: 'medidor', pintar: iaAjustes },
+    { id: 'celular', grupo: 'app', texto: 'Celular', icono: 'telefono', visible: function () { return !!(App.Celular && App.nativo.hay); },
+      nota: function () { return App.Celular.nota(); }, pintar: function (c) { App.Celular.pintar(c); } },
     { id: 'whatsapp', grupo: 'app', texto: 'WhatsApp', icono: 'charla', visible: function () { return !!App.WhatsApp; }, pintar: function (c) { App.WhatsApp.pintar(c); } },
   ];
 

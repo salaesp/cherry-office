@@ -66,6 +66,11 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
       if (!puente) return Promise.resolve(undefined);
       try { return Promise.resolve(puente.postMessage({ accion: 'borrarOficina', carpeta: carpeta })); } catch (e) { return Promise.reject(e); }
     },
+    /* acceso desde el celular (Ajustes › Celular): hacer = 'estado' | 'prender' | 'apagar' | 'probar'; undefined sin app */
+    celular: function (hacer) {
+      if (!puente) return Promise.resolve(undefined);
+      try { return Promise.resolve(puente.postMessage({ accion: 'celular', hacer: hacer || 'estado' })); } catch (e) { return Promise.reject(e); }
+    },
     elegirCarpeta: function (titulo, inicio, crear) {
       if (!puente) return Promise.resolve(undefined);
       try {
@@ -155,6 +160,7 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
     campana: 'M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 21h4',
     mail: 'M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1zM3.5 7l8.5 6.5L20.5 7',
     alerta: 'M12 3l9.5 17h-19zM12 10v4.5M12 17.5v.01',
+    telefono: 'M8 3h8a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM11 18h2',
     clip: 'M20 11.5l-8 8a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4L15 7.1'
   };
   /* «hace 5 min»: acepta segundos epoch, milisegundos, un Date o una fecha ISO */
