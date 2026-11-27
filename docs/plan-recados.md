@@ -133,6 +133,36 @@ recado ve lo que hizo el primero.
     Lo que entra desde cualquier canal termina en `Recados.recibir({canal, texto?, audio?, adjuntos?})`. Sumar Telegram es
     escribir un canal, sin tocar el resto.
 
+## Recados y flujos
+Un flujo es un proceso que vos ya definiste (pasos, quién hace cada uno, dónde aprobás). Si lo que pedís encaja con uno,
+la secretaría tiene que **arrancar ese flujo** en vez de inventar una delegación suelta. Y como los flujos se frenan
+esperándote, el hilo de recados es el lugar natural para destrabarlos desde el celular. Hoy un flujo solo se arranca desde
+la pantalla (`MotorFlujos.iniciar(flujo, nombre, contexto, adjuntos)`) y ningún agente tiene una herramienta para eso.
+
+1. **Arrancar un flujo desde un recado.** Herramienta nueva `arrancar_flujo({flujo, nombre, contexto})`, solo en el hilo de
+   recados. La secretaría ve la lista de flujos de la oficina (nombre, descripción, primer paso) y elige el que encaja. El
+   `contexto` es lo que dijiste, escrito para que lo entienda el primer paso; los adjuntos del recado viajan como adjuntos
+   de la corrida. Misma regla que `delegar`: si se lo pedís por nombre («arrancá el alta de cliente para Prospera») va
+   directo; si lo dedujo, te lo propone. Ante la duda entre un flujo y una delegación suelta, gana el flujo. Si no tiene
+   los datos que el primer paso necesita, te los pregunta antes de arrancar.
+2. **Te avisa cuando un flujo te necesita.** Cuando una corrida que nació de un recado (o, si lo prendés, cualquier corrida)
+   llega a un paso con aprobación o a un paso tuyo (`quien: "persona"`), sale un mensaje al hilo y por el canal:
+   - **aprobación**: «El presupuesto de Marce está listo para aprobar → ver», con botones **Aprobar** y **Pedir cambios**.
+     Pedir cambios abre la respuesta: lo que digas (texto o audio) es la nota que recibe el paso (`volver` con nota);
+   - **paso tuyo**: «Te toca: firmar el contrato». Contestás «hecho» con una nota y, si hace falta, una foto o un archivo,
+     que llegan como entrega del paso (`hecho` con nota y archivos). Desde Telegram es mandar la foto del papel firmado.
+3. **Aprobar por botón o por voz.** Los botones llevan el id de la corrida y el paso: no hay nada que interpretar. Si en
+   cambio lo decís con palabras («aprobale el presupuesto a Marce»), la secretaría usa `aprobar_paso` / `pedir_cambios`
+   solo si hay **una sola** corrida que encaja; si hay más, pregunta cuál. Estas herramientas solo existen en el hilo de
+   recados (donde quien habla sos vos), nunca en revisiones de fuentes: un mensaje de WhatsApp de otro no puede aprobar nada.
+4. **Seguimiento.** «¿Cómo va el alta de Prospera?» se contesta con el estado de la corrida (en qué paso está, quién lo
+   tiene, desde cuándo). Al terminar, o si queda trabada (lo que ya detecta `MotorFlujos.barrer`), te avisa.
+5. **Programado.** «Arrancá el cierre de mes el lunes» necesita que una tarea programada pueda arrancar un flujo; hoy las
+   tareas solo corren un agente. Se suma `flujo` a la tarea de una vez (`tareas.ts`) en vez de hacer otro programador.
+6. **De delegación repetida a flujo** (después). Si le pedís varias veces la misma cadena («que Marce arme el presupuesto y
+   después Betty lo revise»), te sugiere guardarla como flujo, con un borrador armado como el de las esperas
+   (`/api/esperas/flujo`).
+
 ## Acceso desde el celular
 El backend hoy solo escucha dentro de la app (protocolo `hq://`) o en `127.0.0.1` en modo desarrollo: el celular no llega.
 Tres caminos, de menos a más trabajo y riesgo:
@@ -168,6 +198,13 @@ revocable, uno por dispositivo), `Host` y `Origin` controlados como en `servidor
 - «Cancelar» una delegación que no empezó.
 - Lectura de lo que está en curso para «¿cómo va…?».
 - Tema de memoria por delegación abierta.
+
+### R1b: flujos
+- `arrancar_flujo` (ahora), con `origen: {recado}` en la corrida.
+- Aviso de paso con aprobación o paso tuyo, con botones; `aprobar_paso`, `pedir_cambios` y `paso_hecho` en el hilo.
+- Estado de corridas para «¿cómo va…?» y aviso al terminar o al trabarse.
+- Ajuste: avisar por recados solo de las corridas que nacieron de un recado (por defecto) o de todas.
+- Después: tarea programada que arranca un flujo; sugerencia de guardar una cadena repetida como flujo.
 
 ### R2: Telegram
 - Ajustes › Toda la app › Telegram: pegar el token del bot (guardado con `safeStorage`), emparejar con un código de 6
@@ -209,4 +246,6 @@ revocable, uno por dispositivo), `Host` y `Origin` controlados como en `servidor
 2. **¿Un hilo de recados aparte, o que los recados caigan en la charla normal con la secretaría?** Propuesta: aparte, para que
    en el celular veas solo lo que le mandaste y lo que te contestó.
 3. **¿Primer canal del celular: Telegram o la página móvil?** Propuesta: Telegram.
-4. **¿Respuesta en audio?** (la secretaría te contesta con voz). Propuesta: no por ahora; texto corto.
+4. **¿Avisos de flujos por recados de todas las corridas o solo de las que arrancaste desde un recado?** Propuesta: solo
+   esas por defecto, con un ajuste para todas (así el celular te sirve para aprobar cualquier flujo).
+5. **¿Respuesta en audio?** (la secretaría te contesta con voz). Propuesta: no por ahora; texto corto.
