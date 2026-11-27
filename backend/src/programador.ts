@@ -486,7 +486,7 @@ export class Programador implements ProgramadorEntregas {
       const envExtra: Record<string, string> = { ...entorno(ctx) }
       if (mcpUrl !== undefined && mcp) envExtra[variableTokenMCP] = mcp.emitir({ oficina: carpeta, agente, sid, perfil: ctx.perfilMCP })
       try {
-        store.asegurarSesion(sid, agente, carpeta)
+        store.asegurarSesion(sid, agente, carpeta, true)
         store.agregar(sid, 'u', pedido)
         const activa = store.estaActiva(sid)
         const t = await runner.actividad.seguir({ oficina: carpeta, agente, origen: p.origen, tarea: p.actividad, extra: caja.observador(escritos.observador()) },
@@ -639,7 +639,7 @@ export class Programador implements ProgramadorEntregas {
       const envExtra: Record<string, string> = { ...entorno(ctx) }
       if (mcpUrl !== undefined && mcp) envExtra[variableTokenMCP] = mcp.emitir({ oficina: carpeta, agente, sid, perfil: ctx.perfilMCP })
       try {
-        store.asegurarSesion(sid, agente, carpeta)
+        store.asegurarSesion(sid, agente, carpeta, true)
         store.agregar(sid, 'u', v.mensaje)
         const res = await runner.actividad.seguir({ oficina: carpeta, agente, origen, tarea: nombre, extra: caja.observador(escritos.observador()) },
           (obs) => runner.ejecutarChatDetalle({ agente, mensaje: v.mensaje, sid, activa: v.activa, carpeta, obs, envExtra, armar: (p) => argumentos(config, ctx, p) }))
