@@ -280,7 +280,10 @@ A pedido de la persona: armarla era rebuscado (contratar a alguien en un departa
 permisos de WhatsApp, elegir chats en dos lugares, asignar conectores). Ahora:
 - **Ajustes › Secretaría › Contratar**: con un nombre queda armada (chats elegidos, Gmail y Calendario si están
   conectados, con los conectores asignados).
-- **Se sienta en la recepción** (departamento reservado `recepcion`), al costado del mostrador, y no sale a pasear.
+- **Tiene su despacho, «Secretaría», al lado del de la persona** (departamento reservado `recepcion`, el id quedó de
+  cuando se sentaba en el mostrador de la recepción) y no sale a pasear. La recepción queda para el Creador.
+- **Sin género**: la UI habla de «la secretaría» (el puesto) o usa el nombre que le pusiste; nunca «la secretaria» ni
+  «el secretario». La apariencia la elegís en su ficha.
 - **Todo en una pantalla**: los chats se eligen desde la lista completa (elegir uno ahí lo elige en WhatsApp) y prender
   Gmail o Calendario asigna el conector. En la ficha del agente queda un resumen con «Configurar».
 
