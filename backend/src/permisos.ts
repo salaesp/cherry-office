@@ -218,6 +218,17 @@ export const MemoriaSecretariaAgente = {
   herramientasMCP: (o: Oficina, a: AgenteDef) => (MemoriaSecretariaAgente.atiende(o, a) ? MemoriaSecretariaAgente.nombresMCP.map((n) => 'mcp__hq__' + n) : []),
 }
 
+/** Armar la oficina desde la charla (secretaria-creadora.ts): quien atiende la secretaría tiene las herramientas del Creador
+ *  (los mismos nombres que `Creador.nombresMCP`). El servidor solo las ofrece mientras le responde a la persona en una
+ *  charla; van permitidas siempre para que no pidan permiso, como las de delegar. */
+export const SecretariaCreadora = {
+  nombresMCP: ['ver_oficina', 'listar_conectores', 'proponer_departamento', 'proponer_agente', 'proponer_flujo', 'proponer_regla', 'proponer_conector',
+    'proponer_tarea', 'marcar_faltante', 'descartar_tarjeta'],
+  /** ¿Puede proponer cambios en la oficina? Hoy, solo quien atiende la secretaría. */
+  puede: (o: Oficina, agente: string) => o.secretaria !== undefined && o.secretaria.agente === agente,
+  herramientasMCP: (o: Oficina, a: AgenteDef) => (SecretariaCreadora.puede(o, a.id) ? SecretariaCreadora.nombresMCP.map((n) => 'mcp__hq__' + n) : []),
+}
+
 /** El seguimiento de cada agente (seguimiento.ts): temas que sigue y fichas de personas y cosas, en
  *  `conocimiento/agentes/<id>/`. Todo agente menos quien atiende la secretaría (lo suyo va a su memoria privada). */
 export const Seguimiento = {
@@ -261,7 +272,7 @@ export const herramientaProponerSkill = 'mcp__hq__proponer_skill'
 export const HerramientasMCPAgente = {
   lista(o: Oficina, a: AgenteDef): string[] {
     const out: string[] = []
-    for (const h of [...herramientasMCP, ...herramientasDelegar, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, a), ...Acciones.herramientasMCP(o, a), ...WhatsAppAgente.herramientasMCP(o, a), ...MemoriaSecretariaAgente.herramientasMCP(o, a), ...Seguimiento.herramientasMCP(o, a), herramientaProponerSkill]) if (!out.includes(h)) out.push(h)
+    for (const h of [...herramientasMCP, ...herramientasDelegar, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, a), ...Acciones.herramientasMCP(o, a), ...WhatsAppAgente.herramientasMCP(o, a), ...MemoriaSecretariaAgente.herramientasMCP(o, a), ...Seguimiento.herramientasMCP(o, a), ...SecretariaCreadora.herramientasMCP(o, a), herramientaProponerSkill]) if (!out.includes(h)) out.push(h)
     return out
   },
 }

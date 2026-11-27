@@ -19,6 +19,7 @@ import type { AgenteDef, Oficina } from './oficina.js'
 import type { OficinaActiva } from './oficinas.js'
 import { Programador, programadorDe, type Ejecucion } from './programador.js'
 import { atrapar, no404, no405, type Query, type Resp, type SubRouter } from './router.js'
+import { cambiosDeCharla, cambiosPendientes } from './secretaria-creadora.js'
 import { registrarModulo, type Servicios } from './servicios.js'
 import { num, txt, type Fila, type SQLiteDB } from './sqlite.js'
 import { largo, prefijo, uuidValido } from './validar.js'
@@ -327,20 +328,25 @@ export class Delegaciones {
     return {
       tarjetas: this.store.deCharla(oficina, sid).map((t) => this.json(t)),
       acciones: this.accionesDeCharla(oficina, sid).map((a) => ({ ...accionJSON(a), turno: a.turno })),
+      // cambios en la oficina que propuso quien atiende la secretaría (secretaria-creadora.ts)
+      cambios: cambiosDeCharla(this.s, oficina, sid),
     }
   }
 
-  /** Lo que espera a la persona: preguntas abiertas, delegaciones propuestas y propuestas de acción pendientes. */
+  /** Lo que espera a la persona: preguntas abiertas, delegaciones propuestas, propuestas de acción pendientes y las charlas con
+   *  cambios en la oficina sin aprobar (una por charla). */
   pendientesJSON(oficina: string): Obj {
     const tarjetas = [...this.store.enEstado(oficina, 'pregunta', ['abierta']), ...this.store.enEstado(oficina, 'delegacion', ['propuesta'])]
       .sort((a, b) => b.creado - a.creado)
     const acciones = (accionesDe(this.s)?.lista(oficina, ['pendiente']) ?? []).sort((a, b) => b.creada - a.creada)
-    return { tarjetas: tarjetas.map((t) => this.json(t)), acciones: acciones.map(accionJSON) }
+    return { tarjetas: tarjetas.map((t) => this.json(t)), acciones: acciones.map(accionJSON), cambios: cambiosPendientes(this.s, oficina) }
   }
 
-  /** Para la insignia de la Bandeja (las propuestas de acción ya cuentan como entregas sin revisar). */
+  /** Para la insignia de la Bandeja (las propuestas de acción ya cuentan como entregas sin revisar; cada charla con cambios
+   *  sin aprobar cuenta una). */
   teEsperan(oficina: string): number {
     return this.store.enEstado(oficina, 'pregunta', ['abierta']).length + this.store.enEstado(oficina, 'delegacion', ['propuesta']).length
+      + cambiosPendientes(this.s, oficina).length
   }
 
   json(t: Tarjeta): Obj {

@@ -83,3 +83,7 @@
   .tb-dif-fila { grid-template-columns: 1fr; }
   .tb-flecha { display: none; }
 }
+
+/* tarjeta que propuso la secretaría en una charla (docs/plan-secretaria-creadora.md) */
+.tb-de-charla { font: inherit; font-size: 11.5px; color: var(--suave); background: var(--panel-2); border: 1px solid var(--linea); border-radius: 10px; padding: 0 8px; margin-top: 3px; align-self: flex-start; cursor: pointer; }
+.tb-de-charla:hover { color: var(--texto); border-color: var(--linea-fuerte); }

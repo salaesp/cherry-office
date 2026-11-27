@@ -162,7 +162,13 @@
       var msgs = chats[id] || [];
       msgs.forEach(function (m) { delete m.tarjetas; });
       var resto = [];
-      (r.tarjetas || []).map(function (t) { return { t: t }; }).concat((r.acciones || []).map(function (a) { return { a: a, turno: a.turno }; })).forEach(function (x) {
+      /* los cambios en la oficina que propuso la secretaría van juntos, uno por turno (docs/plan-secretaria-creadora.md) */
+      var porTurno = {}, grupos = [];
+      (r.cambios || []).forEach(function (c) {
+        if (!porTurno[c.turno]) { porTurno[c.turno] = { c: [], turno: c.turno }; grupos.push(porTurno[c.turno]); }
+        porTurno[c.turno].c.push(c);
+      });
+      (r.tarjetas || []).map(function (t) { return { t: t }; }).concat((r.acciones || []).map(function (a) { return { a: a, turno: a.turno }; }), grupos).forEach(function (x) {
         var turno = x.t ? x.t.turno : x.turno, m = msgs[turno];
         if (m && m.r === 'a') (m.tarjetas = m.tarjetas || []).push(x); else resto.push(x);
       });
@@ -172,7 +178,7 @@
   function tarjetasEl(lista, id) {
     return lista.map(function (x) {
       var op = { alCambiar: function () { cargarTarjetas(id).then(function () { repintar(id); }); } };
-      return x.a ? App.Tarjetas.accion(x.a, op) : App.Tarjetas.de(x.t, op);
+      return x.c ? App.Tarjetas.cambios(x.c, op) : x.a ? App.Tarjetas.accion(x.a, op) : App.Tarjetas.de(x.t, op);
     });
   }
   function hayVivas(id) {

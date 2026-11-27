@@ -210,19 +210,21 @@ App.Parte = (function () {
     /* lo que te preguntaron o te propusieron en las charlas (docs/plan-recados.md, U3); las propuestas de acción van acá y
        no se repiten en «Para revisar» */
     pend = pend || {};
-    var esperan = (pend.tarjetas || []), accionesP = (pend.acciones || []);
+    var esperan = (pend.tarjetas || []), accionesP = (pend.acciones || []), cambiosP = (pend.cambios || []);
     var enEsperan = {};
     accionesP.forEach(function (a) { if (a.entrega) enEsperan[a.entrega] = true; });
     var entregas = (rev.entregas || []).filter(function (e) { return !enEsperan[e.id]; }).slice(0, 5);
-    var vacio = !esperan.length && !accionesP.length && !(App.Permisos && App.Permisos.cuantos()) && !necesita.length && !entregas.length && !flujos.length && !esperas.length && !bloq.length && !prox.length && !narrado;
+    var vacio = !esperan.length && !accionesP.length && !cambiosP.length && !(App.Permisos && App.Permisos.cuantos()) && !necesita.length && !entregas.length && !flujos.length && !esperas.length && !bloq.length && !prox.length && !narrado;
     var desde = p.desde ? App.hace(p.desde) : '';
     App.add(App.vaciar(der), cabecera('Lo que te espera y lo que pasó' + (desde ? (desde === 'recién' ? ' desde recién' : ' desde ' + desde) : '')), cuerpo, pie);
     /* primero lo urgente: los permisos que piden los agentes, con sus botones acá mismo */
     var perms = App.Permisos && App.Permisos.pendientes ? App.Permisos.pendientes() : [];
     if (perms.length) App.add(cuerpo, seccion('Te piden permiso', h('div.permisos-lista.en-hoy', perms.map(App.Permisos.tarjeta))));
-    if (esperan.length || accionesP.length) {
+    if (esperan.length || accionesP.length || cambiosP.length) {
       var op = { enBandeja: true, alCambiar: function () { cargar(false); } };
-      App.add(cuerpo, seccion('Te esperan', [].concat(esperan.map(function (t) { return App.Tarjetas.de(t, op); }), accionesP.map(function (a) { return App.Tarjetas.accion(a, op); }))));
+      App.add(cuerpo, seccion('Te esperan', [].concat(esperan.map(function (t) { return App.Tarjetas.de(t, op); }), accionesP.map(function (a) { return App.Tarjetas.accion(a, op); }),
+        /* cambios en la oficina que propuso la secretaría, uno por charla (docs/plan-secretaria-creadora.md) */
+        cambiosP.map(function (g) { return App.Tarjetas.cambios(g.tarjetas, { enBandeja: true, agente: g.agente, session: g.session, alCambiar: op.alCambiar }); }))));
     }
 
     var coord = coordinador();

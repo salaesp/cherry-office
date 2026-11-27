@@ -1,13 +1,14 @@
 /* Tarjetas de lo que hizo un agente en una charla (tarjetas.js): delegación, pregunta y propuesta de acción, en la charla y
    en Bandeja › Hoy. Y la grabación de audio (grabadora.js) y el micrófono flotante de la secretaría (microfono.js). */
-:root { --tj-deleg: #a46a12; --tj-deleg-suave: #fbf2e2; --tj-cal: #2f6db5; --tj-cal-suave: #e8f0fa; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; } }
-:root[data-theme="dark"] { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; }
+:root { --tj-deleg: #a46a12; --tj-deleg-suave: #fbf2e2; --tj-cal: #2f6db5; --tj-cal-suave: #e8f0fa; --tj-crea: #2d7f86; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; --tj-crea: #6cc3ca; } }
+:root[data-theme="dark"] { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; --tj-crea: #6cc3ca; }
 
 .tj { background: var(--panel); border: 1px solid var(--linea); border-left: 3px solid var(--tj-tinta, var(--linea-fuerte)); border-radius: var(--radio); overflow: hidden; }
 .tj.deleg { --tj-tinta: var(--tj-deleg); --tj-tinta-suave: var(--tj-deleg-suave); }
 .tj.accion { --tj-tinta: var(--tj-cal); --tj-tinta-suave: var(--tj-cal-suave); }
 .tj.preg { --tj-tinta: var(--acento); }
+.tj.cambio { --tj-tinta: var(--tj-crea); }
 .tj.apagada { opacity: .62; }
 .tj-cab { display: flex; align-items: center; gap: 6px; padding: 9px 12px 0; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--tj-tinta, var(--suave)); }
 .tj-cab svg { width: 14px; height: 14px; }
@@ -27,6 +28,20 @@
 .tj-opcion.elegida::after { content: 'Elegiste esta'; font-size: 11px; color: var(--suave); }
 .tj-opcion small { color: var(--suave); font-size: 12px; }
 .tj .prop { margin: 0; }
+/* cambios en la oficina que propuso la secretaría (docs/plan-secretaria-creadora.md) */
+.tj-cambio + .tj-cambio { border-top: 1px solid var(--linea); padding-top: 9px; }
+.tj-cambio { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tj-cambio-cab { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--suave); }
+.tj-cambio-cab svg { width: 13px; height: 13px; }
+.tj-cambio-campos { font-size: 13px; background: var(--panel-2); border-radius: var(--radio-chico); padding: 5px 9px; }
+.tj-cambio .tb-origen { margin: 2px 0 0; }
+.tj-cambios { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tj-cambios li { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.tj-cambio-tipo { flex: none; width: 92px; font-size: 11.5px; color: var(--tenue); }
+.tj-cambio-tit { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.tj-cambio-est { margin-left: auto; flex: none; font-size: 11.5px; color: var(--suave); }
+.tj-cambio-est.borrador, .tj-cambio-est.error { color: var(--peligro); }
+.tj-cambio-est.creada { color: var(--ok); }
 
 .tj { max-width: 100%; }
 .chat > .tj { align-self: stretch; }

@@ -24,5 +24,6 @@ import './secretaria-memoria.js' // [secretaria-memoria]
 import './secretaria-importar.js' // [secretaria-importar]
 import './audio.js' // [audio]
 import './delegar.js' // [delegar]
+import './secretaria-creadora.js' // [secretaria-creadora]
 import './rutas-skills.js' // [skills-propias]
 export {}

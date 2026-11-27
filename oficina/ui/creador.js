@@ -340,7 +340,10 @@ window.App = window.App || {};
           pintarPie();
         } }) : null,
         h('span.tb-icono', App.icono(TIPO_ICONO[t.tipo])),
-        h('div.tb-tit', h('b', tituloTarjeta(t)), h('span.ayuda', TIPO_UNO[t.tipo])),
+        h('div.tb-tit', h('b', tituloTarjeta(t)), h('span.ayuda', TIPO_UNO[t.tipo]),
+          /* las que propuso la secretaría en una charla dicen de dónde vienen (docs/plan-secretaria-creadora.md) */
+          t.deCharla ? h('button.tb-de-charla', { type: 'button', title: 'Ver la charla', onclick: function () { App.Agente.abrirSesion(t.deCharla, t.charla); } },
+            'De la charla con ' + App.humano.quien(t.deCharla)) : null),
         insignia);
       var faltan = t.faltantes || [];
       var acciones = t.estado !== 'creada' && !form ? h('div.tb-acciones',
@@ -578,5 +581,20 @@ window.App = window.App || {};
     cargarBorrador();
   }
 
-  App.Creador = { abrir: abrir, abierta: function () { return !!(abierta && abierta.el.isConnected); } };
+  /* Lo que sabe dibujar de una tarjeta, para las propuestas que la secretaría hace en la charla (tarjetas.js,
+     docs/plan-secretaria-creadora.md). `todas`: las demás tarjetas, para nombrar las referencias «tarjeta:x». */
+  function resumenTarjeta(t, todas) {
+    var antes = tarjetasActuales;
+    if (todas) tarjetasActuales = todas;
+    try {
+      var d = t.datos || {};
+      return {
+        titulo: tituloTarjeta(t), tipo: TIPO_UNO[t.tipo] || t.tipo, icono: TIPO_ICONO[t.tipo] || 'chispa',
+        accion: ACCION_TXT[t.accion] || t.accion, estado: ESTADO_TXT[t.estado] || t.estado,
+        campos: (t.tipo === 'regla' ? [h('div.tb-texto', d.texto || '')] : camposClave(t)).filter(Boolean)
+      };
+    } finally { tarjetasActuales = antes; }
+  }
+
+  App.Creador = { abrir: abrir, resumenTarjeta: resumenTarjeta, abierta: function () { return !!(abierta && abierta.el.isConnected); } };
 })();

@@ -93,5 +93,86 @@ App.Tarjetas = (function () {
 
   function de(t, op) { return t.tipo === 'pregunta' ? pregunta(t, op) : delegacion(t, op); }
 
-  return { delegacion: delegacion, pregunta: pregunta, accion: accion, de: de };
+  /* ---- cambios en la oficina que propuso la secretaría (docs/plan-secretaria-creadora.md) ----
+     Son tarjetas del Creador: hasta 3 y sin nada en borrador se ven enteras (datos clave y la cita); si son más o a alguna le
+     falta algo, un resumen con «Abrir en el Creador». Se aprueban con POST /api/creador/aplicar y se descartan con DELETE
+     /api/creador/tarjetas/<id>. `op`: {enBandeja, agente, session, alCambiar} */
+  var PENDIENTE = { lista: true, borrador: true, error: true };
+  var MAX_ENTERAS = 3;
+  function resumenDe(t, todas) {
+    if (App.Creador && App.Creador.resumenTarjeta) return App.Creador.resumenTarjeta(t, todas);
+    var d = t.datos || {};
+    return { titulo: d.nombre || d.texto || t.id, tipo: t.tipo, icono: 'chispa', accion: t.accion, estado: t.estado, campos: [] };
+  }
+  function abrirCreador() { App.Nav.ir('#/equipo/creador'); }
+  function aplicar(ts, op) {
+    var quitar = ts.filter(function (t) { return t.accion === 'quitar'; });
+    var conf = quitar.length ? App.confirmar(quitar.length === 1 ? '¿Quitar algo de la oficina?' : '¿Quitar ' + quitar.length + ' cosas de la oficina?',
+      'Se va a quitar: ' + quitar.map(function (t) { return resumenDe(t, ts).titulo; }).join(', ') + '.', 'Quitar y aprobar', true) : Promise.resolve(true);
+    return conf.then(function (si) {
+      if (!si) return;
+      var cuerpo = { ids: ts.map(function (t) { return t.id; }) };
+      if (quitar.length) cuerpo.confirmarQuitar = true;
+      return App.api.post('/api/creador/aplicar', cuerpo).then(function (r) {
+        var res = r.resultados || [], ok = res.filter(function (x) { return x.ok; }).length, mal = res.filter(function (x) { return !x.ok; });
+        if (App.recargarOficina) App.recargarOficina().catch(function () {});
+        if (ok) App.aviso(ok === 1 ? 'Listo: se creó 1 cosa.' : 'Listo: se crearon ' + ok + ' cosas.');
+        if (mal.length) App.aviso(mal[0].error || 'No se pudo crear.', true);
+      }).catch(function (e) { App.aviso(e.message, true); }).then(function () {
+        if (op.alCambiar) op.alCambiar();
+        if (App.Actividad) setTimeout(App.Actividad.ya, 200);
+      });
+    });
+  }
+  function descartarTodas(ts, op) {
+    return Promise.all(ts.map(function (t) { return App.api.del('/api/creador/tarjetas/' + encodeURIComponent(t.id)); }))
+      .catch(function (e) { App.aviso(e.message, true); })
+      .then(function () { if (op.alCambiar) op.alCambiar(); if (App.Actividad) setTimeout(App.Actividad.ya, 200); });
+  }
+  function cambios(lista, op) {
+    op = op || {};
+    var vivas = (lista || []).filter(function (t) { return t.estado !== 'descartada'; });
+    if (!vivas.length) return null;
+    var pend = vivas.filter(function (t) { return PENDIENTE[t.estado]; });
+    var listas = vivas.filter(function (t) { return t.estado === 'lista'; });
+    var borr = vivas.filter(function (t) { return t.estado === 'borrador'; });
+    var compacto = vivas.length > MAX_ENTERAS || borr.length > 0;
+    var cab = op.enBandeja ? nombre(op.agente) + ' te propone cambios en la oficina'
+      : vivas.length === 1 ? 'Propuesta para la oficina' : 'Propuestas para la oficina · ' + vivas.length;
+    var estado = !pend.length ? (vivas.every(function (t) { return t.estado === 'creada'; }) ? 'Creado' : '')
+      : borr.length ? (borr.length === 1 ? '1 con dudas' : borr.length + ' con dudas') : 'Te espera';
+    var cuerpo = [];
+    if (compacto) {
+      cuerpo.push(h('ul.tj-cambios', vivas.map(function (t) {
+        var r = resumenDe(t, vivas);
+        return h('li', h('span.tj-cambio-tipo', r.tipo), h('span.tj-cambio-tit', r.titulo),
+          h('span.tj-cambio-est.' + t.estado, t.estado === 'lista' ? r.accion : r.estado));
+      })));
+      borr.forEach(function (t) {
+        (t.faltantes || []).slice(0, 2).forEach(function (f) { cuerpo.push(h('div.tj-nota', 'Falta: ' + (f.pregunta || f.campo || String(f)))); });
+      });
+    } else {
+      vivas.forEach(function (t) {
+        var r = resumenDe(t, vivas);
+        cuerpo.push(h('div.tj-cambio',
+          h('div.tj-cambio-cab', App.icono(r.icono), h('span', r.accion + ' · ' + r.tipo), h('span.tj-cambio-est.' + t.estado, t.estado === 'lista' ? '' : r.estado)),
+          h('div.tj-tit', r.titulo),
+          r.campos.length ? h('div.tj-cambio-campos', r.campos) : null,
+          t.estado === 'error' && t.error ? h('div.tj-nota.error', t.error) : null,
+          t.origen ? h('blockquote.tb-origen', t.origen) : null));
+      });
+    }
+    var bs = [];
+    if (op.enBandeja && op.session) bs.push(enlaceCharla({ agente: op.agente, session: op.session }));
+    if (pend.length) bs.push(boton('Abrir en el Creador', compacto ? 'primario' : 'fantasma', abrirCreador));
+    else bs.push(boton('Ver en el Creador', 'fantasma', abrirCreador));
+    if (pend.length && !compacto) bs.push(boton('Descartar', 'fantasma', function () { return descartarTodas(pend, op); }));
+    if (listas.length) {
+      var txt = !compacto ? (listas.length === 1 ? 'Aprobar' : 'Aprobar las ' + listas.length) : listas.length === 1 ? 'Aprobar la lista' : 'Aprobar las ' + listas.length + ' listas';
+      bs.push(boton(txt, compacto ? '' : 'primario', function () { return aplicar(listas, op); }));
+    }
+    return caja('cambio' + (pend.length ? '' : '.apagada'), 'chispa', cab, estado, cuerpo, bs);
+  }
+
+  return { delegacion: delegacion, pregunta: pregunta, accion: accion, de: de, cambios: cambios };
 })();
