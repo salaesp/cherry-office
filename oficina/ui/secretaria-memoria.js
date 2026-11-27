@@ -118,7 +118,7 @@
       if (datos.sugerencias.length) {
         datos.sugerencias.forEach(function (s) {
           caja.appendChild(h('div', { style: { border: '1px solid var(--linea-fuerte)', borderRadius: '10px', padding: '10px 12px', marginBottom: '10px', background: 'var(--panel-2)' } },
-            h('div', { style: { fontWeight: 500 } }, 'La secretaria sugiere compartir ' + (s.tipo === 'tema' ? 'el tema' : 'la ficha') + ' «' + s.titulo + '» con la oficina'),
+            h('div', { style: { fontWeight: 500 } }, 'La secretaría sugiere compartir ' + (s.tipo === 'tema' ? 'el tema' : 'la ficha') + ' «' + s.titulo + '» con la oficina'),
             h('div.ajuste-ayuda', { style: { margin: '2px 0 8px' } }, s.motivo),
             h('div', { style: { display: 'flex', gap: '8px' } },
               h('button.btn.chico.primario', { onclick: function () { compartir((s.tipo === 'tema' ? 'temas/' : 'fichas/') + s.slug + '.md', s.titulo, cargar); } }, 'Compartir'),
@@ -132,7 +132,7 @@
         h('option', { value: 'todos', selected: filtro === 'todos' }, 'Todos'));
       sel.addEventListener('change', function () { filtro = sel.value; dibujar(); });
       caja.appendChild(h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' } }, h('span', 'Mostrar'), sel,
-        h('span.ajuste-ayuda', { style: { flex: 1 } }, 'Si algo lleva más de ' + datos.limites.diasSinMovimiento + ' días sin moverse o ya pasó su fecha, la secretaria lo marca en su reporte («Seguimiento»).')));
+        h('span.ajuste-ayuda', { style: { flex: 1 } }, 'Si algo lleva más de ' + datos.limites.diasSinMovimiento + ' días sin moverse o ya pasó su fecha, la secretaría lo marca en su reporte («Seguimiento»).')));
       var temas = datos.temas.filter(function (t) {
         if (filtro === 'abiertos') return t.estado === 'abierto' || t.estado === 'esperando';
         if (filtro === 'trabados') return t.trabado;
@@ -140,7 +140,7 @@
       });
       /* con fecha primero (la más próxima), después por movimiento */
       temas.sort(function (a, b) { return (a.fecha ? 0 : 1) - (b.fecha ? 0 : 1) || (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0); });
-      if (!temas.length) caja.appendChild(h('div.vacio', filtro === 'abiertos' ? 'No hay temas abiertos. La secretaria los va armando sola cuando revisa tus fuentes y cuando charlás con ella.' : 'No hay temas así.'));
+      if (!temas.length) caja.appendChild(h('div.vacio', filtro === 'abiertos' ? 'No hay temas abiertos. La secretaría los va armando cuando revisa tus fuentes y cuando charlan.' : 'No hay temas así.'));
       temas.forEach(function (t) { caja.appendChild(tema(t)); });
     }
 
@@ -239,7 +239,7 @@
   }
 
   /* ---------------- importar notas ---------------- */
-  /* Una carpeta de notas de tu compu (por ejemplo de Obsidian) que la secretaria lee y ordena en su memoria. Nunca se toca la
+  /* Una carpeta de notas de tu compu (por ejemplo de Obsidian) que la secretaría lee y ordena en su memoria. Nunca se toca la
      carpeta: solo se lee. Primero «Analizar» (cuántos archivos y cuánto texto, sin gastar nada), después confirmar. En segundo
      plano, por tandas, con progreso y «Cancelar». API: /api/secretaria/memoria/importar* (ver backend/API.md). */
   var imp = '/importar';
@@ -329,7 +329,7 @@
       } }, App.icono('carpeta'), 'Elegir…') : null;
       caja.appendChild(h('div.ajuste-tit', 'Una carpeta de notas'));
       caja.appendChild(h('div.ajuste-ayuda', { style: { margin: '2px 0 8px' } },
-        'Pasá a la memoria de la secretaria lo que tengas anotado en otro lado: resúmenes por día, datos de salud, trámites… Lee los .md, .txt, PDF y Word de la carpeta y sus subcarpetas (no las ocultas ni las imágenes) y lo ordena en fichas, temas en seguimiento y el diario. La carpeta no se toca: solo se lee. Tiene que estar en esta misma compu.'));
+        'Pasá a la memoria de la secretaría lo que tengas anotado en otro lado: resúmenes por día, datos de salud, trámites… Lee los .md, .txt, PDF y Word de la carpeta y sus subcarpetas (no las ocultas ni las imágenes) y lo ordena en fichas, temas en seguimiento y el diario. La carpeta no se toca: solo se lee. Tiene que estar en esta misma compu.'));
       caja.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, campo, elegir,
         h('button.btn.primario', { onclick: function () { analizar(false); } }, 'Analizar')));
       resultado = h('div', { style: { marginTop: '12px' } });
@@ -356,12 +356,12 @@
       var cuadro = h('div', { style: { border: '1px solid var(--linea-fuerte)', borderRadius: '10px', padding: '10px 12px', background: 'var(--panel-2)' } });
       if (!a.archivos) {
         cuadro.appendChild(h('div', { style: { fontWeight: 500 } }, a.iguales ? 'No hay nada nuevo para importar' : 'No encontré archivos de texto para importar'));
-        cuadro.appendChild(h('div.ajuste-ayuda', a.iguales ? 'Todo lo de esa carpeta ya está en la memoria de la secretaria.' : 'Busqué .md, .txt, PDF, Word y similares, sin las carpetas ocultas.'));
+        cuadro.appendChild(h('div.ajuste-ayuda', a.iguales ? 'Todo lo de esa carpeta ya está en la memoria de la secretaría.' : 'Busqué .md, .txt, PDF, Word y similares, sin las carpetas ocultas.'));
       } else {
         cuadro.appendChild(h('div', { style: { fontWeight: 500 } }, (desdeUltima || a.iguales ? 'Hay para importar: ' : 'Para importar: ') + plural(a.archivos, 'archivo', 'archivos') + ', ' + num(a.caracteres) + ' caracteres'));
         cuadro.appendChild(h('div.ajuste-ayuda', { style: { margin: '2px 0 4px' } }, 'Va en ' + plural(a.tandas, 'tanda', 'tandas') + ' de unos ' + num(a.tandaChars) + ' caracteres' + (partes.length ? ' · ' + partes.join(' · ') : '') + '.'));
         cuadro.appendChild(h('div.ajuste-ayuda', { style: { margin: '4px 0 8px' } },
-          'Ojo: usa Claude en proporción al texto. Cada tanda es una corrida de ' + (a.secretaria ? a.secretaria.nombre : 'la secretaria') + ' con su memoria (un chat de unos minutos), así que ' + plural(a.tandas, 'tanda gasta', 'tandas gastan') + ' del plan, y las notas largas más. Corre en segundo plano y la podés cancelar. Lo que importa es lo que va a la memoria, no una copia de las notas.'));
+          'Ojo: usa Claude en proporción al texto. Cada tanda es una corrida de ' + (a.secretaria ? a.secretaria.nombre : 'la secretaría') + ' con su memoria (un chat de unos minutos), así que ' + plural(a.tandas, 'tanda gasta', 'tandas gastan') + ' del plan, y las notas largas más. Corre en segundo plano y la podés cancelar. Lo que importa es lo que va a la memoria, no una copia de las notas.'));
         var ir = h('button.btn.primario', { onclick: function () {
           ir.disabled = true;
           api().post(base + imp + '/empezar', { ruta: a.carpeta }).then(function () { App.guardado('Empezó la importación.'); return cargar(); })
@@ -385,7 +385,7 @@
 
 
   function borrarTodo(alBorrar) {
-    return App.confirmar('¿Borrar toda la memoria de la secretaría?', 'Se borran su diario, los temas en seguimiento y las fichas. No se puede deshacer, y la secretaria empieza de cero. Lo que ya compartiste con la oficina queda ahí.', 'Borrar la memoria', true).then(function (si) {
+    return App.confirmar('¿Borrar toda la memoria de la secretaría?', 'Se borran su diario, los temas en seguimiento y las fichas. No se puede deshacer, y la secretaría empieza de cero. Lo que ya compartiste con la oficina queda ahí.', 'Borrar la memoria', true).then(function (si) {
       if (!si) return;
       return api().del(base).then(function () { App.guardado('La memoria de la secretaría quedó vacía.'); if (alBorrar) alBorrar(); }).catch(App.fallo);
     });
@@ -407,7 +407,7 @@
           + (r.sugerencias.length ? ' · ' + r.sugerencias.length + (r.sugerencias.length === 1 ? ' sugerencia para compartir' : ' sugerencias para compartir') : '');
         caja.appendChild(h('div.ajuste', { style: { display: 'block' } },
           h('div.ajuste-tit', 'Memoria'),
-          h('div.ajuste-ayuda', { style: { margin: '2px 0 8px' } }, 'Lo que la secretaria va sabiendo de vos, de WhatsApp, Gmail, el calendario y la charla con ella: un diario, los temas en seguimiento y fichas de personas y cosas. Es privada: no la ven los demás agentes ni pasa por la Biblioteca.'),
+          h('div.ajuste-ayuda', { style: { margin: '2px 0 8px' } }, 'Lo que la secretaría va sabiendo de vos, de WhatsApp, Gmail, el calendario y lo que charlan: un diario, los temas en seguimiento y fichas de personas y cosas. Es privada: no la ven los demás agentes ni pasa por la Biblioteca.'),
           h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } },
             h('button.btn', { onclick: function () { abrir({ alCerrar: cargar }); } }, App.icono('carpeta'), 'Ver la memoria'),
             h('button.btn', { onclick: function () { importar(cargar); } }, App.icono('abrir'), 'Importar notas…'),

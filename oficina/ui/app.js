@@ -335,6 +335,7 @@
         else if (t === 'yo') App.Yo.abrir();
         else if (t === 'entrega') App.Entregables.abrir(id);
         else if (t === 'creador') App.Creador.abrir();
+        else if (t === 'secretaria' && App.Ajustes) App.Ajustes.abrir('secretaria');
         else if (t === 'flujos') App.Flujos.abrir();
       });
       if (App.Oficina3D.alPasar && App.Paleta) App.Oficina3D.alPasar(App.Paleta.pista);
@@ -371,8 +372,9 @@
       .catch(function (e) { dom.carga.textContent = 'No pude armar la oficina en 3D: ' + e.message; console.error(e); });
   }
 
-  /* la recepción no es un departamento de la oficina: ahí se sienta quien atiende la secretaría (en el mostrador) */
-  App.RECEPCION = { id: 'recepcion', nombre: 'Recepción', color: '#b9a27a' };
+  /* «recepcion» no es un departamento de la oficina: es el id (de antes) de quien atiende la secretaría, que tiene su
+     despacho al lado del tuyo. Se muestra como «Secretaría» */
+  App.RECEPCION = { id: 'recepcion', nombre: 'Secretaría', color: '#b9a27a' };
   App.depto = function (id) { return (E.oficina.departamentos || []).filter(function (d) { return d.id === id; })[0] || (id === 'recepcion' ? App.RECEPCION : null); };
   App.agente = function (id) { return (E.oficina.agentes || []).filter(function (a) { return a.id === id; })[0] || null; };
 
