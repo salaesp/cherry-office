@@ -188,6 +188,14 @@ select.campo { padding-right: 26px; }
 .etq-tarea[data-estado="escribiendo"] small::before, .etq-tarea[data-estado="trabajando"] small::before { background: var(--ok); }
 .etq-tarea[data-estado="leyendo"] small::before, .etq-tarea[data-estado="buscando"] small::before { background: #5b8fd9; }
 .persona-rol.vivo { color: var(--texto); }
+/* mientras trabaja: de dónde viene el trabajo y, abajo, el paso y cuánto lleva */
+.persona-origen { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--suave); white-space: nowrap; min-width: 0; }
+.persona-origen svg { width: 12px; height: 12px; flex: none; color: var(--tenue); }
+.persona-origen span { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.persona-rol.persona-paso { display: flex; color: var(--texto); min-width: 0; }
+.persona-paso .paso-txt { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.persona-paso .paso-seg { flex: none; margin-left: 6px; color: var(--tenue); font-variant-numeric: tabular-nums; }
+.persona-paso.esperando { color: var(--suave); font-style: italic; }
 .etq-agente.hablando .etq-in span::after { content: " · hablando"; font-weight: 500; opacity: .75; }
 
 /* ---------- panel derecho ---------- */

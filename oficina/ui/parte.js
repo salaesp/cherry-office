@@ -154,16 +154,50 @@ App.Parte = (function () {
     return d.toLocaleString('es', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
 
+  /* «Qué pasó»: cifras grandes (entregas, tareas hechas, con error, gasto), lo que falló con su motivo y quién trabajó */
   function quePaso(p) {
-    var l = [];
-    if (p.entregas) l.push(plural(p.entregas, 'entrega nueva', 'entregas nuevas'));
-    if (p.pasosTerminados) l.push(plural(p.pasosTerminados, 'paso de flujo terminado', 'pasos de flujo terminados'));
-    if (p.ejecucionesOk) l.push(plural(p.ejecucionesOk, 'tarea hecha', 'tareas hechas'));
-    if (p.ejecucionesError) l.push(plural(p.ejecucionesError, 'tarea con error', 'tareas con error'));
-    if (p.reunionesCerradas) l.push(plural(p.reunionesCerradas, 'reunión cerrada', 'reuniones cerradas'));
-    if (!l.length) return null;
-    var out = [h('ul.parte-lista', l.map(function (x) { return h('li', x); }))];
-    if (typeof p.costo === 'number' && p.costo > 0) out.push(h('div.ayuda', '≈ US$ ' + p.costo.toFixed(2) + ' en total'));
+    var cifras = [];
+    var cifra = function (n, uno, varios, clase, alTocar) {
+      if (!n) return;
+      cifras.push(h((alTocar ? 'button' : 'div') + '.qp-cifra' + (clase ? '.' + clase : ''), alTocar ? { type: 'button', onclick: alTocar } : null,
+        h('b', String(n)), h('span', n === 1 ? uno : varios)));
+    };
+    cifra(p.entregas, 'entrega nueva', 'entregas nuevas', null, function () { App.Nav.ir('#/bandeja/revisar'); });
+    cifra(p.ejecucionesOk, 'tarea hecha', 'tareas hechas');
+    cifra(p.ejecucionesError, 'tarea con error', 'tareas con error', 'error');
+    cifra(p.pasosTerminados, 'paso de flujo', 'pasos de flujo');
+    cifra(p.reunionesCerradas, 'reunión cerrada', 'reuniones cerradas');
+    var hayCosto = typeof p.costo === 'number' && p.costo > 0;
+    if (hayCosto) cifras.push(h('div.qp-cifra.costo', h('b', 'US$ ' + p.costo.toFixed(2)), h('span', 'gastado')));
+    if (!cifras.length) return null;
+    var out = [h('div.qp-cifras', cifras)];
+
+    /* lo que falló: qué tarea, de quién y por qué */
+    var errs = p.errores || [];
+    if (errs.length) {
+      out.push(h('div.qp-sub', 'Lo que falló'), h('div.qp-errores', errs.map(function (x) {
+        var ag = x.agente && App.agente(x.agente);
+        var esTarea = ag && ((App.E.oficina || {}).tareas || []).some(function (t) { return t.id === x.tarea; });
+        return h((esTarea ? 'button' : 'div') + '.qp-error', esTarea ? { type: 'button', title: 'Ver las tareas de ' + ag.nombre, onclick: function () { App.Agente.abrir(ag.id, 'tareas'); } } : null,
+          ag ? App.retratoImg(ag, 'retrato', 48) : h('span.qp-ico', App.icono('alerta')),
+          h('div.qp-txt', h('b', x.nombre), h('span', (ag ? ag.nombre + ' · ' : '') + x.error)),
+          h('span.qp-cuando', App.hace(x.cuando)));
+      })));
+    }
+
+    /* quién trabajó: lo que gastó cada uno, con una barra a escala del que más gastó */
+    var gastos = Object.keys(p.costoAgentes || {}).map(function (id) { return [id, p.costoAgentes[id]]; })
+      .filter(function (x) { return x[1] > 0.005; }).sort(function (a, b) { return b[1] - a[1]; });
+    if (gastos.length > 1) {
+      var max = gastos[0][1];
+      out.push(h('div.qp-sub', 'Quién trabajó'), h('div.qp-gastos', gastos.slice(0, 6).map(function (x) {
+        var ag = App.agente(x[0]);
+        return h('div.qp-gasto', ag ? App.retratoImg(ag, 'retrato', 48) : h('span.qp-ico', App.icono('personas')),
+          h('span.qp-nombre', ag ? ag.nombre : App.humano.quien(x[0])),
+          h('span.qp-barra', h('i', { style: { width: Math.max(4, Math.round(x[1] / max * 100)) + '%' } })),
+          h('span.qp-monto', 'US$ ' + x[1].toFixed(2)));
+      })));
+    }
     return out;
   }
 

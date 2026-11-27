@@ -133,6 +133,8 @@ describe('Parte.armar / GET /api/parte con datos sembrados', () => {
     expect(typeof fl.dias === 'number' && fl.desde !== '').toBe(true)
     // qué pasó
     expect(o.paso).toMatchObject({ entregas: 2, ejecucionesOk: 2, ejecucionesError: 1, reunionesCerradas: 1, pasosTerminados: 1 })
+    // lo que falló, con su motivo, de quién y el nombre de la tarea en palabras
+    expect(o.paso.errores).toEqual([expect.objectContaining({ tarea: 'informe', nombre: 'Informe', agente: 'marce', error: 'x' })])
     expect(Math.abs(o.paso.costo - 0.42)).toBeLessThan(1e-9)
     expect(Array.isArray(o.bloqueos)).toBe(true)
     // próximas

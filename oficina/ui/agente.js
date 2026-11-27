@@ -537,6 +537,7 @@
   function ocupado(id, si) {
     if (si) { enCurso[id] = true; App.E.ocupados[id] = true; } else { delete enCurso[id]; delete App.E.ocupados[id]; }
     App.Oficina.ocupado(id, si);
+    if (App.Actividad) App.Actividad.repintar();
     App.marcarEstados();
   }
 
@@ -584,7 +585,23 @@
     }
     return App.seccion('En la oficina', [
       fila('coordinador', 'Coordinador/a', 'Ve el trabajo de todos y reparte encargos', a.nombre + ' coordina la oficina.', a.nombre + ' ya no coordina.'),
-      fila('whatsapp', 'Leer WhatsApp', 'Los chats elegidos en Ajustes › WhatsApp', a.nombre + ' puede leer WhatsApp.', a.nombre + ' ya no lee WhatsApp.')]);
+      filaWhatsAppSecretaria(a) || fila('whatsapp', 'Leer WhatsApp', 'Los chats elegidos en Ajustes › WhatsApp', a.nombre + ' puede leer WhatsApp.', a.nombre + ' ya no lee WhatsApp.')]);
+  }
+
+  /* Quien atiende la secretaría ya lee los chats de su fuente WhatsApp sin el permiso: en vez de un interruptor apagado (que
+     parece «no puede»), se muestra prendido y fijo, cuántos chats lee y desde dónde se eligen. Si además tiene el permiso
+     (de antes), queda el interruptor normal para poder sacárselo. */
+  function filaWhatsAppSecretaria(a) {
+    var sec = (App.E.oficina || {}).secretaria;
+    if (!sec || sec.agente !== a.id || ((App.agente(a.id) || a).permisos || []).indexOf('whatsapp') >= 0) return null;
+    var f = (sec.fuentes || []).filter(function (x) { return x && x.id === 'whatsapp'; })[0];
+    if (!f) return null;
+    var n = (f.chats || []).length;
+    var cuantos = f.todos ? 'todos los chats que se leen' : n === 0 ? 'ningún chat todavía' : n === 1 ? '1 chat' : n + ' chats';
+    var fijo = App.interruptor(true, null, 'Lee WhatsApp por la secretaría', true);
+    fijo.title = 'Lo da la secretaría: se cambia en Ajustes › Secretaría';
+    return App.renglon({ titulo: 'Leer WhatsApp', sub: 'Por la secretaría · ' + cuantos,
+      control: [h('button.btn.chico.fantasma', { onclick: function () { App.Ajustes.abrir('secretaria'); } }, 'Elegir chats'), fijo] });
   }
 
   function despedir(a) {

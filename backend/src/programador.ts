@@ -779,6 +779,7 @@ export function nombreCorrida(id: string): string {
   if (id.startsWith(Programador.prefijoParte)) return 'Parte del día'
   if (id.startsWith(Programador.prefijoPedido)) return 'Pedido de un colega'
   if (id.startsWith(Programador.prefijoEspera)) return 'Versión completa'
+  if (/^secretaria:r\d+$/.test(id)) return 'Reporte de la secretaría'
   if (id.startsWith(Programador.prefijoSecretaria)) return 'Revisión de la secretaría'
   if (id.startsWith(Programador.prefijoImportar)) return 'Importación a la memoria de la secretaría'
   return id
