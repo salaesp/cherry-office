@@ -68,7 +68,7 @@ App.Flujos = (function () {
     clearTimeout(relojDetalle);
     if (abierta !== null) { abierta = null; App.Nav.alAbrir('flujos'); }
     var der = App.dom.derecho, cuerpo = h('div.der-cuerpo'), pie = h('div.der-pie');
-    var zona = h('div', App.cargando('Trayendo las corridas y los flujos…'));
+    var zona = h('div.der-secciones', App.cargando('Trayendo las corridas y los flujos…'));
     function chip(est, txt) {
       return h('button.chip' + (filtro === est ? '.sel' : ''), { onclick: function () { filtro = est; pintarLista(); } }, txt);
     }
