@@ -312,11 +312,29 @@ App.Nav = (function () {
   }
 
   /* --- charlas guardadas de todos (la más reciente primero): las usa el costado de cada charla --- */
+  /* charlas que empezaste en este navegador y el servidor todavía no listó (le escribiste a una charla nueva y el agente
+     sigue respondiendo, o el pedido todavía no salió): quedan en la lista hasta que /api/sesiones las traiga, así no
+     desaparecen si te vas a otra charla antes de que termine. */
+  var pendientes = {};
+  function conPendientes(lista) {
+    var hay = {};
+    lista.forEach(function (s) { hay[s.session] = true; delete pendientes[s.session]; });
+    var extra = Object.keys(pendientes).map(function (k) { return pendientes[k]; }).filter(function (s) { return !hay[s.session]; });
+    return extra.length ? extra.concat(lista).sort(function (x, y) { return y.ts - x.ts; }) : lista;
+  }
   function cargarSesiones() {
     return api().get('/api/sesiones').then(function (r) {
-      sesiones = r.sesiones || [];
+      sesiones = conPendientes(r.sesiones || []);
       return sesiones;
-    }).catch(function () { sesiones = sesiones || []; });
+    }).catch(function () { sesiones = sesiones || conPendientes([]); });
+  }
+  /* mandaste un mensaje: si es la primera de esa charla, va a la lista ya (con tu mensaje de título) */
+  function anotarCharla(agente, sid, texto) {
+    if (!sid || (sesiones || []).some(function (s) { return s.session === sid; })) return;
+    var t = (texto || '').replace(/\s+/g, ' ').trim();
+    var s = { session: sid, agente: agente, titulo: t, ultimo: t, de: 'u', ts: Date.now() / 1000, n: 1 };
+    pendientes[sid] = s;
+    if (sesiones) sesiones.unshift(s);
   }
   function titulo(s) {
     var t = App.Adjuntos && App.Adjuntos.separar ? App.Adjuntos.separar(s.titulo || '').texto : s.titulo;
@@ -600,7 +618,7 @@ App.Nav = (function () {
   });
 
   return {
-    riel: riel, aplicar: aplicar, ir: ir, alAbrir: alAbrir, alCerrar: alCerrar, refrescar: refrescar,
+    riel: riel, aplicar: aplicar, ir: ir, alAbrir: alAbrir, alCerrar: alCerrar, refrescar: refrescar, anotarCharla: anotarCharla,
     seccion: function () { return seccion; }, enSeccion: function () { return !!seccion && seccion !== 'oficina'; },
     nombreSeccion: function () { var s = SECCIONES.filter(function (x) { return x.id === seccion; })[0]; return s ? s.texto : ''; },
     pintarLista: pintarLista, elegirAgente: elegirAgente, relacionado: relacionado, menuNueva: menuNueva,
