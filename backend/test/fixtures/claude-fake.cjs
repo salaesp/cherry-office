@@ -60,6 +60,7 @@ async function main() {
     else if (m.includes('ador de equipos')) kind = 'borrador'
     else if (m.includes('secretario de actas')) kind = 'acta'
     else if (m.includes('Sos quien ordena el trabajo')) kind = 'tareaschat'
+    else if (m.includes('Sos quien convierte una charla en una skill')) kind = 'chatskill'
     else if (m.includes('Sos el bibliotecario')) kind = 'ficha'
     else if (m.includes('imagen que est')) kind = 'imagen'
   } else {
@@ -115,6 +116,7 @@ async function main() {
       case 'memoria': salida(String.raw`{"type":"result","result":"{\"temas\":[],\"no_vigentes\":[],\"agentes\":[],\"choques\":[],\"oficina\":null,\"resumen\":\"Nada para ordenar.\"}","is_error":false,"total_cost_usd":0.05}`); break
       case 'preguntale': salida(String.raw`{"type":"result","result":"{\"respuesta\":\"Según lo escrito, no hay más datos. [1]\",\"citas\":[1]}","is_error":false,"total_cost_usd":0.04}`); break
       case 'tareaschat': salida(String.raw`{"type":"result","result":"{\"pendientes\":[{\"quien\":\"Marce\",\"nombre\":\"Calendario de diciembre\",\"consigna\":\"Armá el calendario de publicaciones de diciembre con los reels acordados.\",\"depende_de\":[]},{\"quien\":\"\",\"consigna\":\"Aprobar el presupuesto con el cliente\",\"necesita_usuario\":true,\"depende_de\":[1]}]}","is_error":false,"total_cost_usd":0.01}`); break
+      case 'chatskill': salida(String.raw`{"type":"result","result":"{\"nombre\":\"Calendario Mensual\",\"descripcion\":\"Usala cuando te pidan armar el calendario de publicaciones de un mes.\",\"contenido\":\"# Calendario mensual\\n\\n1. Listá las fechas clave.\\n2. Repartí los reels.\"}","is_error":false,"total_cost_usd":0.01}`); break
       case 'ficha': salida(String.raw`{"type":"result","result":"{\"titulo\":\"Ficha de prueba\",\"resumen\":\"Resumen de prueba del documento.\",\"datos_clave\":[\"dato uno\"],\"temas\":[\"pruebas\"],\"util_para\":[\"direccion\"],\"fechas\":[],\"contradicciones\":[]}","is_error":false}`); break
       case 'imagen': salida('{"type":"result","result":"Una imagen de prueba con el texto HOLA MUNDO.","is_error":false}'); break
       case 'turno': salida(JSON.stringify({ type: 'result', result: `Opinión de ${agent} sobre el tema.`, is_error: false, total_cost_usd: 0.02 })); break

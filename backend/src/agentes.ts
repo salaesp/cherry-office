@@ -1,6 +1,7 @@
 // Agentes de la oficina: contratar, borrador, editar, despedir y notas (Agentes.swift + rutas de /api/agentes).
 import { esMemoriaIA, type MemoriaIA } from './config.js'
 import { modoSkillsDe, type ModoSkills } from './skills.js'
+import { SkillsPropias } from './skills-propias.js'
 import { Habilitados } from './habilitados.js'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -498,7 +499,9 @@ export function despedir(oficinas: Oficinas, id: string, log?: { info(m: string)
     if (destino) { try { fs.renameSync(destino, md) } catch {} }
     throw e
   }
-  log?.info(`agente despedido id=${id}`)
+  // sus skills propias no las ve ningún otro agente: se archivan junto al .md (y sus propuestas se descartan)
+  const skills = SkillsPropias.archivar(a.carpeta, id, a.ruta(path.join('.claude', 'agents', '.archivados', `${id}-skills-${sello(new Date())}`)))
+  log?.info(`agente despedido id=${id}${skills > 0 ? ` skills_archivadas=${skills}` : ''}`)
   return [rel, new OficinaActiva(a.carpeta, o)]
 }
 

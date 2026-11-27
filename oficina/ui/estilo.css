@@ -1275,3 +1275,9 @@ button.adjunto:hover { background: var(--panel-2); }
     .hoja-doc .hoja-cuerpo { padding: 14px 16px 20px; }
   }
 }
+
+/* Skills propias (skills-propias.js) */
+.skill-aviso { background: var(--panel-2); border: 1px solid var(--linea); border-radius: var(--radio-chico); padding: 10px 12px; margin-bottom: 14px; font-size: 13px; line-height: 1.45; }
+.skill-aviso b { display: block; margin-bottom: 2px; }
+.skill-aviso .ayuda { margin-top: 4px; }
+textarea.campo.skill-contenido { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; min-height: 260px; }

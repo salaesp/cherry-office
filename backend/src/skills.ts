@@ -57,17 +57,20 @@ export class CatalogoSkills extends CatalogoNombres {
 }
 
 /** `--settings` de una corrida, o undefined si no hace falta. `elegidas` = las que puede usar el agente (lo de la oficina
- *  y su ficha, habilitados.ts); undefined = todas. El llamador ya sacó la herramienta Skill si no queda ninguna (o con
- *  `agente` sin lista). Con lista y catálogo, las demás van `off`; en `resumidas`, además, la descripción recortada. */
-export function settingsSkills(modo: ModoSkills, elegidas: string[] | undefined, catalogo: string[] | undefined): Record<string, unknown> | undefined {
+ *  y su ficha, habilitados.ts, más sus skills propias); undefined = todas. El llamador ya sacó la herramienta Skill si no
+ *  queda ninguna (o con `agente` sin lista). Con lista y catálogo, las demás van `off`; en `resumidas`, además, la
+ *  descripción recortada. `apagar`: las skills propias de otros agentes de la oficina, siempre `off` (no hace falta el
+ *  catálogo: se sabe su nombre por la carpeta de la oficina). */
+export function settingsSkills(modo: ModoSkills, elegidas: string[] | undefined, catalogo: string[] | undefined, apagar: string[] = []): Record<string, unknown> | undefined {
   const r: Record<string, unknown> = {}
   if (modo === 'resumidas') r.skillListingMaxDescChars = largoResumido
+  const off: Record<string, string> = {}
   if (elegidas !== undefined) {
     // sin catálogo todavía (primera corrida): resumidas, y la próxima ya sabe cuáles apagar
-    if (!catalogo) return { skillListingMaxDescChars: largoResumido }
-    const off: Record<string, string> = {}
-    for (const s of catalogo) if (!elegidas.includes(s)) off[s] = 'off'
-    if (Object.keys(off).length > 0) r.skillOverrides = off
+    if (!catalogo) r.skillListingMaxDescChars = largoResumido
+    else for (const s of catalogo) if (!elegidas.includes(s)) off[s] = 'off'
   }
+  for (const s of apagar) if (!elegidas?.includes(s)) off[s] = 'off'
+  if (Object.keys(off).length > 0) r.skillOverrides = off
   return Object.keys(r).length > 0 ? r : undefined
 }

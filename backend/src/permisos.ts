@@ -7,6 +7,7 @@ import { ClaudeRunner, type TurnoConPermiso } from './claude-runner.js'
 import { Config, type MemoriaIA } from './config.js'
 import { jsonCompacto } from './json-swift.js'
 import { settingsSkills, type ModoSkills } from './skills.js'
+import { SkillsPropias } from './skills-propias.js'
 import { Habilitados, prefijoMCP } from './habilitados.js'
 import type { AgenteDef, AlcanceVinculo, Oficina } from './oficina.js'
 import type { OficinaActiva } from './oficinas.js'
@@ -52,6 +53,10 @@ export type ContextoOficina = {
   mcpLocales?: boolean
   /** Skills que puede usar el agente (oficina + ficha, habilitados.ts). undefined = todas (en modo `agente`: ninguna). */
   skillsElegidas?: string[]
+  /** Skills propias del agente (`.claude/skills` de la oficina, skills-propias.ts): van aunque la oficina acote las demás. */
+  skillsPropias?: string[]
+  /** Skills propias de los demás agentes de la oficina: se apagan en esta corrida. */
+  skillsAjenas?: string[]
   /** Servidores MCP de Claude Code que puede usar el agente (oficina + ficha). undefined = todos. */
   mcpElegidos?: string[]
 }
@@ -81,7 +86,12 @@ export function opcionesEfectivas(cfg: Config, ctx: ContextoOficina): { esfuerzo
 function skillsDeCorrida(cfg: Config, ctx: ContextoOficina): string[] | undefined {
   const m = opcionesEfectivas(cfg, ctx).skills
   if (m === 'ninguna') return []
-  return ctx.skillsElegidas ?? (m === 'agente' ? [] : undefined)
+  const base = ctx.skillsElegidas ?? (m === 'agente' ? [] : undefined)
+  if (base === undefined) return undefined
+  const ajenas = new Set(ctx.skillsAjenas ?? [])
+  const out = base.filter((x) => !ajenas.has(x))
+  for (const x of ctx.skillsPropias ?? []) if (!out.includes(x)) out.push(x)
+  return out
 }
 
 /** ¿La corrida lleva la herramienta Skill? No con `ninguna`, ni si la lista que queda está vacía. */
@@ -202,10 +212,13 @@ export const MemoriaSecretariaAgente = {
   herramientasMCP: (o: Oficina, a: AgenteDef) => (MemoriaSecretariaAgente.atiende(o, a) ? MemoriaSecretariaAgente.nombresMCP.map((n) => 'mcp__hq__' + n) : []),
 }
 
+/** Para sugerir una skill propia (rutas-skills.ts): la tienen todos los agentes. */
+export const herramientaProponerSkill = 'mcp__hq__proponer_skill'
+
 export const HerramientasMCPAgente = {
   lista(o: Oficina, a: AgenteDef): string[] {
     const out: string[] = []
-    for (const h of [...herramientasMCP, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, a), ...Acciones.herramientasMCP(o, a), ...WhatsAppAgente.herramientasMCP(o, a), ...MemoriaSecretariaAgente.herramientasMCP(o, a)]) if (!out.includes(h)) out.push(h)
+    for (const h of [...herramientasMCP, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, a), ...Acciones.herramientasMCP(o, a), ...WhatsAppAgente.herramientasMCP(o, a), ...MemoriaSecretariaAgente.herramientasMCP(o, a), herramientaProponerSkill]) if (!out.includes(h)) out.push(h)
     return out
   },
 }
@@ -291,6 +304,8 @@ export const Instrucciones = {
     if (conMCP) {
       secciones.push('## Si te falta algo de un colega\n'
         + 'Consultalo (consultar); si no lo tiene, pedíselo con pedir. Entregá lo que puedas marcando lo que falta y llamá a quedo_esperando: cuando tu colega entregue, la oficina te vuelve a encargar la versión completa.')
+      secciones.push('## Tus skills\n'
+        + `Si en tu trabajo aparece algo que conviene repetir igual la próxima vez (un procedimiento, un formato que te pidieron, criterios para decidir), proponé guardarlo como skill tuya con proponer_skill. ${jefe} la revisa antes de que exista. No propongas por proponer: solo lo que de verdad se va a repetir.`)
     }
     const trabajo = (o.carpetasTrabajo ?? []).filter((c) => alcanceIncluye(c.alcance, a)).map((c) => c.ruta)
     if (trabajo.length > 0) {
@@ -336,6 +351,7 @@ export function contexto(a: OficinaActiva, def: AgenteDef, { dirsExtra = [], act
   const todos = TodosConectores.activo(config)
   const agente = TodosConectores.agente(config, def, catalogo, a.oficina)
   const skillsElegidas = Habilitados.skills(a.oficina, def)
+  const { propias: skillsPropias, ajenas: skillsAjenas } = SkillsPropias.nombres(a.carpeta, def.id)
   const mcpElegidos = Habilitados.mcp(a.oficina, def)
   const rutas = [a.ruta(`conocimiento/agentes/${agente.id}.md`)]
   for (const r of agente.escritura ?? []) if (Validar.rutaEscrituraValida(r)) rutas.push(a.ruta(r))
@@ -353,6 +369,8 @@ export function contexto(a: OficinaActiva, def: AgenteDef, { dirsExtra = [], act
     reglas: agente.reglas ?? [], preguntar: false, ...(todos ? { todosConectores: true } : {}),
     ...(esfuerzoDe(agente) !== undefined ? { esfuerzo: esfuerzoDe(agente) } : {}),
     ...(skillsElegidas !== undefined ? { skillsElegidas } : {}),
+    ...(skillsPropias.length > 0 ? { skillsPropias } : {}),
+    ...(skillsAjenas.length > 0 ? { skillsAjenas } : {}),
     ...(mcpElegidos !== undefined ? { mcpElegidos } : {}),
   }
 }
@@ -473,7 +491,7 @@ export function argumentos(cfg: Config, ctx: ContextoOficina, p: { agente: strin
   if (op.mcpLocales && !estricto) for (const v of mcpVedados(cfg, ctx)) if (!vedadas.includes(v)) vedadas.push(v)
   if (vedadas.length > 0) a.push('--disallowedTools', ...vedadas)
   if (estricto) a.push('--strict-mcp-config')
-  const ajustes = conSkill(cfg, ctx) ? settingsSkills(op.skills, skillsDeCorrida(cfg, ctx), cfg.skillsInstaladas()) : undefined
+  const ajustes = conSkill(cfg, ctx) ? settingsSkills(op.skills, skillsDeCorrida(cfg, ctx), cfg.skillsInstaladas(), ctx.skillsAjenas) : undefined
   if (ajustes) a.push('--settings', jsonCompacto(ajustes))
   const instrucciones = conMemoria(ctx.instrucciones, op.memoria)
   if (instrucciones) a.push('--append-system-prompt', instrucciones)

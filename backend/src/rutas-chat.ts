@@ -1,4 +1,5 @@
 // Rutas del núcleo para el chat (Router.swift): historial, chat, actividad, avisos y costos.
+import { SkillsPropias } from './skills-propias.js'
 import { Adjuntos, type Adjunto } from './adjuntos.js'
 import type { Avisos } from './avisos.js'
 import { TextoAviso, avisoJSON } from './avisos.js'
@@ -425,7 +426,9 @@ export function rutasChat(d: DepsChat): RutaNucleo {
         }
       }
       // los servidores MCP de Claude Code salen del mismo sondeo (y de cualquier corrida sin --strict-mcp-config)
-      return [200, { skills: lista ?? [], mcp: runner.mcpLocales.lista ?? [] }]
+      // las skills propias de los agentes (skills-propias.ts) no se eligen acá: van solas con su agente
+      const propias = new Set(act ? SkillsPropias.listar(act.carpeta).map((x) => x.nombre) : [])
+      return [200, { skills: (lista ?? []).filter((x) => !propias.has(x)), mcp: runner.mcpLocales.lista ?? [] }]
     }
     if (seccion === 'permisos' && n === 3) return method === 'POST' ? responderPermiso(a2!, body) : no405
     if (seccion === 'avisos' && n === 2) {

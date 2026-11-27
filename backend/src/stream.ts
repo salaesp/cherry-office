@@ -85,6 +85,8 @@ export function objetivo(input: Record<string, unknown>): string | undefined {
   }
   if (s(input.query)) return corto(input.query as string)
   if (s(input.colega)) return corto(input.colega as string)
+  // Skill: el nombre de la skill que cargó
+  if (s(input.skill)) return corto(input.skill as string)
   // Bash, Task, Agent: la descripción que el propio agente escribe («Lista los archivos de ventas»)
   if (s(input.description)) return corto(input.description as string)
   return undefined

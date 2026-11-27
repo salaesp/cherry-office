@@ -13,6 +13,7 @@ App.Avisos = (function () {
   function titulo(a) {
     if (a.tipo === 'reunion') return 'Reunión esperándote';
     if (a.tipo === 'propuestas') return 'Propuesta de cambio en un documento';
+    if (a.tipo === 'skill') return (nombre(a) || 'Un agente') + ' propone una skill';
     if (a.tipo === 'pendiente') return 'Pendientes para vos';
     if (a.tipo === 'flujo') return 'Te toca en un flujo';
     if (a.tipo === 'espera') {
@@ -95,6 +96,7 @@ App.Avisos = (function () {
     }
     if (a.tipo === 'reunion') { if (a.ref && App.Reunion.ver) App.Reunion.ver(a.ref); else App.Reunion.abrir(); if (App.Oficina3D.enfocarLugar) App.Oficina3D.enfocarLugar('reunion'); return; }
     if (a.tipo === 'propuestas') { App.Biblioteca.abrir(); return; }
+    if (a.tipo === 'skill') { if (App.SkillsPropias) App.SkillsPropias.revisar(a.agente, a.ref); return; }
     if (a.tipo === 'flujo') { visto({ id: a.id }); if (App.Flujos && App.Flujos.verCorrida) App.Flujos.verCorrida(a.ref); return; }
     if (a.tipo === 'espera') { visto({ id: a.id }); if (App.Parte && App.Parte.abrirEspera) App.Parte.abrirEspera(a.ref); return; }
     if (a.tipo === 'pendiente') { visto({ id: a.id }); if (App.Reunion.ver && a.ref) App.Reunion.ver(a.ref); else App.Reunion.abrir(); return; }

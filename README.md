@@ -57,6 +57,7 @@ En los dos casos hace falta **Claude Code** instalado y con la sesión iniciada.
 | Departamentos | UI: `oficina/ui/departamentos.js` · rutas: `backend/src/rutas-departamentos.ts` · reglas: `backend/src/departamentos.ts` · API: [backend/API.md#departamentos](backend/API.md#departamentos) |
 | Oficinas (abrir, crear, perfil) | `backend/src/oficinas.ts`, `backend/src/rutas-oficinas.ts` |
 | Agentes (contratar, editar, despedir) | `backend/src/agentes.ts`, UI en `oficina/ui/contratar.js` y `oficina/ui/agente.js` |
+| Skills propias de cada agente (ficha, «Convertir en skill», `proponer_skill`) | `backend/src/skills-propias.ts`, `backend/src/rutas-skills.ts`, UI en `oficina/ui/skills-propias.js` · API: [backend/API.md#skills-propias](backend/API.md#skills-propias) |
 | El Creador (armar una oficina con tarjetas) | `backend/src/creador.ts`, `backend/src/rutas-creador.ts`, `oficina/ui/creador.js` |
 | Flujos | `backend/src/flujos.ts`, `backend/src/motor-flujos.ts`, `oficina/ui/flujos.js` |
 | Biblioteca | `backend/src/biblioteca.ts`, `oficina/ui/biblioteca.js` |

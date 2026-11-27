@@ -17,6 +17,11 @@ describe('detalle de herramientas en el chat', () => {
     expect(w).toMatchObject({ objetivo: 'example.com', detalle: 'https://example.com/a/b?c=1' })
   })
 
+  test('Skill: el objetivo es el nombre de la skill (el chat dice «Usó la skill resumen-de-mails»)', () => {
+    const [e] = parsearEvento(toolUse('Skill', { skill: 'resumen-de-mails' }))
+    expect(e).toMatchObject({ tipo: 'herramienta', nombre: 'Skill', objetivo: 'resumen-de-mails' })
+  })
+
   test('Read no lleva detalle; un comando larguísimo se recorta', () => {
     const [r] = parsearEvento(toolUse('Read', { file_path: '/x/oficina.md' }))
     expect(r).not.toHaveProperty('detalle')
