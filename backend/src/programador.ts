@@ -5,6 +5,7 @@
 // de reunión, pasos de flujo, acciones, coordinador, parte) y los «pedir cambios» de las entregas.
 import { randomUUID } from 'node:crypto'
 import { Adjuntos, type Adjunto } from './adjuntos.js'
+import { aplicarEleccion, eleccionCharla } from './agentes.js'
 import { ClaudeError } from './claude-runner.js'
 import { ErrorAPI } from './errores.js'
 import { ArchivosEntrega, iso, type Entrega } from './entregas.js'
@@ -23,18 +24,18 @@ import { registrarModulo, type Servicios } from './servicios.js'
 import { num, txt, type Fila, type SQLiteDB } from './sqlite.js'
 import { CajaArchivos, CajaCosto } from './stream.js'
 import {
-  Programacion, ValidarTareas, esUnica, fechaInicio, mensajeTarea, tareaJSON, zonaDelSistema, type OrigenTarea, type TareaProgramada,
+  Programacion, ValidarTareas, esUnica, type IATarea, fechaInicio, mensajeTarea, tareaJSON, zonaDelSistema, type OrigenTarea, type TareaProgramada,
 } from './tareas.js'
 import { Slug, Validar, largo, prefijo } from './validar.js'
 
 // MARK: - ejecución (una corrida de una tarea)
 
-/** Lo que entregó la ejecución anterior de una tarea repetida, recortado, para el pedido de la siguiente. */
+/** Lo que entregó la ejecución anterior de una tarea repetida, recortado, para las instrucciones de la siguiente. */
 export const maxVezAnterior = 1500
 export function vezAnterior(e: Ejecucion): string {
   const cuando = new Date((e.fin ?? e.inicio) * 1000).toISOString().slice(0, 16).replace('T', ' ')
   const r = e.resultado.trim()
-  return `\n\n---\nLa vez anterior (${cuando} UTC) respondiste esto${largo(r) > maxVezAnterior ? ' (recortado)' : ''}. Usalo para seguir desde ahí y no repetir; no hace falta rehacer lo que ya estaba:\n${prefijo(r, maxVezAnterior)}`
+  return `# La vez anterior\nEsta tarea ya corrió (${cuando} UTC) y respondiste esto${largo(r) > maxVezAnterior ? ' (recortado)' : ''}. Usalo para seguir desde ahí y no repetir; no hace falta rehacer lo que ya estaba:\n${prefijo(r, maxVezAnterior)}`
 }
 
 export type Ejecucion = {
@@ -420,13 +421,17 @@ export class Programador implements ProgramadorEntregas {
   /** «Hacelo ahora» de un pendiente de reunión: una corrida única (no queda en `oficina.json`) con id de tarea
    *  `encargo:<reunión>:<n>`. */
   encargar(act: OficinaActiva, def: AgenteDef, p: { reunion: string; pendiente: number; nombre: string; consigna: string }): Promise<Ejecucion> {
-    return this.encargarLibre(act, def, { id: Programador.idEncargo(p.reunion, p.pendiente), nombre: p.nombre, consigna: p.consigna })
+    return this.encargarLibre(act, def, { id: Programador.idEncargo(p.reunion, p.pendiente), nombre: p.nombre, consigna: p.consigna, sistema: Programador.sistemaPendiente })
   }
 
+  /** Lo que recibe como mensaje de sistema un pendiente de reunión (el mensaje es el pendiente, `consignaEncargo`). */
+  static readonly sistemaPendiente = '# Pendiente de reunión\nEl mensaje es un pendiente que salió de una reunión. Hacelo ahora. Si producís un documento, guardalo en `archivos/entregables/` y decí al final qué archivo dejaste.'
+
   /** Una corrida única con un id de tarea cualquiera (`encargo:`, `flujo:`, `accion:`, `coord:`, `parte:`): misma maquinaria
-   *  que una tarea. `actuar`: herramientas de conectores de actuar que esta corrida puede usar. */
-  encargarLibre(act: OficinaActiva, def: AgenteDef, p: { id: string; nombre: string; consigna: string; actuar?: string[]; sid?: string }): Promise<Ejecucion> {
-    const t: TareaProgramada = { id: p.id, agente: def.id, nombre: p.nombre, consigna: p.consigna, dias: [1], hora: '00:00', activa: false }
+   *  que una tarea. `actuar`: herramientas de conectores de actuar que esta corrida puede usar. `sistema`: instrucciones que
+   *  van como mensaje de sistema (no quedan en la charla); `consigna` es entonces solo el material. */
+  encargarLibre(act: OficinaActiva, def: AgenteDef, p: { id: string; nombre: string; consigna: string; sistema?: string; actuar?: string[]; sid?: string }): Promise<Ejecucion> {
+    const t: TareaProgramada = { id: p.id, agente: def.id, nombre: p.nombre, consigna: p.consigna, dias: [1], hora: '00:00', activa: false, ...(p.sistema ? { sistema: p.sistema } : {}) }
     return this.correrAhora(act, t, def, p.actuar ?? [], p.sid)
   }
 
@@ -601,8 +606,10 @@ export class Programador implements ProgramadorEntregas {
   private async correr(ej: Ejecucion, act: OficinaActiva, t: TareaProgramada, def: AgenteDef, actuar: string[]) {
     // una tarea repetida corre cada horas o días: retomar su conversación saldría más caro (la caché de claude ya venció
     // y habría que reescribir toda la historia). Arranca de cero, con lo que entregó la vez anterior para seguir desde ahí.
+    // Va como mensaje de sistema (con la tarea, así lo retoma igual si se frena por permisos): en la charla queda solo la consigna.
     const previa = esUnica(t) ? undefined : this.ejecuciones.lista(act.carpeta, t.id, 5).find((x) => x.id !== ej.id && x.estado === 'ok' && x.resultado.trim() !== '')
-    await this.vuelta(ej, act, t, def, actuar, { mensaje: mensajeTarea(t) + (previa ? vezAnterior(previa) : ''), activa: false, reglasExtra: [] })
+    const tc: TareaProgramada = previa ? { ...t, sistema: [t.sistema, vezAnterior(previa)].filter(Boolean).join('\n\n') } : t
+    await this.vuelta(ej, act, tc, def, actuar, { mensaje: mensajeTarea(t), activa: false, reglasExtra: [] })
   }
 
   /** Una vuelta de una corrida: la primera (la consigna, en una sesión nueva) o la que retoma la conversación después de
@@ -613,6 +620,9 @@ export class Programador implements ProgramadorEntregas {
     const { store, runner, config, entregas } = this.s
     const ctx = contexto(act, def, { dirsExtra: config.oficinaDirsExtra, actuar, catalogo: this.s.catalogo?.(), config })
     ctx.anotarRechazos = true
+    // modelo, esfuerzo y ahorro propios de la tarea: pisan los del agente solo en esta corrida
+    if (t.ia) aplicarEleccion(ctx, t.ia)
+    if (t.sistema) ctx.instrucciones = ctx.instrucciones ? `${ctx.instrucciones}\n\n${t.sistema}` : t.sistema
     for (const r of v.reglasExtra) if (!(ctx.reglas ?? []).includes(r)) ctx.reglas = [...(ctx.reglas ?? []), r]
     // MCP también fuera del chat: token con el perfil del agente, que vive lo que dura la corrida
     const mcp = this.s.mcp?.()
@@ -897,6 +907,16 @@ export class TareasRouter implements SubRouter {
     return z
   }
 
+  /** «ia»: {modelo, esfuerzo, skills, memoria, colegas, mcpLocales} de las corridas de la tarea (como en una charla).
+   *  undefined = no vino (no cambia); null o {} = sin elección propia (los del agente). */
+  private static ia(v: unknown): IATarea | null | undefined {
+    if (v === undefined) return undefined
+    if (v === null) return null
+    if (!esObjeto(v)) throw new ErrorAPI(400, '«ia» tiene que ser un objeto con modelo, esfuerzo, skills, memoria, colegas o mcpLocales.')
+    const e = eleccionCharla(v)
+    return Object.keys(e).length > 0 ? e : null
+  }
+
   /** «tipo»: "repetida" | "unica" (undefined si no vino). Devuelve si es única. */
   private static tipo(v: unknown): boolean | undefined {
     if (v === undefined || v === null) return undefined
@@ -993,6 +1013,7 @@ export class TareasRouter implements SubRouter {
     }
     const activa = TareasRouter.booleano(d.activa, 'activa') ?? true
     const origen = this.origen(d.origen)
+    const ia = TareasRouter.ia(d.ia)
     const pedidoId = Validar.texto(d.id, 'id', 41, false)
     if (pedidoId !== undefined && !Slug.valido(pedidoId)) throw new ErrorAPI(400, 'Id de tarea inválido (usá minúsculas, números y guiones).')
     const adjuntos = this.guardarAdjuntos(Adjuntos.leer(d.archivos), agente)
@@ -1008,6 +1029,7 @@ export class TareasRouter implements SubRouter {
       if (origen) t.origen = origen
       if (fecha !== undefined) t.fecha = fecha
       if (adjuntos.length > 0) t.archivos = adjuntos
+      if (ia) t.ia = ia
       ts.push(t)
       o.tareas = ts
       return t
@@ -1034,6 +1056,7 @@ export class TareasRouter implements SubRouter {
     const tipo = TareasRouter.tipo(d.tipo)
     if (d.fecha !== undefined && d.dias !== undefined) throw new ErrorAPI(400, 'Elegí días (si se repite) o una fecha (si es una sola vez), no las dos cosas.')
     const fecha = d.fecha === undefined ? undefined : TareasRouter.fecha(d.fecha)
+    const ia = TareasRouter.ia(d.ia)
     const quitar = TareasRouter.quitar(d.quitarArchivos)
     const nuevos = Adjuntos.leer(d.archivos)
     let adjuntos: string[] = []
@@ -1057,6 +1080,8 @@ export class TareasRouter implements SubRouter {
       }
       if (nombre !== undefined) t.nombre = nombre
       if (consigna !== undefined) t.consigna = consigna
+      if (ia === null) delete t.ia
+      else if (ia !== undefined) t.ia = ia
       // pasar de un tipo al otro
       const unica = tipo ?? (fecha !== undefined ? true : dias !== undefined ? false : esUnica(t))
       if (unica && !esUnica(t)) {

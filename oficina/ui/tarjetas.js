@@ -1,6 +1,8 @@
 /* Tarjetas de lo que hizo un agente en una charla (docs/plan-recados.md, U2 y U3): pasarle trabajo a un colega (con unos
    segundos para deshacer, o como propuesta), preguntarle algo a la persona con opciones, o proponer una acción (evento,
    mail). Se ven debajo de la respuesta en la charla y, lo que espera a la persona, en Bandeja › Hoy («Te esperan»).
+   Y los cambios en la oficina que propone un agente en su charla (proponer_tarea; la secretaría, todo lo del Creador;
+   docs/plan-secretaria-creadora.md).
    Usa POST /api/charlas/tarjetas/<id>; elegir una opción manda «Elijo: …» en esa charla (App.Agente.enviarEn). */
 window.App = window.App || {};
 App.Tarjetas = (function () {
@@ -37,15 +39,30 @@ App.Tarjetas = (function () {
   function enlaceCharla(t) {
     return h('button.tj-ver', { onclick: function () { App.Agente.abrirSesion(t.agente, t.session); } }, 'Ver la charla con ' + nombre(t.agente));
   }
-  function decidir(t, accion, opcion, alCambiar) {
+  function decidir(t, accion, opcion, alCambiar, extra) {
     var cuerpo = { accion: accion };
     if (opcion !== undefined) cuerpo.opcion = opcion;
+    if (extra) Object.keys(extra).forEach(function (k) { cuerpo[k] = extra[k]; });
     return App.api.post('/api/charlas/tarjetas/' + t.id, cuerpo).then(function (r) {
       if (r.mensaje && App.Agente && App.Agente.enviarEn) App.Agente.enviarEn(r.mensaje.agente, r.mensaje.session, r.mensaje.texto);
       if (alCambiar) alCambiar(r.tarjeta);
       if (App.Actividad) setTimeout(App.Actividad.ya, 200);
     }).catch(function (e) { App.aviso(e.message, true); });
   }
+
+  /* lo que el agente le compartió al colega o al flujo de WhatsApp: exactamente esos mensajes, con un candado */
+  function compartido(t) {
+    if (!t.compartido || !t.compartido.length) return null;
+    var n = t.compartido.length;
+    return h('details.tj-compartido', h('summary', App.icono('candado'), 'Compartió ' + (n === 1 ? '1 mensaje' : n + ' mensajes') + ' de WhatsApp'),
+      t.compartido.map(function (c) {
+        var f = new Date(c.ts * 1000);
+        var cuando = String(f.getDate()).padStart(2, '0') + '/' + String(f.getMonth() + 1).padStart(2, '0') + ' ' + String(f.getHours()).padStart(2, '0') + ':' + String(f.getMinutes()).padStart(2, '0');
+        return h('div.tj-cita', h('small', c.de + (c.chat && c.chat !== c.de ? ' en «' + c.chat + '»' : '') + ' · ' + cuando), h('div', c.texto));
+      }),
+      h('div.tj-nota', 'Le llegó solo esto, no el chat.'));
+  }
+  function fecha(cuando) { return cuando.fecha.split('-').reverse().join('/') + ' a las ' + cuando.hora; }
 
   var EST_DELEG = { propuesta: 'Te espera', esperando: '', corriendo: 'Trabajando', programada: 'Programado', hecha: 'Hecho', fallida: 'Falló', cancelada: 'Cancelado' };
   /* `op`: {enBandeja, alCambiar} */
@@ -58,6 +75,7 @@ App.Tarjetas = (function () {
     var cuerpo = [h('div.tj-tit', t.nombre), h('details.tj-consigna', h('summary', 'Consigna'), h('div', t.consigna))];
     if (t.estado === 'programada' && t.cuando) cuerpo.push(h('div.tj-nota', 'Para el ' + t.cuando.fecha.split('-').reverse().join('/') + ' a las ' + t.cuando.hora + '.'));
     if (t.estado === 'fallida' && t.error) cuerpo.push(h('div.tj-nota.error', t.error));
+    var cmp = compartido(t); if (cmp) cuerpo.push(cmp);
     var bs = [];
     if (op.enBandeja) bs.push(enlaceCharla(t));
     if (t.estado === 'propuesta') bs.push(boton('Descartar', 'fantasma', function () { return decidir(t, 'descartar', undefined, op.alCambiar); }), boton('Pasárselo', 'primario', function () { return decidir(t, 'confirmar', undefined, op.alCambiar); }));
@@ -91,7 +109,147 @@ App.Tarjetas = (function () {
       [h('div.tj-tit', ac.resumen), App.Propuestas ? App.Propuestas.tarjeta(ac) : null], bs);
   }
 
-  function de(t, op) { return t.tipo === 'pregunta' ? pregunta(t, op) : delegacion(t, op); }
+  /* un flujo que arrancó el agente: propuesta, ventana para deshacer o programado, después sigue la corrida (en qué paso
+     va) y, cuando te espera, se aprueba, se piden cambios o se da por hecho el paso tuyo ahí mismo */
+  var EST_FLUJO = { propuesta: 'Te espera', esperando: '', programada: 'Programado', en_curso: 'En curso', te_espera: 'Te espera', hecha: 'Terminado', trabada: 'Trabado', cancelada: 'Cancelado', fallida: 'No arrancó' };
+  function flujo(t, op) {
+    op = op || {};
+    var de = nombre(t.agente), fl = t.flujoNombre || t.flujo;
+    var cab = op.enBandeja ? (t.estado === 'propuesta' ? de + ' te propone arrancar ' + fl : 'Flujo ' + fl + ' · lo arrancó ' + de)
+      : t.estado === 'propuesta' ? '¿Arranco ' + fl + '?' : t.estado === 'cancelada' && !t.corrida ? 'No arrancó ' + fl : 'Flujo ' + fl;
+    var estado = t.estado === 'esperando' ? h('span', { 'data-empieza': t.empieza || 0 }, 'Empieza en…') : EST_FLUJO[t.estado] || t.estado;
+    var cuerpo = [h('div.tj-tit', t.nombre)];
+    if (t.por_que && (t.estado === 'propuesta' || t.estado === 'esperando')) cuerpo.push(h('div.tj-nota', t.por_que));
+    /* los pasos, con el actual marcado */
+    if (t.pasos && t.pasos.length) {
+      cuerpo.push(h('div.tj-pasos', t.pasos.map(function (p, i) {
+        var cls = typeof t.paso !== 'number' ? '' : i < t.paso || t.estado === 'hecha' ? '.hecho' : i === t.paso ? '.actual' : '';
+        return h('span.tj-paso' + cls, p);
+      })));
+    }
+    if (t.estado === 'te_espera') cuerpo.push(h('div.tj-nota', t.espera === 'aprobacion' ? (nombre(t.quien) + ' terminó «' + t.pasoNombre + '»: falta tu aprobación.') : 'Te toca: ' + t.pasoNombre + '.'));
+    else if (t.estado === 'en_curso' && t.pasoNombre) cuerpo.push(h('div.tj-nota', 'Ahora: ' + t.pasoNombre + (t.quien ? ' (' + nombre(t.quien) + ')' : '') + '.'));
+    if (t.estado === 'programada' && t.cuando) cuerpo.push(h('div.tj-nota', 'Para el ' + fecha(t.cuando) + '.'));
+    if ((t.estado === 'trabada' || t.estado === 'fallida') && t.error) cuerpo.push(h('div.tj-nota.error', t.error));
+    var datos = t.datos && typeof t.datos === 'object' ? Object.keys(t.datos) : [];
+    cuerpo.push(h('details.tj-consigna', h('summary', 'Con qué arranca'), h('div', (t.contexto || '') + (datos.length ? '\n\n' + datos.map(function (k) { return k + ': ' + t.datos[k]; }).join('\n') : ''))));
+    var cmp = compartido(t); if (cmp) cuerpo.push(cmp);
+    /* pedir cambios o contar cómo te fue: una nota que se abre ahí mismo */
+    var nota = null;
+    var conNota = function (accion, etiqueta, ph, obligatoria) {
+      return boton(etiqueta, '', function () {
+        if (!nota) {
+          nota = h('textarea.campo', { rows: 2, placeholder: ph });
+          cuerpoEl.appendChild(nota); nota.focus(); return;
+        }
+        if (obligatoria && !nota.value.trim()) { nota.focus(); return; }
+        return decidir(t, accion, undefined, op.alCambiar, { nota: nota.value });
+      });
+    };
+    var bs = [];
+    if (op.enBandeja) bs.push(enlaceCharla(t));
+    else if (t.corrida && App.Flujos && App.Flujos.verCorrida) bs.push(h('button.tj-ver', { onclick: function () { App.Flujos.verCorrida(t.corrida); } }, 'Ver la corrida'));
+    if (t.estado === 'propuesta') bs.push(boton('Descartar', 'fantasma', function () { return decidir(t, 'descartar', undefined, op.alCambiar); }), boton('Arrancarlo', 'primario', function () { return decidir(t, 'confirmar', undefined, op.alCambiar); }));
+    if (t.estado === 'esperando') bs.push(boton('Deshacer', '', function () { return decidir(t, 'cancelar', undefined, op.alCambiar); }), boton('Empezar ya', 'primario', function () { return decidir(t, 'ya', undefined, op.alCambiar); }));
+    if (t.estado === 'programada') bs.push(boton('Cancelar', 'fantasma', function () { return decidir(t, 'cancelar', undefined, op.alCambiar); }), boton('Arrancar ya', '', function () { return decidir(t, 'ya', undefined, op.alCambiar); }));
+    if (t.estado === 'te_espera' && t.espera === 'aprobacion') {
+      if (t.entrega) bs.push(boton('Ver lo que entregó', '', function () { App.Entregables.abrir(t.entrega); }));
+      bs.push(conNota('cambios', 'Pedir cambios', 'Qué querés que cambie', true), boton('Aprobar', 'primario', function () { return decidir(t, 'aprobar', undefined, op.alCambiar); }));
+    }
+    if (t.estado === 'te_espera' && t.espera === 'persona') bs.push(conNota('hecho', 'Hecho, con una nota', 'Lo que quieras contar (opcional)', false), boton('Hecho', 'primario', function () { return decidir(t, 'hecho', undefined, op.alCambiar); }));
+    if (t.estado === 'esperando') vigilarReloj();
+    var el = caja('flujo' + (t.estado === 'cancelada' || t.estado === 'fallida' ? '.apagada' : ''), 'flujo', cab, estado, cuerpo, bs);
+    var cuerpoEl = el.querySelector('.tj-cuerpo');
+    return el;
+  }
 
-  return { delegacion: delegacion, pregunta: pregunta, accion: accion, de: de };
+  function de(t, op) { return t.tipo === 'pregunta' ? pregunta(t, op) : t.tipo === 'flujo' ? flujo(t, op) : delegacion(t, op); }
+
+  /* ---- cambios en la oficina que propuso la secretaría (docs/plan-secretaria-creadora.md) ----
+     Son tarjetas del Creador: hasta 3 y sin nada en borrador se ven enteras (datos clave y la cita); si son más o a alguna le
+     falta algo, un resumen con «Abrir en el Creador». Se aprueban con POST /api/creador/aplicar y se descartan con DELETE
+     /api/creador/tarjetas/<id>. `op`: {enBandeja, agente, session, alCambiar} */
+  var PENDIENTE = { lista: true, borrador: true, error: true };
+  var MAX_ENTERAS = 3;
+  function resumenDe(t, todas) {
+    if (App.Creador && App.Creador.resumenTarjeta) return App.Creador.resumenTarjeta(t, todas);
+    var d = t.datos || {};
+    return { titulo: d.nombre || d.texto || t.id, tipo: t.tipo, icono: 'chispa', accion: t.accion, estado: t.estado, campos: [] };
+  }
+  function abrirCreador() { App.Nav.ir('#/equipo/creador'); }
+  function aplicar(ts, op) {
+    var quitar = ts.filter(function (t) { return t.accion === 'quitar'; });
+    var conf = quitar.length ? App.confirmar(quitar.length === 1 ? '¿Quitar algo de la oficina?' : '¿Quitar ' + quitar.length + ' cosas de la oficina?',
+      'Se va a quitar: ' + quitar.map(function (t) { return resumenDe(t, ts).titulo; }).join(', ') + '.', 'Quitar y aprobar', true) : Promise.resolve(true);
+    return conf.then(function (si) {
+      if (!si) return;
+      var cuerpo = { ids: ts.map(function (t) { return t.id; }) };
+      if (quitar.length) cuerpo.confirmarQuitar = true;
+      return App.api.post('/api/creador/aplicar', cuerpo).then(function (r) {
+        var res = r.resultados || [], ok = res.filter(function (x) { return x.ok; }).length, mal = res.filter(function (x) { return !x.ok; });
+        if (App.recargarOficina) App.recargarOficina().catch(function () {});
+        if (ok) App.aviso(ok === 1 ? 'Listo: se creó 1 cosa.' : 'Listo: se crearon ' + ok + ' cosas.');
+        if (mal.length) App.aviso(mal[0].error || 'No se pudo crear.', true);
+      }).catch(function (e) { App.aviso(e.message, true); }).then(function () {
+        if (op.alCambiar) op.alCambiar();
+        if (App.Actividad) setTimeout(App.Actividad.ya, 200);
+      });
+    });
+  }
+  function descartarTodas(ts, op) {
+    return Promise.all(ts.map(function (t) { return App.api.del('/api/creador/tarjetas/' + encodeURIComponent(t.id)); }))
+      .catch(function (e) { App.aviso(e.message, true); })
+      .then(function () { if (op.alCambiar) op.alCambiar(); if (App.Actividad) setTimeout(App.Actividad.ya, 200); });
+  }
+  function cambios(lista, op) {
+    op = op || {};
+    var vivas = (lista || []).filter(function (t) { return t.estado !== 'descartada'; });
+    if (!vivas.length) return null;
+    var pend = vivas.filter(function (t) { return PENDIENTE[t.estado]; });
+    var listas = vivas.filter(function (t) { return t.estado === 'lista'; });
+    var borr = vivas.filter(function (t) { return t.estado === 'borrador'; });
+    var compacto = vivas.length > MAX_ENTERAS || borr.length > 0;
+    /* los demás agentes solo proponen tareas programadas: la cabecera lo dice así */
+    var soloTareas = vivas.every(function (t) { return t.tipo === 'tarea'; });
+    var cab = soloTareas
+      ? (op.enBandeja ? nombre(op.agente) + (vivas.length === 1 ? ' te propone una tarea programada' : ' te propone tareas programadas')
+        : vivas.length === 1 ? 'Tarea programada' : 'Tareas programadas · ' + vivas.length)
+      : op.enBandeja ? nombre(op.agente) + ' te propone cambios en la oficina'
+      : vivas.length === 1 ? 'Propuesta para la oficina' : 'Propuestas para la oficina · ' + vivas.length;
+    var estado = !pend.length ? (vivas.every(function (t) { return t.estado === 'creada'; }) ? 'Creado' : '')
+      : borr.length ? (borr.length === 1 ? '1 con dudas' : borr.length + ' con dudas') : 'Te espera';
+    var cuerpo = [];
+    if (compacto) {
+      cuerpo.push(h('ul.tj-cambios', vivas.map(function (t) {
+        var r = resumenDe(t, vivas);
+        return h('li', h('span.tj-cambio-tipo', r.tipo), h('span.tj-cambio-tit', r.titulo),
+          h('span.tj-cambio-est.' + t.estado, t.estado === 'lista' ? r.accion : r.estado));
+      })));
+      borr.forEach(function (t) {
+        (t.faltantes || []).slice(0, 2).forEach(function (f) { cuerpo.push(h('div.tj-nota', 'Falta: ' + (f.pregunta || f.campo || String(f)))); });
+      });
+    } else {
+      vivas.forEach(function (t) {
+        var r = resumenDe(t, vivas);
+        cuerpo.push(h('div.tj-cambio',
+          h('div.tj-cambio-cab', App.icono(r.icono), h('span', r.accion + ' · ' + r.tipo), h('span.tj-cambio-est.' + t.estado, t.estado === 'lista' ? '' : r.estado)),
+          h('div.tj-tit', r.titulo),
+          r.campos.length ? h('div.tj-cambio-campos', r.campos) : null,
+          t.estado === 'error' && t.error ? h('div.tj-nota.error', t.error) : null,
+          t.origen ? h('blockquote.tb-origen', t.origen) : null));
+      });
+    }
+    var bs = [];
+    if (op.enBandeja && op.session) bs.push(enlaceCharla({ agente: op.agente, session: op.session }));
+    if (pend.length) bs.push(boton('Abrir en el Creador', compacto ? 'primario' : 'fantasma', abrirCreador));
+    else bs.push(boton('Ver en el Creador', 'fantasma', abrirCreador));
+    if (pend.length && !compacto) bs.push(boton('Descartar', 'fantasma', function () { return descartarTodas(pend, op); }));
+    if (listas.length) {
+      var txt = !compacto ? (listas.length === 1 ? 'Aprobar' : 'Aprobar las ' + listas.length) : listas.length === 1 ? 'Aprobar la lista' : 'Aprobar las ' + listas.length + ' listas';
+      bs.push(boton(txt, compacto ? '' : 'primario', function () { return aplicar(listas, op); }));
+    }
+    return caja('cambio' + (pend.length ? '' : '.apagada'), 'chispa', cab, estado, cuerpo, bs);
+  }
+
+  return { delegacion: delegacion, pregunta: pregunta, accion: accion, flujo: flujo, de: de, cambios: cambios };
 })();

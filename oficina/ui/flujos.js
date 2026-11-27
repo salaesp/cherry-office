@@ -479,13 +479,16 @@ App.Flujos = (function () {
     }
 
     function vacioEd() {
-      return { id: null, nombre: '', descripcion: '', activo: true, siguiente: '', cierreAbierto: false, pasos: [pasoNuevo()] };
+      return { id: null, nombre: '', descripcion: '', activo: true, siguiente: '', disparadores: '', datos: '', cierreAbierto: false, pasos: [pasoNuevo()] };
     }
     function pasoNuevo() {
       return { id: null, nombre: '', quien: '', consigna: '', recibe: '', entrega: '', aprobacion: false, plazoDias: '', esperaDias: '', recibeDe: [], recibeNada: false, abierto: true };
     }
     function desdeFlujo(f) {
       return { id: f.id, nombre: f.nombre || '', descripcion: f.descripcion || '', activo: f.activo !== false, origen: f.origen, siguiente: f.siguiente || '', cierreAbierto: false,
+        /* cómo se nombra en una charla y qué necesita para arrancar: se editan como texto separado por comas (* = obligatorio) */
+        disparadores: (f.disparadores || []).join(', '),
+        datos: (f.datos || []).map(function (d) { return d.nombre + (d.obligatorio ? '*' : ''); }).join(', '),
         pasos: (f.pasos || []).map(function (p) {
           return { id: p.id, nombre: p.nombre || '', quien: p.quien || '', consigna: p.consigna || '', recibe: p.recibe || '', entrega: p.entrega || '',
             aprobacion: !!p.aprobacion, plazoDias: p.plazoDias || '', esperaDias: p.esperaDias || '', recibeDe: (p.recibeDe || []).slice(),
@@ -544,6 +547,8 @@ App.Flujos = (function () {
       var nombre = h('input.campo', { value: ed.nombre, maxlength: 80, placeholder: 'Producción de una clase', oninput: function () { ed.nombre = nombre.value; sucio = true; } });
       var desc = h('textarea.campo', { rows: 2, maxlength: 600, placeholder: 'Para qué sirve este flujo (opcional)', oninput: function () { ed.descripcion = desc.value; sucio = true; } });
       desc.value = ed.descripcion;
+      var disp = h('input.campo', { value: ed.disparadores, maxlength: 800, placeholder: 'presupuesto, cotización', oninput: function () { ed.disparadores = disp.value; sucio = true; } });
+      var datosIn = h('input.campo', { value: ed.datos, maxlength: 800, placeholder: 'cliente*, pedido*, plazo', oninput: function () { ed.datos = datosIn.value; sucio = true; } });
       var estado = App.elegir({ forma: 'interruptor', etiqueta: 'Estado', valor: ed.activo,
         opciones: [{ valor: true, titulo: 'Activo' }, { valor: false, titulo: 'Pausado' }],
         alCambiar: function (v) { ed.activo = v; sucio = true; } });
@@ -555,6 +560,8 @@ App.Flujos = (function () {
       App.add(formulario,
         campo('Nombre', null, nombre),
         campo('Descripción', null, desc),
+        campo('Cómo lo nombrás', 'Palabras que usás para pedirlo en una charla, separadas por comas. Si las usás, el agente lo arranca sin preguntarte (con unos segundos para deshacer).', disp),
+        campo('Qué necesita para arrancar', 'Datos que el agente tiene que juntar antes de arrancarlo, separados por comas. Con * es obligatorio: si falta, te lo pregunta.', datosIn),
         campo('Estado', 'Un flujo pausado queda guardado pero no se puede correr.', estado),
         h('div.etiqueta-campo', { style: { marginTop: '12px' } }, 'Pasos'),
         h('div.ayuda', 'Tocá un paso para ver o cambiar sus detalles.'));
@@ -718,6 +725,9 @@ App.Flujos = (function () {
       var cuerpo = { nombre: ed.nombre.trim(), pasos: pasos, activo: !!ed.activo };
       cuerpo.descripcion = ed.descripcion.trim();
       cuerpo.siguiente = ed.siguiente || null;
+      var lista = function (t) { return String(t || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean); };
+      cuerpo.disparadores = lista(ed.disparadores);
+      cuerpo.datos = lista(ed.datos);
       if (!ed.id && ed.origen) cuerpo.origen = ed.origen;   // un flujo nuevo armado desde una reunión o desde esperas recuerda de dónde salió
       return cuerpo;
     }

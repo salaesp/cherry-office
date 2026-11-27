@@ -271,6 +271,8 @@ App.Ajustes = (function () {
     { id: 'ia', grupo: 'app', texto: 'Modelos y consumo', icono: 'medidor', pintar: iaAjustes },
     { id: 'celular', grupo: 'app', texto: 'Celular', icono: 'telefono', visible: function () { return !!(App.Celular && App.nativo.hay); },
       nota: function () { return App.Celular.nota(); }, pintar: function (c) { App.Celular.pintar(c); } },
+    /* solo en la versión web (en el navegador): la app de escritorio se actualiza sola desde las releases */
+    { id: 'actualizar', grupo: 'app', texto: 'Actualizar', icono: 'recargar', visible: function () { return !App.nativo.hay; }, pintar: actualizarWeb },
     { id: 'whatsapp', grupo: 'app', texto: 'WhatsApp', icono: 'charla', visible: function () { return !!App.WhatsApp; }, pintar: function (c) { App.WhatsApp.pintar(c); } },
   ];
 
@@ -535,6 +537,88 @@ App.Ajustes = (function () {
     App.add(hj.cuerpo,
       fila('Exportar oficina', 'Un archivo .zip para compartirla o pasarla a otra compu.', 'Exportar…', function () { App.exportarOficina(); }),
       fila('Borrar oficina', 'Se borran sus conversaciones y tareas, y su carpeta del disco (permanente).', 'Borrar…', function () { App.borrarOficina(); }, true));
+  }
+
+  /* Sección «Actualizar» (solo la versión web, GET/POST /api/actualizacion): trae lo último de la rama del clon
+     (normalmente main), recompila y reinicia el servidor con actualizar.sh. Mientras tanto se pregunta cada 2 s; cuando
+     vuelve con otro commit, se recarga la página. */
+  function actualizarWeb(crear) {
+    var vigilando = null;
+    var hj = crear({ titulo: 'Actualizar', alCerrar: function () { clearTimeout(vigilando); vigilando = null; },
+      acciones: h('button.btn.chico', { onclick: function () { if (!vigilando) cargar(); } }, App.icono('recargar'), 'Buscar de nuevo') });
+    var err = h('div.error');
+    function salida(txt) {
+      return h('pre', { style: { font: '12px ui-monospace, Menlo, monospace', background: 'var(--panel-2)', border: '1px solid var(--linea)',
+        borderRadius: 'var(--radio-chico)', padding: '8px', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: '240px', overflow: 'auto', margin: '6px 0 0' } }, txt);
+    }
+    function cargar() {
+      App.vaciar(hj.cuerpo);
+      hj.cuerpo.appendChild(App.cargando('Buscando cambios…'));
+      api().get('/api/actualizacion').then(pintar).catch(function (e) {
+        App.vaciar(hj.cuerpo);
+        hj.cuerpo.appendChild(e.status === 404
+          ? h('div.ayuda', { style: { marginTop: 0 } }, 'Esta instalación no se actualiza desde acá: el servidor no corre desde un clon del repo con actualizar.sh.')
+          : h('div.error', e.message));
+      });
+    }
+    function pintar(r) {
+      App.vaciar(hj.cuerpo);
+      var a = r.actual, nuevos = r.nuevos || [];
+      App.add(hj.cuerpo,
+        h('div.ayuda', { style: { marginTop: 0 } }, 'Trae lo último de la rama ' + (r.remoto || a.rama) + ', recompila y reinicia el servidor. La app de escritorio no se actualiza por acá: se actualiza sola con cada release.'),
+        App.ajuste('Versión actual', a.version + ' · ' + a.rama + (a.fecha ? ' · ' + App.hace(a.fecha) : ''), null));
+      if (r.corriendo) { esperar(a.commit); return; }
+      if (r.error) hj.cuerpo.appendChild(h('div.error', r.error));
+      var u = r.ultima;
+      if (u && u.terminada && !u.ok) {
+        App.add(hj.cuerpo, h('div.ajuste-tit', { style: { marginTop: '14px' } }, 'La última actualización falló (' + App.hace(u.terminada) + ')'), salida(u.salida));
+      }
+      if (r.cambiosLocales) {
+        hj.cuerpo.appendChild(h('div.error', 'Hay cambios sin guardar en los archivos del repo de esta máquina: hay que guardarlos o descartarlos ahí antes de actualizar.'));
+      }
+      if (!nuevos.length) {
+        if (!r.error) hj.cuerpo.appendChild(App.ajuste('Estás al día', 'No hay cambios nuevos en ' + (r.remoto || a.rama) + '.', null));
+        return;
+      }
+      var lista = h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px' } }, nuevos.slice(0, 30).map(function (c) {
+        return h('li', { style: { margin: '3px 0' } }, c.titulo, ' ', h('small', { style: { color: 'var(--suave)' } }, App.hace(c.fecha)));
+      }));
+      var boton = h('button.btn.primario', { disabled: !!r.cambiosLocales, onclick: function () { actualizar(r); } }, App.icono('bajar'), 'Actualizar ahora');
+      App.add(hj.cuerpo,
+        App.ajuste(nuevos.length === 1 ? '1 cambio nuevo' : nuevos.length + ' cambios nuevos', null, boton),
+        lista, nuevos.length > 30 ? h('div.ayuda', 'y ' + (nuevos.length - 30) + ' más.') : null, err);
+    }
+    function actualizar(r) {
+      var n = r.procesosVivos || 0;
+      App.confirmar('Actualizar y reiniciar', (n ? 'Hay ' + (n === 1 ? 'un agente trabajando' : n + ' agentes trabajando') + ': se cortan al reiniciar. ' : '') +
+        'El servidor se reinicia y la página se recarga sola cuando vuelve (tarda un par de minutos).', 'Actualizar').then(function (si) {
+        if (!si) return;
+        err.textContent = '';
+        api().post('/api/actualizacion').then(function () { esperar(r.actual.commit); }).catch(function (e) { err.textContent = e.message; });
+      });
+    }
+    /* se pregunta hasta que el servidor vuelve con otro commit (recarga), o el script termina sin cambiarlo (se muestra cómo) */
+    function esperar(antes) {
+      var desde = Date.now();
+      App.vaciar(hj.cuerpo);
+      var estado = h('div.ayuda', 'Bajando los cambios y compilando. Mientras se reinicia la página puede no responder un momento.');
+      App.add(hj.cuerpo, App.cargando('Actualizando…'), estado);
+      function otraVez() {
+        if (!vigilando && vigilando !== 0) return;
+        api().get('/api/actualizacion').then(function (r) {
+          if (r.actual.commit !== antes) { estado.textContent = 'Listo: ' + r.actual.version + '. Recargando…'; location.reload(); return; }
+          if (!r.corriendo) { vigilando = null; pintar(r); if (r.ultima && r.ultima.ok) App.aviso('El servidor se reinició.'); return; }
+          seguir();
+        }).catch(function () { estado.textContent = 'Reiniciando el servidor…'; seguir(); });
+      }
+      function seguir() {
+        if (Date.now() - desde > 600000) { vigilando = null; cargar(); return; }
+        vigilando = setTimeout(otraVez, 2000);
+      }
+      vigilando = 0;
+      seguir();
+    }
+    cargar();
   }
 
   function permisos(crear) {

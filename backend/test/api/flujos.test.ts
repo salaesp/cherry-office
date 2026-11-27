@@ -13,6 +13,8 @@ const pasos3: Obj[] = [
 
 // Los args del claude falso pueden llegar en NFD (Swift compara con equivalencia canónica): se normaliza.
 const prompts = (f: Fix) => f.sb.prompts.map((p) => p.normalize('NFC'))
+/** El mensaje de sistema de cada llamada (en qué flujo y paso está, qué entrega y dónde van ahí). */
+const sistemas = (f: Fix) => f.sb.llamadas.map((a) => (Sandbox.valor(a, '--append-system-prompt') ?? '').normalize('NFC'))
 
 const fix = () => Fix.crear({
   deps: ['Dirección'],
@@ -71,8 +73,12 @@ describe('Flujos: motor, corridas y API', () => {
     // la consigna llevó el flujo, el paso y el contexto, y termina con la carpeta de entrega
     const consigna = prompts(f)[0]!
     expect(consigna).toBeDefined()
-    expect(consigna.includes('Paso 1 de 3: Diseño') && consigna.includes('Diseñá la clase') && consigna.includes('Tema: fracciones')).toBe(true)
-    expect(consigna.endsWith('Dejá lo que entregues en archivos/entregables/sofia/.')).toBe(true)
+    expect(consigna.includes('Diseñá la clase') && consigna.includes('Tema: fracciones')).toBe(true)
+    // en qué paso está y dónde dejar la entrega van como mensaje de sistema, no en la charla
+    const sis0 = sistemas(f)[0]!
+    expect(sis0).toContain('Paso 1 de 3: Diseño')
+    expect(sis0.endsWith('Dejá lo que entregues en archivos/entregables/sofia/.')).toBe(true)
+    expect(consigna).not.toContain('Dejá lo que entregues')
     // la entrega aparece al filtrar las corridas por entrega
     const porEntrega = lista((await f.get('/api/flujos/corridas', { entrega: String(a1) })).obj.corridas)
     expect(porEntrega.map((x) => str(x.nombre))).toEqual(['Clase 7'])
@@ -113,7 +119,8 @@ describe('Flujos: motor, corridas y API', () => {
     // recibeDe se ve en la consigna de B: lo de la persona y lo de A, no «el anterior» solamente
     const deB = prompts(f).at(-1)!
     expect(deB).toBeDefined()
-    expect(deB.includes('Paso 3 de 3: Edición') && deB.includes('Grabé con el celular') && deB.includes(`archivos/entregables/persona/${c}-1/toma1.txt`)).toBe(true)
+    expect(sistemas(f).at(-1)).toContain('Paso 3 de 3: Edición')
+    expect(deB.includes('Paso 3: Edición') && deB.includes('Grabé con el celular') && deB.includes(`archivos/entregables/persona/${c}-1/toma1.txt`)).toBe(true)
     expect(deB.includes('hola sofia')).toBe(true)
     expect(deB.indexOf('Paso «Grabación»'), 'respeta el orden de recibeDe').toBeLessThan(deB.indexOf('Paso «Diseño»'))
     expect(deB.indexOf('Paso «Grabación»')).toBeGreaterThanOrEqual(0)
@@ -206,7 +213,7 @@ describe('Flujos: motor, corridas y API', () => {
     expect(i.length === 2 && str(i[1]!.estado) === 'listo' && str(i[1]!.nota) === 'Hacelo más corto').toBe(true)
     const ultimo = prompts(f).at(-1)
     expect(ultimo?.includes('Hacelo más corto')).toBe(true)
-    expect(ultimo?.includes('Dejá lo que entregues en archivos/entregables/sofia/.')).toBe(true)
+    expect(sistemas(f).at(-1)?.includes('Dejá lo que entregues en archivos/entregables/sofia/.')).toBe(true)
     // el paso de la persona quedó con dos intentos (el reabierto y el nuevo)
     expect((await intentos(f, c, 1)).length).toBeGreaterThanOrEqual(2)
   })

@@ -61,7 +61,7 @@ describe('Coordinador', () => {
       expect(Sandbox.reglas(l).includes('mcp__hq__' + n)).toBe(true)
     }
     expect(Sandbox.reglas(l).includes('mcp__hq__encargar')).toBe(false)
-    expect(tools.endsWith('mcp__hq__consultar,mcp__hq__colegas,mcp__hq__quien_sabe,mcp__hq__buscar,mcp__hq__marcar_obsoleto,mcp__hq__anotar,mcp__hq__delegar,mcp__hq__preguntar,mcp__hq__pedir,mcp__hq__quedo_esperando,mcp__hq__cancelar_espera,mcp__hq__estado_oficina,mcp__hq__entregas,mcp__hq__corridas,mcp__hq__bloqueos,mcp__hq__seguimiento,mcp__hq__seguimientos,mcp__hq__seguimiento_leer,mcp__hq__ficha_anotar,mcp__hq__ficha_leer,mcp__hq__proponer_skill')).toBe(true)
+    expect(tools.endsWith('mcp__hq__consultar,mcp__hq__colegas,mcp__hq__quien_sabe,mcp__hq__buscar,mcp__hq__marcar_obsoleto,mcp__hq__anotar,mcp__hq__delegar,mcp__hq__preguntar,mcp__hq__en_curso,mcp__hq__arrancar_flujo,mcp__hq__aprobar_paso,mcp__hq__pedir_cambios,mcp__hq__paso_hecho,mcp__hq__pedir,mcp__hq__quedo_esperando,mcp__hq__cancelar_espera,mcp__hq__estado_oficina,mcp__hq__entregas,mcp__hq__corridas,mcp__hq__bloqueos,mcp__hq__seguimiento,mcp__hq__seguimientos,mcp__hq__seguimiento_leer,mcp__hq__ficha_anotar,mcp__hq__ficha_leer,mcp__hq__ver_oficina,mcp__hq__proponer_tarea,mcp__hq__marcar_faltante,mcp__hq__descartar_tarjeta,mcp__hq__proponer_skill')).toBe(true)
     // interno (unit test del port): b.mcp.tokens.activos == 0
 
     await chat(f.b, { agent: 'marce', message: 'hola', session: U.b })

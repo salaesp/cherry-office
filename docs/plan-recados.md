@@ -297,18 +297,44 @@ Lo planeado:
   (delegado a X, esperando tu ok, esperando respuesta).
 - Botón «Dejar un recado» en el ícono de la bandeja del sistema (abre el hilo con el micrófono listo).
 
-### R1: cerrar el circuito
+### R1: cerrar el circuito (hecho, sobre la charla)
 - `alTerminar` con `origen.recado`: mensaje en el hilo + notificación; recado `hecho` cuando terminan todas sus delegaciones.
 - «Cancelar» una delegación que no empezó.
 - Lectura de lo que está en curso para «¿cómo va…?».
 - Tema de memoria por delegación abierta.
 
-### R1b: flujos
+Como quedó (detalle en «Pasar trabajo, preguntar y hablar por audio en la charla» de [backend/API.md](../backend/API.md)):
+- Ya no hay hilo de recados: al terminar una delegación la tarjeta cambia, sale un aviso que abre esa charla (con
+  notificación) y queda una **novedad** que el agente recibe en su próximo mensaje ahí («Novedades desde tu último mensaje»),
+  una sola vez. No se escribe un mensaje falso en la charla: la sesión de claude no lo vería.
+- «Cancelar» ya estaba (U2).
+- `en_curso` en la charla, para todos: delegaciones abiertas, flujos por arrancar y corridas abiertas.
+- El tema de memoria por delegación abierta no se hizo: las novedades y `en_curso` cubren el «¿cómo va?» sin escribir en la
+  memoria de la secretaría.
+
+### R1b: flujos (hecho, sobre la charla)
 - `arrancar_flujo` (ahora), con `origen: {recado}` en la corrida.
 - Aviso de paso con aprobación o paso tuyo, con botones; `aprobar_paso`, `pedir_cambios` y `paso_hecho` en el hilo.
 - Estado de corridas para «¿cómo va…?» y aviso al terminar o al trabarse.
 - Ajuste: avisar por recados solo de las corridas que nacieron de un recado (por defecto) o de todas.
 - Después: tarea programada que arranca un flujo; sugerencia de guardar una cadena repetida como flujo.
+
+Como quedó (detalle en «Flujos desde la charla» de [backend/API.md](../backend/API.md); código en `charla-flujos.ts`):
+- `arrancar_flujo` para cualquier agente en la charla con la persona, con `disparadores` y `datos` en `FlujoDef` (el editor
+  de flujos los pide). Directo solo si el mensaje nombra el flujo; si no, propuesta. 45 s para deshacer.
+- La corrida no guarda `origen`: la tarjeta guarda la corrida (`datos.corrida`) y `MotorFlujos.alCambiar` la actualiza.
+- La tarjeta del flujo muestra los pasos con el actual marcado y, cuando te espera, **Aprobar**, **Pedir cambios** (con
+  nota) o **Hecho** (con nota opcional; sin archivos: para adjuntar, desde la corrida en Flujos).
+- Se avisa solo de las corridas que nacieron en una charla (la propuesta por defecto de la decisión 4). El ajuste para
+  avisar de todas no se hizo.
+- **Programado:** `arrancar_flujo` con `cuando` deja la tarjeta programada (una vez). Una tarea programada *repetida* que
+  arranque un flujo sigue pendiente.
+- Sugerir guardar una cadena repetida como flujo: pendiente (era «después»).
+
+### Citas de WhatsApp (hecho)
+Lo de «Datos de WhatsApp y de su memoria»: `[wa:N]` en lo que se lee, cambiado por el mensaje real en la respuesta, y
+`citas` en `delegar` y `arrancar_flujo` con el candado en la tarjeta (`citas-whatsapp.ts`). Las citas de la memoria de la
+secretaría no se hicieron.
 
 ### R2: Telegram
 - Ajustes › Toda la app › Telegram: pegar el token del bot (guardado con `safeStorage`), emparejar con un código de 6

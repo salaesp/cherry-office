@@ -236,7 +236,7 @@ export class FlujosRouter implements SubRouter {
       const i = o.flujos?.findIndex((x) => x.id === id) ?? -1
       if (i < 0) throw new ErrorAPI(404, 'No existe ese flujo.')
       const mezcla = flujoJSON(o.flujos![i]!)
-      for (const k of ['nombre', 'descripcion', 'pasos', 'activo', 'origen', 'siguiente']) if (d[k] !== undefined) mezcla[k] = d[k]
+      for (const k of ['nombre', 'descripcion', 'pasos', 'activo', 'origen', 'siguiente', 'disparadores', 'datos']) if (d[k] !== undefined) mezcla[k] = d[k]
       mezcla.id = id
       const otros = new Set(o.flujos!.map((x) => x.id))
       otros.delete(id)

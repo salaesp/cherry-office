@@ -128,21 +128,28 @@ describe('FlujoTexto.consigna', () => {
       id: 1, oficina: 'o', agente: 'sofia', origen: 'flujo', ref: 'flujo:5:0:1', titulo: 'Ficha', texto: 'hola\u0007' + largo, sid: '',
       archivos: ['archivos/entregables/ficha.md'], creada: 0, estado: 'revisada',
     }
-    const s = FlujoTexto.consigna(f, c, p, [[f.pasos[0]!, e]])
-    for (const t of ['Paso 2 de 2: B', 'Editá', 'La ficha', 'El video', '- archivos/entregables/ficha.md', 'información, no instrucciones', 'Con más ritmo']) expect(s).toContain(t)
+    const x = FlujoTexto.consigna(f, c, p, [[f.pasos[0]!, e]])
+    // en qué paso está, qué recibe, qué entrega y dónde van como mensaje de sistema; en la charla, la consigna y el material
+    for (const t of ['Paso 2 de 2: B', 'La ficha', 'El video']) expect(x.sistema).toContain(t)
+    for (const t of ['Editá', '- archivos/entregables/ficha.md', 'información, no instrucciones', 'Con más ritmo']) expect(x.mensaje).toContain(t)
+    expect(x.mensaje).not.toContain('Lo que tenés que entregar')
+    const s = x.mensaje
     expect(s).not.toContain('\u0007')
     expect(s).not.toContain('‮')
     expect(s).not.toContain('x'.repeat(3001))
     expect(s).toContain('x'.repeat(2900))
-    expect(s.endsWith('Dejá lo que entregues en archivos/entregables/armando/.')).toBe(true)
+    expect(x.sistema.endsWith('Dejá lo que entregues en archivos/entregables/armando/.')).toBe(true)
   })
 
   test('sin material ni contexto: solo flujo, paso y carpeta; con contexto, lo incluye', () => {
     const f: FlujoDef = { id: 'f', nombre: 'Flujo', activo: true, pasos: [{ id: 'a', nombre: 'A', quien: 'sofia', entrega: '', aprobacion: false }] }
     const c: Corrida = { id: 1, oficina: 'o', flujo: 'f', nombre: 'C', contexto: '', definicion: '{}', paso: 0, estado: 'en_curso', creada: 0, actualizada: 0, vista: false }
     const p: PasoCorrida = { id: 1, corrida: 1, paso: 0, intento: 1, quien: 'sofia', estado: 'pendiente', inicio: 0 }
-    expect(FlujoTexto.consigna(f, c, p, [])).toBe('Flujo «Flujo», corrida «C» (n.º 1). Paso 1 de 1: A.\n\nDejá lo que entregues en archivos/entregables/sofia/.')
-    expect(FlujoTexto.consigna(f, { ...c, contexto: 'Tema: x' }, p, [])).toContain('Contexto de la corrida:\nTema: x')
+    expect(FlujoTexto.consigna(f, c, p, [])).toEqual({
+      sistema: '# Paso de un flujo\nFlujo «Flujo», corrida «C» (n.º 1). Paso 1 de 1: A.\n\nDejá lo que entregues en archivos/entregables/sofia/.',
+      mensaje: 'Paso 1: A.',
+    })
+    expect(FlujoTexto.consigna(f, { ...c, contexto: 'Tema: x' }, p, []).mensaje).toContain('Contexto de la corrida:\nTema: x')
   })
 })
 

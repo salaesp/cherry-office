@@ -707,7 +707,7 @@ export class ServicioDependencias {
       const de = yo ? `${yo.nombre} (${yo.rol})` : ped.de
       this.pedidos.actualizar(oficina, ped.id, { estado: 'corriendo', error: null })
       try {
-        const e = await prog.encargarLibre(act, b, { id: `${Programador.prefijoPedido}${ped.id}`, nombre: `Pedido de ${yo?.nombre ?? ped.de}`, consigna: consignaPedido(de, ped.que, ped.contexto, b.id) })
+        const e = await prog.encargarLibre(act, b, { id: `${Programador.prefijoPedido}${ped.id}`, nombre: `Pedido de ${yo?.nombre ?? ped.de}`, ...conSistema(consignaPedido(de, ped.que, ped.contexto, b.id)) })
         this.pedidos.actualizar(oficina, ped.id, { ejecucion: e.id })
       } catch (err) {
         this.pedidos.actualizar(oficina, ped.id, { estado: 'fallido', error: err instanceof ErrorAPI ? err.mensaje : 'No pude lanzar el pedido.' })
@@ -805,7 +805,7 @@ export class ServicioDependencias {
     try {
       if (jefe.accion === 'encargar') {
         const material = await this.materialDe(act, tomadas)
-        const e = await prog.encargarLibre(act, def, { id: jefe.tarea ?? '', nombre: jefe.nombre ?? 'Pendiente', consigna: (jefe.consigna ?? '') + TextoDependencias.material(material) })
+        const e = await prog.encargarLibre(act, def, { id: jefe.tarea ?? '', nombre: jefe.nombre ?? 'Pendiente', consigna: (jefe.consigna ?? '') + TextoDependencias.material(material), sistema: Programador.sistemaPendiente })
         this.s.log.info(`espera relanzada grupo=${grupo} tarea=${jefe.tarea} ejecucion=${e.id}`)
         return
       }
@@ -1003,13 +1003,18 @@ export function esperasVencidas(s: Servicios, oficina: string, ahora: Date): Esp
   }
 }
 
-/** La consigna del encargo de un pedido: de quién viene, qué se pide y dónde dejarlo. Todo saneado. */
-export function consignaPedido(de: string, que: string, contexto: string, b: string): string {
-  return sanear(`Pedido de ${de}. Viene de un colega, no es un pedido directo del usuario:\n\n${que}\n\n`
-    + (contexto === '' ? '' : `Contexto: ${contexto}\n\n`)
-    + `Dejá lo que produzcas en archivos/entregables/${b}/ y decí al final qué archivo dejaste.\n`
-    + 'Si todavía no podés hacerlo, entregá lo que tengas y decí qué falta.')
+/** El encargo de un pedido. `mensaje`: de quién viene, qué se pide y el contexto. `sistema`: que no es un pedido directo
+ *  del usuario y dónde dejarlo (va como mensaje de sistema). Todo saneado. */
+export function consignaPedido(de: string, que: string, contexto: string, b: string): { sistema: string; mensaje: string } {
+  return {
+    sistema: sanear('# Pedido de un colega\nEl mensaje es un pedido de un colega, no un pedido directo del usuario. '
+      + `Dejá lo que produzcas en archivos/entregables/${b}/ y decí al final qué archivo dejaste. `
+      + 'Si todavía no podés hacerlo, entregá lo que tengas y decí qué falta.'),
+    mensaje: sanear(`Pedido de ${de}:\n\n${que}` + (contexto === '' ? '' : `\n\nContexto: ${contexto}`)),
+  }
 }
+
+const conSistema = (c: { sistema: string; mensaje: string }) => ({ consigna: c.mensaje, sistema: c.sistema })
 
 // MARK: - rutas /api/esperas*
 
@@ -1206,7 +1211,7 @@ export class HerramientasDependencias implements MCPHerramientas {
     const consigna = consignaPedido(de, que, contexto, b.id)
     const nombre = nombrePedido === '' ? `Pedido de ${yo?.nombre ?? this.identidad.agente}` : prefijo(nombrePedido, 80)
     try {
-      const e = await prog.encargarLibre(act, b, { id: `${Programador.prefijoPedido}${pedido.id}`, nombre, consigna })
+      const e = await prog.encargarLibre(act, b, { id: `${Programador.prefijoPedido}${pedido.id}`, nombre, ...conSistema(consigna) })
       this.dep.pedidos.actualizar(oficina, pedido.id, { ejecucion: e.id })
     } catch (err) {
       const m = err instanceof ErrorAPI ? err.mensaje : 'No pude lanzar el pedido.'

@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secretaría creadora</title>
+<style>
+/* Boceto: la secretaría propone cambios en la oficina (agentes, departamentos, tareas, flujos) con las herramientas del
+   Creador. Mismos colores que recados.html; suma el tono --crea para las tarjetas de propuesta. */
+:root {
+  --fondo: #f2f0ec; --panel: #ffffff; --panel-2: #f8f7f4; --linea: #e4e1db; --linea-fuerte: #d3cfc7;
+  --texto: #1d1d1f; --suave: #6d6962; --tenue: #9a958d; --acento: #1d1d1f; --sobre-acento: #ffffff;
+  --peligro: #b3362c; --ok: #3b7a4b; --aviso: #a46a12;
+  --sombra: 0 1px 2px rgba(20,18,15,.06), 0 8px 24px rgba(20,18,15,.08);
+  --cal: #2f6db5; --cal-suave: #e8f0fa; --wa: #2e8a57; --wa-suave: #e6f4ec; --flujo: #6b4fb3; --flujo-suave: #efeafa;
+  --deleg: #a46a12; --deleg-suave: #fbf2e2; --burbuja: #1d1d1f; --sobre-burbuja: #ffffff;
+  --f-texto: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --f-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radio: 10px; --radio-chico: 7px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+  --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --acento: #f1f1f2; --sobre-acento: #1b1b1d;
+  --peligro: #e0675d; --ok: #6cbf80; --aviso: #e0a84a;
+  --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  --cal: #7fb0ea; --cal-suave: #1f2b3a; --wa: #6cc495; --wa-suave: #1c3127; --flujo: #b8a2f0; --flujo-suave: #2a2440;
+  --deleg: #e0a84a; --deleg-suave: #352a18; --burbuja: #f1f1f2; --sobre-burbuja: #1b1b1d; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+  --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --acento: #f1f1f2; --sobre-acento: #1b1b1d;
+  --peligro: #e0675d; --ok: #6cbf80; --aviso: #e0a84a;
+  --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  --cal: #7fb0ea; --cal-suave: #1f2b3a; --wa: #6cc495; --wa-suave: #1c3127; --flujo: #b8a2f0; --flujo-suave: #2a2440;
+  --deleg: #e0a84a; --deleg-suave: #352a18; --burbuja: #f1f1f2; --sobre-burbuja: #1b1b1d; color-scheme: dark }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--fondo); color: var(--texto); font: 14px/1.5 var(--f-texto); }
+.pagina { max-width: 1180px; margin: 0 auto; padding: 28px 16px 60px; }
+h1 { font-size: 24px; margin: 0 0 6px; text-wrap: balance; }
+.intro { color: var(--suave); max-width: 72ch; margin: 0 0 18px; }
+.selector { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; position: sticky; top: 0; z-index: 5; background: var(--fondo); padding: 8px 0; }
+.selector button { font: inherit; font-size: 13px; height: 32px; padding: 0 13px; border-radius: 16px; border: 1px solid var(--linea-fuerte); background: var(--panel); color: var(--texto); cursor: pointer; }
+.selector button[aria-pressed="true"] { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); }
+.selector button:focus-visible, .btn:focus-visible, .tab:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.fila { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+
+/* ---------- celular ---------- */
+.cel { width: 390px; max-width: 100%; flex: 0 0 auto; border-radius: 34px; border: 1px solid var(--linea-fuerte); background: var(--panel-2); box-shadow: var(--sombra); overflow: hidden; display: flex; flex-direction: column; height: 760px; }
+.cel-cab { display: flex; align-items: center; gap: 10px; padding: 18px 16px 10px; background: var(--panel); }
+.avatar { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 600; font-size: 13px; color: #fff; background: linear-gradient(160deg, #c27a5a, #8c4f3a); }
+.avatar.m { background: linear-gradient(160deg, #5a8bc2, #3a5a8c); }
+.avatar.chico { width: 20px; height: 20px; font-size: 9px; }
+.cel-cab .t { font-weight: 600; font-size: 15px; line-height: 1.2; }
+.cel-cab .s { font-size: 12px; color: var(--suave); }
+.tabs { display: flex; gap: 4px; padding: 0 12px 10px; background: var(--panel); border-bottom: 1px solid var(--linea); }
+.tab { font: inherit; font-size: 12.5px; height: 28px; padding: 0 10px; border-radius: 14px; border: 0; background: transparent; color: var(--suave); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.tab[aria-pressed="true"] { background: var(--panel-2); color: var(--texto); font-weight: 600; }
+.tab .n { min-width: 18px; height: 18px; border-radius: 9px; background: var(--peligro); color: #fff; font-size: 11px; display: grid; place-items: center; padding: 0 5px; }
+.hilo { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 12px 18px; display: flex; flex-direction: column; gap: 10px; }
+.hilo > * { flex: none; }
+.hilo > .dia { align-self: center; }
+.hilo > .mio { align-self: flex-end; }
+.dia { justify-self: center; font-size: 11px; color: var(--tenue); text-transform: uppercase; letter-spacing: .05em; }
+.anterior { font-size: 12.5px; color: var(--suave); background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); padding: 8px 10px; display: flex; gap: 8px; align-items: center; }
+.anterior .est { margin-left: auto; }
+.mio { justify-self: end; max-width: 86%; background: var(--burbuja); color: var(--sobre-burbuja); border-radius: 16px 16px 4px 16px; padding: 9px 12px; }
+.mio .audio { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: .85; margin-bottom: 5px; }
+.onda { display: inline-flex; gap: 2px; align-items: center; height: 14px; }
+.onda i { width: 2px; border-radius: 1px; background: currentColor; display: block; }
+.mio .tx { font-size: 13.5px; }
+.mio .hora { font-size: 10.5px; opacity: .6; text-align: right; margin-top: 3px; }
+.entendi { font-size: 12.5px; color: var(--suave); padding: 0 4px; display: flex; gap: 6px; align-items: baseline; }
+.entendi b { color: var(--texto); font-weight: 600; }
+.tarjeta { background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); overflow: hidden; border-left: 3px solid var(--tinta, var(--linea-fuerte)); }
+.tarjeta.flujo { --tinta: var(--flujo); --suave-t: var(--flujo-suave); }
+.tarjeta.wa { --tinta: var(--wa); --suave-t: var(--wa-suave); }
+.tarjeta.cal { --tinta: var(--cal); --suave-t: var(--cal-suave); }
+.tarjeta.deleg { --tinta: var(--deleg); --suave-t: var(--deleg-suave); }
+.tarjeta.preg { --tinta: var(--acento); }
+.tarjeta.resp { --tinta: var(--linea-fuerte); }
+.t-cab { display: flex; align-items: center; gap: 6px; padding: 9px 11px 0; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--tinta); font-weight: 600; }
+.t-cab .est { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.t-cuerpo { padding: 6px 11px 10px; display: grid; gap: 7px; font-size: 13.5px; }
+.t-titulo { font-weight: 600; font-size: 14px; line-height: 1.3; }
+.pasos { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 11.5px; color: var(--suave); }
+.pasos span.p { background: var(--panel-2); border: 1px solid var(--linea); border-radius: 10px; padding: 1px 7px; }
+.pasos span.p.act { border-color: var(--tinta); color: var(--texto); }
+.datos { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12.5px; background: var(--panel-2); border-radius: var(--radio-chico); padding: 7px 9px; }
+.datos dt { color: var(--suave); }
+.datos dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.datos dd .de { color: var(--tenue); font-size: 11px; }
+.falta { color: var(--peligro); }
+.porque { font-size: 12px; color: var(--suave); }
+.cita { font-size: 12.5px; background: var(--suave-t, var(--panel-2)); border-radius: var(--radio-chico); padding: 7px 9px; }
+.cita .q { display: flex; gap: 6px; font-size: 11px; color: var(--suave); margin-bottom: 2px; }
+.cita + .cita { margin-top: -2px; }
+.nota-priv { font-size: 11.5px; color: var(--suave); display: flex; gap: 5px; align-items: center; }
+.opciones { display: grid; gap: 6px; }
+.opcion { text-align: left; font: inherit; font-size: 13px; padding: 8px 10px; border-radius: var(--radio-chico); border: 1px solid var(--linea-fuerte); background: var(--panel); color: var(--texto); cursor: pointer; }
+.opcion small { display: block; color: var(--suave); font-size: 11.5px; }
+.t-pie { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 11px; border-top: 1px solid var(--linea); background: var(--panel-2); }
+.btn { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border-radius: var(--radio-chico); border: 1px solid var(--linea-fuerte); background: var(--panel); color: var(--texto); font: inherit; font-size: 12.5px; cursor: pointer; }
+.btn.primario { background: var(--acento); border-color: var(--acento); color: var(--sobre-acento); }
+.btn.fantasma { border-color: transparent; background: transparent; color: var(--suave); }
+.reloj { font-variant-numeric: tabular-nums; }
+.aviso-flujo { font-size: 11px; color: var(--tenue); text-align: center; text-transform: uppercase; letter-spacing: .05em; }
+.componer { display: flex; gap: 8px; align-items: center; padding: 10px 12px 22px; background: var(--panel); border-top: 1px solid var(--linea); }
+.componer .campo { flex: 1; height: 38px; border-radius: 19px; border: 1px solid var(--linea-fuerte); background: var(--panel-2); display: flex; align-items: center; padding: 0 14px; color: var(--tenue); font-size: 13.5px; }
+.mic { width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--acento); color: var(--sobre-acento); display: grid; place-items: center; cursor: pointer; flex: none; }
+.ico { width: 16px; height: 16px; flex: none; }
+
+/* ---------- por dentro ---------- */
+.dentro { flex: 1 1 380px; min-width: 0; }
+.dentro h2 { font-size: 19px; margin: 0 0 4px; }
+.dentro .que { color: var(--suave); margin: 0 0 14px; max-width: 64ch; }
+.linea-t { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.linea-t li { position: relative; padding: 0 0 14px 26px; }
+.linea-t li::before { content: ""; position: absolute; left: 7px; top: 6px; bottom: -6px; width: 1px; background: var(--linea-fuerte); }
+.linea-t li:last-child::before { display: none; }
+.linea-t li::after { content: ""; position: absolute; left: 3px; top: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--panel); border: 2px solid var(--suave); }
+.linea-t li.regla::after { border-color: var(--flujo); background: var(--flujo); }
+.linea-t .paso { font-weight: 600; font-size: 13.5px; }
+.linea-t .det { color: var(--suave); font-size: 13px; }
+pre { font: 12px/1.5 var(--f-mono); background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio-chico); padding: 8px 10px; margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--texto); }
+pre .c { color: var(--tenue); }
+.clave { margin-top: 10px; padding: 10px 12px; background: var(--flujo-suave); border-radius: var(--radio); font-size: 13px; }
+.clave b { color: var(--flujo); }
+
+.vista { margin-top: 40px; border-top: 1px dashed var(--linea-fuerte); padding-top: 18px; }
+.vista h2 { font-size: 19px; margin: 0 0 10px; }
+.partes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.parte { background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); padding: 12px 14px; border-left: 3px solid var(--tinta, var(--linea-fuerte)); }
+@media (max-width: 440px) { .cel { border-radius: 20px; height: 700px; } }
+
+/* ---------- agregados de este boceto ---------- */
+:root { --crea: #2d7f86; --crea-suave: #e3f2f3; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --crea: #6cc3ca; --crea-suave: #1a3133; } }
+:root[data-theme="dark"] { --crea: #6cc3ca; --crea-suave: #1a3133; }
+.tarjeta.crea { --tinta: var(--crea); --suave-t: var(--crea-suave); }
+.tarjeta.rep { --tinta: var(--linea-fuerte); }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; border: 1px solid var(--linea); background: var(--panel-2); border-radius: 10px; padding: 1px 8px; color: var(--suave); }
+.chip.nuevo { border-color: var(--crea); color: var(--crea); }
+.lista-t { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
+.lista-t li { display: flex; gap: 8px; align-items: center; }
+.lista-t li .k { font-size: 11px; color: var(--tenue); width: 92px; flex: none; }
+.lista-t li .x { margin-left: auto; font-size: 11.5px; }
+.ok-t { color: var(--ok); }
+.btn[disabled] { opacity: .45; cursor: default; }
+.oculto { display: none !important; }
+
+/* ---------- la compu (pantalla del Creador) ---------- */
+.compu { flex: 1 1 100%; min-width: 0; border-radius: 12px; border: 1px solid var(--linea-fuerte); background: var(--panel-2); box-shadow: var(--sombra); overflow: hidden; display: flex; flex-direction: column; height: 640px; }
+.compu-barra { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--linea); font-size: 12.5px; color: var(--suave); }
+.compu-barra .pts { display: flex; gap: 6px; } .compu-barra .pts i { width: 11px; height: 11px; border-radius: 50%; background: var(--linea-fuerte); display: block; }
+.compu-barra .ruta { margin-left: 8px; }
+.compu-cuerpo { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+.c-chat { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--linea); }
+.c-chat .cel-cab { border-bottom: 1px solid var(--linea); }
+.c-tablero { min-height: 0; overflow-y: auto; padding: 14px; display: grid; gap: 14px; align-content: start; }
+.c-grupo h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--suave); display: flex; gap: 6px; }
+.c-grupo .tarjetas { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.c-pie { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--panel); border-top: 1px solid var(--linea); font-size: 12.5px; color: var(--suave); }
+.c-pie .btn { margin-left: auto; }
+.burbuja-ella { max-width: 92%; background: var(--panel); border: 1px solid var(--linea); border-radius: 16px 16px 16px 4px; padding: 9px 12px; font-size: 13.5px; }
+@media (max-width: 760px) { .compu { height: auto; } .compu-cuerpo { grid-template-columns: 1fr; } .c-chat { border-right: 0; border-bottom: 1px solid var(--linea); } .c-chat .hilo { max-height: 360px; } }
+</style>
+</head>
+<body>
+<div class="pagina">
+  <h1>La secretaría arma la oficina</h1>
+  <p class="intro">Cómo sería que la secretaría proponga lo mismo que hoy propone el Creador (agentes, departamentos, tareas,
+    flujos, reglas) desde la charla de recados. Lo chico se aprueba ahí mismo. Lo grande se sigue en la pantalla del Creador,
+    con ella del otro lado. Y lo que llega de afuera nunca arma nada solo.</p>
+
+  <div class="selector" role="group" aria-label="Ejemplo" id="selector"></div>
+
+  <div class="fila">
+    <div class="cel" id="cel" aria-label="Vista de recados en el celular">
+      <div class="cel-cab">
+        <div class="avatar">S</div>
+        <div><div class="t">Recados</div><div class="s">Sofía · Secretaría · Oficina Prospera</div></div>
+      </div>
+      <div class="tabs" role="group" aria-label="Filtro">
+        <button class="tab" aria-pressed="true">Todo</button>
+        <button class="tab" aria-pressed="false">Te esperan <span class="n">2</span></button>
+        <button class="tab" aria-pressed="false">En curso</button>
+        <button class="tab" aria-pressed="false">Hechos</button>
+      </div>
+      <div class="hilo" id="hilo"></div>
+      <div class="componer">
+        <div class="campo">Dejale un recado a Sofía…</div>
+        <button class="mic" aria-label="Grabar audio"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V15"/></svg></button>
+      </div>
+    </div>
+
+    <div class="compu oculto" id="compu" aria-label="Pantalla del Creador en la compu">
+      <div class="compu-barra"><span class="pts"><i></i><i></i><i></i></span><span class="ruta">Equipo › Armar la oficina</span></div>
+      <div class="compu-cuerpo">
+        <div class="c-chat">
+          <div class="cel-cab"><div class="avatar">S</div><div><div class="t">Armando con Sofía</div><div class="s">Viene de tu recado de las 11:40 · nada se crea hasta que lo apruebes</div></div></div>
+          <div class="hilo" id="c-hilo"></div>
+          <div class="componer"><div class="campo">Seguí contándole a Sofía…</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;min-height:0">
+          <div class="c-tablero" id="c-tablero"></div>
+          <div class="c-pie"><span id="c-cuenta"></span><button class="btn primario" id="c-aprobar">Aprobar las listas</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dentro" id="dentro"></div>
+  </div>
+
+  <section class="vista">
+    <h2>Lo que cambia, por partes</h2>
+    <div class="partes">
+      <div class="parte" style="--tinta: var(--crea)"><h3>Tarjeta de propuesta</h3><p>La misma tarjeta del Creador (Nuevo, Cambio, Quitar), con la cita de lo que dijiste. En el hilo de recados se aprueba con un toque, como una delegación.</p></div>
+      <div class="parte" style="--tinta: var(--crea)"><h3>Varias que dependen entre sí</h3><p>Si una tarea es para un agente que todavía no existe, la tarea lo nombra «(propuesto)». Se aprueban juntas, o la tarea espera al agente.</p></div>
+      <div class="parte" style="--tinta: var(--crea)"><h3>Tanda grande</h3><p>A partir de unas 4 tarjetas, o si a alguna le falta un dato, en el hilo queda un resumen con «Abrir en el Creador». Ahí está el tablero completo para editar.</p></div>
+      <div class="parte"><h3>El Creador es la pantalla, no otro agente</h3><p>Equipo › Armar la oficina sigue igual: chat a la izquierda, tarjetas a la derecha. Lo que cambia es quién te habla: si hay secretaría, es ella, con su memoria y el contexto del recado.</p></div>
+      <div class="parte" style="--tinta: var(--peligro)"><h3>Solo cuando le hablás vos</h3><p>Las herramientas de proponer existen únicamente en los turnos en que te contesta (recados o charla). Mientras revisa WhatsApp o Gmail, o arma un reporte, no las tiene.</p></div>
+      <div class="parte" style="--tinta: var(--aviso)"><h3>Falta decidir</h3><p>Si toda oficina nueva arranca con secretaría (y el Creador desaparece como personaje), o si sin secretaría sigue el Creador de hoy.</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const ico = {
+  crea: '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3M3.4 3.4l2 2M10.6 10.6l2 2M3.4 12.6l2-2M10.6 5.4l2-2"/></svg>',
+  rep: '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2.5" y="2" width="11" height="12" rx="1.5"/><path d="M5 5.5h6M5 8h6M5 10.5h4"/></svg>',
+  resp: '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.5 3h11v7.5H7L4 13v-2.5H2.5Z"/></svg>',
+  mail: '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="1.5" y="3" width="13" height="10" rx="1.5"/><path d="m2 4 6 5 6-5"/></svg>',
+  candado: '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
+}
+const onda = (n = 22) => '<span class="onda">' + Array.from({ length: n }, (_, i) => `<i style="height:${3 + Math.round(Math.abs(Math.sin(i * 1.7)) * 11)}px"></i>`).join('') + '</span>'
+const mio = (m) => `<div class="mio">${m.audio ? `<div class="audio">▶ ${onda()} ${m.audio}</div>` : ''}<div class="tx">${m.texto}</div><div class="hora">${m.hora}${m.audio ? ' · transcripto en tu compu' : ''}</div></div>`
+const ella = (t) => `<div class="burbuja-ella">${t}</div>`
+const entendi = (t) => `<div class="entendi"><span>Entendí:</span><b>${t}</b></div>`
+const datos = (filas) => `<dl class="datos">${filas.map(([k, v, de]) => `<dt>${k}</dt><dd${v === null ? ' class="falta"' : ''}>${v === null ? 'falta' : v}${de ? ` <span class="de">· ${de}</span>` : ''}</dd>`).join('')}</dl>`
+const cita = (t, de = 'lo dijiste', i = ico.resp) => `<div class="cita"><div class="q">${i}<span>${de}</span></div>«${t}»</div>`
+const pie = (bs) => `<div class="t-pie">${bs.map((b) => `<button class="btn${b[1] ? ' ' + b[1] : ''}"${b[2] ? ' disabled' : ''}>${b[0]}</button>`).join('')}</div>`
+const tarjeta = (tipo, cab, est, cuerpo, botones) => `<div class="tarjeta ${tipo}"><div class="t-cab">${ico[tipo] || ''}<span>${cab}</span>${est ? `<span class="est">${est}</span>` : ''}</div><div class="t-cuerpo">${cuerpo}</div>${botones ? pie(botones) : ''}</div>`
+
+/* tarjetas del tablero de la compu */
+const tTab = (cab, est, titulo, filas, extra = '') => `<div class="tarjeta crea"><div class="t-cab"><span>${cab}</span><span class="est${est === 'Borrador' ? ' falta' : ''}">${est}</span></div><div class="t-cuerpo"><div class="t-titulo">${titulo}</div>${datos(filas)}${extra}</div></div>`
+
+const ejemplos = [
+  {
+    id: 'contratar', boton: '1 · Contratar a alguien',
+    titulo: 'Un recado que es contratar y dar una tarea',
+    que: 'Lo chico se resuelve en el hilo: dos tarjetas del Creador debajo de su respuesta, que se aprueban juntas.',
+    hilo: () => mio({ audio: '0:19', texto: 'Necesito a alguien que lleve la facturación: que todos los lunes mire los mails de proveedores y me arme la lista de lo que hay que pagar.', hora: '9:05' })
+      + entendi('Contratar a alguien para facturación y darle una tarea de los lunes.')
+      + tarjeta('crea', 'Nuevo · Agente', 'Lista',
+        `<div class="t-titulo">Lucía · Facturación</div>`
+        + datos([['Departamento', 'Administración', 'ya existe'], ['Hace', 'Revisa facturas de proveedores y arma la lista de pagos'], ['Conectores', 'Gmail <span class="chip">solo leer</span>'], ['Límites', 'No paga ni contesta mails: lo propone']])
+        + cita('alguien que lleve la facturación… que mire los mails de proveedores'),
+        null)
+      + tarjeta('crea', 'Nueva · Tarea', 'Lista',
+        `<div class="t-titulo">Lista de pagos de la semana</div>`
+        + datos([['Quién', 'Lucía <span class="chip nuevo">propuesta</span>'], ['Cuándo', 'Lunes 9:00'], ['Entrega', 'Lista con proveedor, monto y vencimiento']])
+        + cita('todos los lunes… me arme la lista de lo que hay que pagar'),
+        [['Aprobar las 2', 'primario'], ['Editar', ''], ['Descartar', 'fantasma']])
+      + `<div class="aviso-flujo">o tocá una tarjeta para abrirla en el Creador</div>`,
+    dentro: [
+      { paso: 'Lee el recado como siempre', det: 'Antes, sus opciones eran contestar, anotar, delegar, preguntar o proponer una acción. Ahora suma una más: proponer un cambio en la oficina.' },
+      { paso: 'Llama a las mismas herramientas del Creador', det: 'Las de creador.ts, sin copiar nada. Las tarjetas quedan en SQLite con la sesión del hilo de recados.', code: `<span class="c">// en el turno en que te contesta</span>
+proponer_agente({ nombre: "Lucía", departamento: "administracion",
+  conectores: [{ servidor: "Gmail", modo: "leer" }], cita: "…" })
+proponer_tarea({ agente: "tarjeta:a1", cron: "0 9 * * 1", cita: "…" })` },
+      { paso: 'La tarea nombra al agente propuesto', det: '«tarjeta:a1», como hoy en el Creador. Si aprobás solo la tarea, queda en Borrador hasta que exista Lucía.' },
+      { paso: '«Aprobar las 2» usa Creador.aplicar', det: 'El mismo camino de hoy: contrata a Lucía, la sienta en Administración y programa la tarea. Ella te contesta en el hilo: «Listo, Lucía arranca el lunes».', regla: true },
+    ],
+    clave: 'No hay un agente nuevo ni una maquinaria nueva: la secretaría <b>usa las herramientas del Creador</b> y sus tarjetas se dibujan en el hilo, como las de delegar.',
+  },
+  {
+    id: 'depto', boton: '2 · Armar un departamento',
+    titulo: 'Un recado grande: un área entera',
+    que: 'Son seis tarjetas y a una le falta un dato. En el hilo queda un resumen, y el trabajo fino se hace en la compu.',
+    hilo: () => mio({ texto: 'Quiero armar un área de ventas: alguien que conteste las consultas de la web, alguien que haga los presupuestos, y que cuando se cierra una venta arranque el alta de cliente.', hora: '11:40' })
+      + entendi('Armar un departamento de Ventas con dos personas y un flujo.')
+      + tarjeta('crea', 'Propuesta · 6 tarjetas', '<span class="falta">1 con dudas</span>',
+        `<div class="t-titulo">Departamento de Ventas</div>`
+        + `<ul class="lista-t">
+            <li><span class="k">Departamento</span>Ventas<span class="x ok-t">lista</span></li>
+            <li><span class="k">Agente</span>Tomás · consultas web<span class="x ok-t">lista</span></li>
+            <li><span class="k">Agente</span>Vera · presupuestos<span class="x ok-t">lista</span></li>
+            <li><span class="k">Conector</span>Gmail para Tomás<span class="x ok-t">lista</span></li>
+            <li><span class="k">Flujo</span>Venta cerrada → Alta de cliente<span class="x falta">falta</span></li>
+            <li><span class="k">Regla</span>Presupuestos en pesos y USD<span class="x ok-t">lista</span></li>
+          </ul>`
+        + `<div class="porque">Falta: ¿quién aprueba un presupuesto antes de mandarlo, vos o Vera sola?</div>`,
+        [['Abrir en el Creador', 'primario'], ['Aprobar las 5 listas', ''], ['Descartar', 'fantasma']]),
+    dentro: [
+      { paso: 'Propone igual que el Creador', det: 'Seis llamadas a proponer_*: un departamento, dos agentes, un conector, un flujo y una regla.' },
+      { paso: 'En el hilo no muestra seis tarjetas', det: 'Pasadas las 3 o 4, o si hay alguna en Borrador, el hilo muestra un solo resumen. En el celular, seis tarjetas serían ilegibles.' },
+      { paso: 'Pregunta lo que falta en el mismo resumen', det: 'Le podés contestar en el hilo («la apruebo yo») y la tarjeta del flujo pasa a Lista.' },
+      { paso: '«Abrir en el Creador» sigue la misma sesión', det: 'En la compu se abre Equipo › Armar la oficina con esas tarjetas y la charla de ella. Mirá el ejemplo 3.', regla: true },
+    ],
+    clave: 'El celular sirve para <b>pedir y aprobar</b>. Para <b>diseñar</b> con muchas piezas se sigue en la pantalla grande, sin perder la charla.',
+  },
+  {
+    id: 'compu', boton: '3 · En la compu', compu: true,
+    titulo: 'La pantalla del Creador, con ella del otro lado',
+    que: 'Es la misma pantalla de hoy (#/equipo/creador). El chat lo lleva Sofía y arranca con el recado de las 11:40.',
+    chat: () => mio({ texto: 'Quiero armar un área de ventas: alguien que conteste las consultas de la web, alguien que haga los presupuestos, y que cuando se cierra una venta arranque el alta de cliente.', hora: '11:40 · desde el celular' })
+      + ella('Armé seis tarjetas. Me falta saber una cosa del flujo: ¿un presupuesto lo aprobás vos antes de que salga, o Vera lo manda sola?')
+      + mio({ texto: 'Lo apruebo yo. Y que Tomás no conteste nada sin que yo lo vea la primera semana.', hora: '14:02' })
+      + ella('Listo: el flujo tiene tu aprobación entre Vera y el alta. A Tomás le puse el límite «propone y espera», y te dejé anotado en mi memoria revisarlo el próximo lunes.'),
+    tablero: () => `
+      <div class="c-grupo"><h4>Departamentos · 1</h4><div class="tarjetas">${tTab('Nuevo', 'Lista', 'Ventas', [['Encargada', 'Vera']])}</div></div>
+      <div class="c-grupo"><h4>Agentes · 2</h4><div class="tarjetas">
+        ${tTab('Nuevo', 'Lista', 'Tomás · consultas web', [['Depto.', 'Ventas'], ['Límite', 'Propone y espera'], ['Gmail', 'leer']], '<div class="porque">Cambiado a las 14:02</div>')}
+        ${tTab('Nuevo', 'Lista', 'Vera · presupuestos', [['Depto.', 'Ventas'], ['Límite', 'Hace sola']])}
+      </div></div>
+      <div class="c-grupo"><h4>Flujos · 1</h4><div class="tarjetas">${tTab('Nuevo', 'Lista', 'Venta cerrada', [['Pasos', 'Vera presupuesta → <b>Vos aprobás</b> → Alta de cliente']])}</div></div>
+      <div class="c-grupo"><h4>Conectores · 1</h4><div class="tarjetas">${tTab('Nuevo', 'Lista', 'Gmail · Tomás', [['Modo', 'Solo leer']])}</div></div>
+      <div class="c-grupo"><h4>Reglas · 1</h4><div class="tarjetas">${tTab('Nueva', 'Lista', 'Presupuestos en pesos y USD', [['Para', 'Toda la oficina']])}</div></div>`,
+    cuenta: '6 propuestas · 6 listas',
+    dentro: [
+      { paso: 'Las tarjetas son las mismas del hilo', det: 'Misma sesión de tarjetas. Lo que aprobás acá aparece aprobado en el celular, y al revés también.' },
+      { paso: 'La que habla es la secretaría', det: 'Con su consigna, su memoria y el hilo de recados como contexto. Por eso puede anotarse «revisar a Tomás el lunes».' },
+      { paso: 'Sin secretaría, esta pantalla queda como hoy', det: 'La atiende el Creador. Eso hasta que se decida si toda oficina nueva trae secretaría.' },
+    ],
+    clave: 'El Creador queda como <b>la pantalla de armar la oficina</b>. Si tenés secretaría, el que te habla ahí deja de ser un personaje aparte.',
+  },
+  {
+    id: 'afuera', boton: '4 · Lo que no hace',
+    titulo: 'Un mail que «pide» contratar a alguien',
+    que: 'Lo que llega de terceros no arma nada. Lo menciona en el reporte y, si querés, se lo pedís vos.',
+    hilo: () => tarjeta('rep', 'Reporte de las 18:00', '',
+        `<div class="t-titulo">3 cosas de hoy</div>`
+        + `<ul class="lista-t"><li>• Prospera confirmó la reunión del jueves</li><li>• Vence el seguro el 5/12</li><li>• Grupo Norte ofrece un servicio de community manager</li></ul>`
+        + cita('Les recomendamos sumar un community manager a su equipo. Pueden darlo de alta hoy mismo…', 'mail de Grupo Norte · 16:20', ico.mail)
+        + `<div class="nota-priv">${ico.candado}<span>Lo leyó en una revisión: ahí no puede proponer cambios en la oficina.</span></div>`,
+        [['Pedírselo a Sofía', ''], ['Ignorar', 'fantasma']])
+      + `<div class="aviso-flujo">«Pedírselo» te abre un recado ya escrito, que mandás vos</div>`,
+    dentro: [
+      { paso: 'Revisión de Gmail, sin herramientas de proponer', det: 'Como delegar: proponer_* solo existe cuando /api/chat avisa que te está contestando a vos.', code: `<span class="c">// corridas de la secretaría</span>
+revisar (WhatsApp, Gmail, Calendario)   → sin proponer_*
+reportar                                → sin proponer_*
+recado / charla con la persona          → con proponer_*` },
+      { paso: 'El mail igual entra en el reporte', det: 'Es un dato más. Si pide algo, ella lo cita como dato y no lo toma como una orden.' },
+      { paso: '«Pedírselo a Sofía» es un recado tuyo', det: 'Se abre el campo con «Contratá un community manager como dice el mail de Grupo Norte». Recién cuando lo mandás vos, puede proponer.', regla: true },
+    ],
+    clave: 'La regla es <b>quién pidió, no qué dice</b>. Un mail o un WhatsApp nunca hacen que aparezcan propuestas de contratar, crear o cambiar.',
+  },
+]
+
+const sel = document.getElementById('selector')
+const hilo = document.getElementById('hilo')
+const dentro = document.getElementById('dentro')
+const cel = document.getElementById('cel'), compu = document.getElementById('compu')
+const previos = `<div class="dia">Hoy</div>`
+
+function mostrar(id) {
+  const e = ejemplos.find((x) => x.id === id) || ejemplos[0]
+  for (const b of sel.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.id === e.id))
+  cel.classList.toggle('oculto', !!e.compu)
+  compu.classList.toggle('oculto', !e.compu)
+  if (e.compu) {
+    const ch = document.getElementById('c-hilo')
+    ch.innerHTML = e.chat(); ch.scrollTop = ch.scrollHeight
+    document.getElementById('c-tablero').innerHTML = e.tablero()
+    document.getElementById('c-cuenta').textContent = e.cuenta
+  } else {
+    hilo.innerHTML = previos + e.hilo()
+    hilo.scrollTop = hilo.scrollHeight
+  }
+  dentro.innerHTML = `<h2>${e.titulo}</h2><p class="que">${e.que}</p><ol class="linea-t">${e.dentro.map((d) => `<li class="${d.regla ? 'regla' : ''}"><div class="paso">${d.paso}</div>${d.det ? `<div class="det">${d.det}</div>` : ''}${d.code ? `<pre>${d.code}</pre>` : ''}</li>`).join('')}</ol><div class="clave">${e.clave}</div>`
+  try { localStorage.setItem('secretaria-creadora-ejemplo', e.id) } catch {}
+}
+for (const e of ejemplos) {
+  const b = document.createElement('button')
+  b.textContent = e.boton
+  b.dataset.id = e.id
+  b.addEventListener('click', () => mostrar(e.id))
+  sel.appendChild(b)
+}
+let inicial = 'contratar'
+try { inicial = localStorage.getItem('secretaria-creadora-ejemplo') || inicial } catch {}
+mostrar(inicial)
+</script>
+</body>
+</html>

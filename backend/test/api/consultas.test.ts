@@ -102,7 +102,7 @@ describe('Consultas entre agentes (MCP)', () => {
     expect((await rpc(url, 'inventado', 'tools/list')).status).toBe(401)
     const ok = await rpc(url, t, 'tools/list')
     expect(ok.status).toBe(200)
-    expect(lista(dict(ok.obj.result).tools).map((x) => str(x.name))).toEqual(['colegas', 'consultar', 'pedir_permiso', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'pedir', 'quedo_esperando', 'cancelar_espera', 'delegar', 'preguntar', 'proponer_skill'])   // el token de un chat es interactivo; con el mensaje de la persona en curso, delegar y preguntar
+    expect(lista(dict(ok.obj.result).tools).map((x) => str(x.name))).toEqual(['colegas', 'consultar', 'pedir_permiso', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'pedir', 'quedo_esperando', 'cancelar_espera', 'delegar', 'preguntar', 'proponer_skill', 'ver_oficina', 'proponer_tarea', 'marcar_faltante', 'descartar_tarjeta', 'en_curso', 'arrancar_flujo', 'aprobar_paso', 'pedir_cambios', 'paso_hecho'])   // el token de un chat es interactivo; con el mensaje de la persona en curso, delegar, preguntar, proponer tareas y los flujos
 
     // GET (el sondeo SSE de claude) y otras rutas
     expect((await crudo(url, 'GET')).status).toBe(405)
@@ -165,7 +165,7 @@ describe('Consultas entre agentes (MCP)', () => {
     const hq = dict(dict(o.mcpServers).hq)
     expect(str(hq.type) === 'http' && /^http:\/\/127\.0\.0\.1:/.test(str(hq.url)) && str(hq.url).endsWith('/mcp')).toBe(true)
     expect(str(dict(hq.headers).Authorization)).toBe('Bearer ${HQ_MCP_TOKEN}')
-    expect(Sandbox.valor(l, '--tools')?.endsWith(',mcp__hq__consultar,mcp__hq__colegas,mcp__hq__quien_sabe,mcp__hq__buscar,mcp__hq__marcar_obsoleto,mcp__hq__anotar,mcp__hq__delegar,mcp__hq__preguntar,mcp__hq__pedir,mcp__hq__quedo_esperando,mcp__hq__cancelar_espera,mcp__hq__seguimiento,mcp__hq__seguimientos,mcp__hq__seguimiento_leer,mcp__hq__ficha_anotar,mcp__hq__ficha_leer,mcp__hq__proponer_skill')).toBe(true)
+    expect(Sandbox.valor(l, '--tools')?.endsWith(',mcp__hq__consultar,mcp__hq__colegas,mcp__hq__quien_sabe,mcp__hq__buscar,mcp__hq__marcar_obsoleto,mcp__hq__anotar,mcp__hq__delegar,mcp__hq__preguntar,mcp__hq__en_curso,mcp__hq__arrancar_flujo,mcp__hq__aprobar_paso,mcp__hq__pedir_cambios,mcp__hq__paso_hecho,mcp__hq__pedir,mcp__hq__quedo_esperando,mcp__hq__cancelar_espera,mcp__hq__seguimiento,mcp__hq__seguimientos,mcp__hq__seguimiento_leer,mcp__hq__ficha_anotar,mcp__hq__ficha_leer,mcp__hq__ver_oficina,mcp__hq__proponer_tarea,mcp__hq__marcar_faltante,mcp__hq__descartar_tarjeta,mcp__hq__proponer_skill')).toBe(true)
     const reglas = Sandbox.reglas(l)
     expect(reglas.includes('mcp__hq__consultar') && reglas.includes('mcp__hq__colegas')).toBe(true)
     expect(l.slice(-2)).toEqual(['--', 'hola'])

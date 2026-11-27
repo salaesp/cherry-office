@@ -162,7 +162,13 @@
       var msgs = chats[id] || [];
       msgs.forEach(function (m) { delete m.tarjetas; });
       var resto = [];
-      (r.tarjetas || []).map(function (t) { return { t: t }; }).concat((r.acciones || []).map(function (a) { return { a: a, turno: a.turno }; })).forEach(function (x) {
+      /* los cambios en la oficina que propuso la secretaría van juntos, uno por turno (docs/plan-secretaria-creadora.md) */
+      var porTurno = {}, grupos = [];
+      (r.cambios || []).forEach(function (c) {
+        if (!porTurno[c.turno]) { porTurno[c.turno] = { c: [], turno: c.turno }; grupos.push(porTurno[c.turno]); }
+        porTurno[c.turno].c.push(c);
+      });
+      (r.tarjetas || []).map(function (t) { return { t: t }; }).concat((r.acciones || []).map(function (a) { return { a: a, turno: a.turno }; }), grupos).forEach(function (x) {
         var turno = x.t ? x.t.turno : x.turno, m = msgs[turno];
         if (m && m.r === 'a') (m.tarjetas = m.tarjetas || []).push(x); else resto.push(x);
       });
@@ -172,13 +178,13 @@
   function tarjetasEl(lista, id) {
     return lista.map(function (x) {
       var op = { alCambiar: function () { cargarTarjetas(id).then(function () { repintar(id); }); } };
-      return x.a ? App.Tarjetas.accion(x.a, op) : App.Tarjetas.de(x.t, op);
+      return x.c ? App.Tarjetas.cambios(x.c, op) : x.a ? App.Tarjetas.accion(x.a, op) : App.Tarjetas.de(x.t, op);
     });
   }
   function hayVivas(id) {
     var todas = [].concat(sueltas[id] || []);
     (chats[id] || []).forEach(function (m) { if (m.tarjetas) todas = todas.concat(m.tarjetas); });
-    return todas.some(function (x) { return x.t && (x.t.estado === 'esperando' || x.t.estado === 'corriendo'); });
+    return todas.some(function (x) { return x.t && (x.t.estado === 'esperando' || x.t.estado === 'corriendo' || x.t.estado === 'en_curso'); });
   }
 
   function cargarConsultas(id) {
@@ -1074,6 +1080,8 @@
       }
       var linea1 = unica ? 'Una sola vez · ' + (t.cuando ? fechaCorta(t.cuando, t.zona, true) : (t.fecha + ' ' + t.hora)) + zonaTxt
         : textoDias(t.dias) + ' · ' + t.hora + zonaTxt;
+      /* modelo o esfuerzo propios de la tarea (pisan los del agente) */
+      if (t.ia && (t.ia.modelo || t.ia.esfuerzo)) linea1 += ' · ' + [t.ia.modelo ? App.tituloModelo(t.ia.modelo) : '', t.ia.esfuerzo ? App.tituloEsfuerzo(t.ia.esfuerzo) : ''].filter(Boolean).join(' · ');
       var linea2 = unica ? estadoUnica(t, activa, hecha)
         : (activa ? (t.proxima ? 'Próxima: ' + fechaCorta(t.proxima, t.zona, true) : 'Sin próxima corrida') : 'No corre mientras esté en pausa');
       var ultima = t.ultima && !hecha ? 'Última: ' + fechaCorta(t.ultima.inicio, t.zona, false) + (t.ultima.manual ? (unica ? ' (a mano)' : ' (prueba)') : '') : null;
@@ -1234,7 +1242,17 @@
 
     var agenteEl = a ? null : App.elegir({ etiqueta: 'Para quién', valor: elegido ? elegido.id : null,
       opciones: agentes.map(function (x) { return { valor: x.id, titulo: x.nombre, retrato: x }; }),
-      alCambiar: function (id) { elegido = App.agente(id); hj.titulo(tituloHoja()); pintarTipo(); } });
+      alCambiar: function (id) { elegido = App.agente(id); hj.titulo(tituloHoja()); pintarTipo(); armarSelectorIA(); } });
+    /* modelo, esfuerzo y ahorro de sus corridas (el mismo selector de las charlas): por defecto, los del agente.
+       Sirve para darle más potencia (o gastar menos) a una tarea puntual sin tocar la ficha del agente. */
+    var iaElegida = (t && t.ia) || {}, selectorIA = null, cajaIA = h('div');
+    function armarSelectorIA() {
+      if (selectorIA) iaElegida = selectorIA.valor();
+      selectorIA = App.SelectorCharla({ modelo: elegido ? elegido.modelo : null, esfuerzo: elegido ? elegido.esfuerzo : null, valor: iaElegida,
+        titulo: 'Modelo, esfuerzo y ahorro de esta tarea' });
+      App.add(App.vaciar(cajaIA), selectorIA);
+    }
+    armarSelectorIA();
     var tipoEl = App.elegir({ etiqueta: 'Tipo', valor: unica, opciones: [{ valor: false, titulo: 'Se repite' }, { valor: true, titulo: 'Una sola vez' }],
       alCambiar: function (v) { unica = v; pintarTipo(); } });
     var cuandoEl = t ? null : App.elegir({ etiqueta: 'Cuándo', valor: ahora, opciones: [{ valor: true, titulo: 'Ahora' }, { valor: false, titulo: 'En una fecha' }],
@@ -1298,6 +1316,7 @@
       campo('Nombre', null, nombre),
       campo('Consigna', ayudaConsigna, consigna),
       campo('Archivos', ayudaArchivos, [guardados, h('div', adj.boton, adj.input), adj.lista]),
+      campo('Modelo y esfuerzo', h('div.ayuda', 'Por defecto, los del agente. Cambialos si esta tarea necesita más potencia (o menos gasto); vale solo para ella.'), cajaIA),
       filaCuando, filaDias,
       h('div', { style: { display: 'flex', gap: '12px', alignItems: 'flex-start', flexWrap: 'wrap' } }, filaFecha, filaHora),
       zonaLink, zonaCaja,
@@ -1325,6 +1344,9 @@
       }
       guardar.disabled = true; err.textContent = '';
       if (t && quitados.length) cuerpo.quitarArchivos = quitados;
+      var ia = selectorIA.valor();
+      if (Object.keys(ia).length) cuerpo.ia = ia;
+      else if (t && t.ia) cuerpo.ia = null;
       var leidos = [];
       var p = adj.leer().then(function (archivos) {
         leidos = archivos;

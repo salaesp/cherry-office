@@ -86,6 +86,13 @@ App.Tareas = (function () {
     if (mismoDia(d, man)) return 'mañana ' + hora;
     return d.toLocaleString('es', { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + hora;
   }
+  /* « · Opus · Máximo» si la tarea tiene modelo o esfuerzo propios (pisan los del agente) */
+  function textoIA(t) {
+    var ia = t.ia || {}, p = [];
+    if (ia.modelo) p.push(App.tituloModelo(ia.modelo));
+    if (ia.esfuerzo) p.push(App.tituloEsfuerzo(ia.esfuerzo));
+    return p.length ? ' · ' + p.join(' · ') : '';
+  }
   function cadencia(t) { return t.tipo === 'unica' ? 'una sola vez' : textoDias(t.dias) + ' · ' + t.hora; }
 
   function detalle(t, g) {
@@ -143,7 +150,7 @@ App.Tareas = (function () {
       : g === 'error' ? h('span.insignia.error', 'Con error') : null;
 
     var el = App.filaDecision({ marca: ag || 'reloj', titulo: t.nombre, clase: 'tarea-fila', alTocar: ag ? abrirFicha : null,
-      sub: (ag ? ag.nombre : App.humano.quien(t.agente)) + ' · ' + detalle(t, g), estado: estado, principal: principal, mas: mas });
+      sub: (ag ? ag.nombre : App.humano.quien(t.agente)) + ' · ' + detalle(t, g) + textoIA(t), estado: estado, principal: principal, mas: mas });
     if (g === 'pausa' || g === 'hechas') el.style.opacity = 0.75;
     return el;
   }
