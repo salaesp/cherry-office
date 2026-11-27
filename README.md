@@ -81,6 +81,16 @@ npm run dev --prefix backend        # http://localhost:8765
 ```
 Variables útiles: `PORT`, `HQ_DATA_DIR`, `HQ_OFICINAS_DIR`, `CLAUDE_BIN`, `HQ_UI_DIR` (ver `backend/src/dev.ts`).
 
+**Desde otra compu o el celular, con Tailscale:** el navegador solo deja usar el micrófono en `https://` o `localhost`, así que
+para hablarles a los agentes desde afuera conviene `tailscale serve`, que le da a la máquina una dirección `https://` con
+certificado válido (en la consola de Tailscale, DNS › MagicDNS y HTTPS Certificates prendidos):
+```bash
+tailscale serve --bg 8765
+HQ_HOSTS=alfred.tu-red.ts.net npm run dev --prefix backend   # el nombre que muestra `tailscale serve status`
+```
+y se entra por `https://alfred.tu-red.ts.net`. `HQ_HOSTS` (nombres separados por comas) le dice al servidor qué nombres
+aceptar además de localhost; sin eso rechaza los pedidos que llegan por otro nombre.
+
 Tests (con un `claude` falso, sin tocar tus datos ni tu cuenta):
 ```bash
 npm test --prefix backend
@@ -96,7 +106,8 @@ npm start --prefix desktop
 La versión sale de `desktop/package.json` (subirla también en `desktop/package-lock.json`, por ejemplo con
 `npm version X.Y.Z --no-git-tag-version --prefix desktop`). Al subir una etiqueta `vX.Y.Z`, el workflow
 `.github/workflows/release.yml` corre los tests, arma el `.dmg` y el `.exe` y los adjunta a la release de esa etiqueta.
-Si la release no existe, la crea como borrador para completar las notas.
+Si la release no existe, la crea como borrador con las notas de `docs/releases/vX.Y.Z.md` (si no existe ese archivo, con un
+texto para completar a mano).
 
 ### Actualizaciones automáticas
 Las apps instaladas se actualizan solas desde las releases **publicadas** (los borradores no cuentan): publicar la
