@@ -487,7 +487,9 @@
     var selector = App.SelectorCharla({ modelo: a.modelo, esfuerzo: a.esfuerzo, valor: eleccionDe(claveEleccion()),
       alCambiar: function (v) { guardarEleccion(claveEleccion(), v); } });
     var mic = App.Grabadora.puede() ? h('button.btn.icono.btn-mic', { title: 'Grabar un audio para ' + a.nombre, onclick: grabar }, App.Grabadora.icono()) : null;
-    var redactar = h('div.redactar', adj.boton, mic, txt, parar, enviar);
+    /* como en Claude o ChatGPT: una sola caja con el texto arriba y, abajo, adjuntar a la izquierda y micrófono + enviar a la derecha */
+    adj.boton.classList.add('fantasma');
+    var redactar = h('div.redactar.caja', txt, h('div.redactar-barra', adj.boton, h('span.redactar-hueco'), mic, parar, enviar));
     /* grabar: la franja reemplaza al campo; al mandar, se transcribe en la compu y sale como «(nota de voz) …» */
     function grabar() {
       var franja, g = App.Grabadora.crear({ alTiempo: function (sg) { franja.tiempo(sg); }, alTope: terminar });
