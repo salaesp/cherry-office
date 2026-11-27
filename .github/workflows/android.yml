@@ -20,7 +20,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
+      # el SDK de Android ya viene en ubuntu-latest (ANDROID_HOME)
       - name: Armar el APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon

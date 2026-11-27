@@ -299,8 +299,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
-
+      # el SDK de Android ya viene en ubuntu-latest (ANDROID_HOME)
       # la versión de la app (versionName y versionCode) sale de desktop/package.json (android/app/build.gradle.kts)
       - name: Armar el APK
         working-directory: android
