@@ -1,7 +1,7 @@
 /* Entregables (docs/plan-entregables.md, E2): lo que los agentes terminaron y te falta revisar.
    Panel derecho con la lista (filtro «sin revisar» por defecto, por agente y por origen) y el detalle de cada entrega
    (texto, archivos, «Listo», «Pedir cambios», «Abrir en el chat»). El contador llega con /api/actividad y se reparte a la
-   barra lateral, al muro 3D, al Dock (junto con los avisos) y a la tecla N. Abrir una entrega NO la marca revisada. */
+   barra lateral, al muro de la oficina, al Dock (junto con los avisos) y a la tecla N. Abrir una entrega NO la marca revisada. */
 window.App = window.App || {};
 App.Entregables = (function () {
   'use strict';
@@ -48,7 +48,7 @@ App.Entregables = (function () {
   function pintarContador() {
     var b = App.dom && App.dom.navEnt;
     if (b) { b.textContent = sinRevisar; b.classList.toggle('oculto', !sinRevisar); }
-    if (App.Oficina3D && App.Oficina3D.muro) App.Oficina3D.muro(ultimas, sinRevisar);
+    if (App.Oficina && App.Oficina.muro) App.Oficina.muro(ultimas, sinRevisar);
     if (App.Avisos && App.Avisos.insignia) App.Avisos.insignia();
     if (App.Yo && App.Yo.refrescar) App.Yo.refrescar();
     if (App.Nav && App.Nav.seccion() === 'bandeja') App.Nav.pintarLista();
@@ -171,8 +171,20 @@ App.Entregables = (function () {
     var der = App.dom.derecho, cuerpo = h('div.der-cuerpo'), pie = h('div.der-pie');
     var bloqueAccion = h('div'), bloqueEspera = h('div');
     var volver = { texto: 'Para revisar', titulo: 'Volver a la lista', accion: function () { App.Nav.ir('#/bandeja/revisar'); } };
-    var sub = nombreDe(e) + ' · ' + origenTxt(e.origen) + ' · ' + hace(e.creada) + (typeof e.costo === 'number' && e.costo > 0 ? ' · ≈ US$ ' + e.costo.toFixed(2) : '');
-    App.add(App.vaciar(der), cabecera(e.titulo, sub, volver, e.origen === 'reunion' ? 'reunion' : 'libro'), cuerpo, pie);
+    var costo = typeof e.costo === 'number' && e.costo > 0 ? ' · ≈ US$ ' + e.costo.toFixed(2) : '';
+    var sub = nombreDe(e) + ' · ' + origenTxt(e.origen) + ' · ' + hace(e.creada) + costo;
+    var titulo = e.titulo, ico = e.origen === 'reunion' ? 'reunion' : 'libro';
+    /* propuestas y reportes de la secretaría: con la cara de quien la deja y un título en palabras */
+    var ag = e.agente && App.agente(e.agente);
+    if (e.origen === 'propuesta') {
+      titulo = String(e.titulo || '').replace(/^Propuesta:\s*/, '');
+      sub = nombreDe(e) + ' te lo propone · ' + hace(e.creada) + costo;
+    } else if (e.origen === 'secretaria') {
+      titulo = App.Propuestas.tituloReporte(e.creada);
+      sub = nombreDe(e) + ' · revisó ' + hace(e.creada) + costo;
+    }
+    if ((e.origen === 'propuesta' || e.origen === 'secretaria') && ag) ico = App.retratoImg(ag, 'retrato', 96);
+    App.add(App.vaciar(der), cabecera(titulo, sub, volver, ico), cuerpo, pie);
     var est = e.estado === 'sin_revisar' ? h('span.insignia.aviso', 'Sin revisar') : e.estado === 'revisada' ? h('span.insignia.ok', 'Revisada') : h('span.insignia', 'Reemplazada por una versión nueva');
     var meta = h('div.entrega-meta', est, e.padre ? h('span.insignia', 'Versión con cambios') : null, linkOrigen(e));
     App.add(cuerpo, meta, bloqueEspera, bloqueAccion);
@@ -217,16 +229,28 @@ App.Entregables = (function () {
         return h('li', a.cita ? h('span.suave', '«' + a.cita + '»: ') : null, n.texto);
       }))));
     }).catch(function () { /* sin la anterior: no se muestra */ });
-    App.add(cuerpo, App.htmlSeguro(h('div.md-doc.doc-panel.entrega-texto'), App.markdown(e.texto || '(sin texto)')));
+    /* el texto: en una propuesta, solo si no hay acción (la tarjeta ya dice lo mismo); en un reporte de la secretaría,
+       armado por secciones si sigue el formato */
+    var textoCaja = h('div');
+    App.add(cuerpo, textoCaja);
+    var pintarTexto = function (accion, propuestas) {
+      App.vaciar(textoCaja);
+      if (e.origen === 'propuesta' && accion) return;
+      var armado = e.origen === 'secretaria' && App.Propuestas.reporte(e.texto || '', propuestas, { ver: function (id) { App.Nav.ir('#/bandeja/revisar/' + id); } });
+      App.add(textoCaja, armado ? h('div.entrega-texto', armado) : App.htmlSeguro(h('div.md-doc.doc-panel.entrega-texto'), App.markdown(e.texto || '(sin texto)')));
+    };
+    if (e.origen !== 'propuesta' && e.origen !== 'secretaria') pintarTexto(null, []);
     /* flujo y acción llegan aparte: hasta entonces el pie queda vacío, para no ofrecer «Listo» sobre una propuesta sin resolver */
     var extra = { corrida: null, accion: null };
     Promise.all([
       api().get('/api/flujos/corridas', { entrega: e.id, estado: 'todas' }).then(function (r) { return (r.corridas || [])[0] || null; }).catch(function () { return null; }),
       api().get('/api/acciones', { entrega: e.id }).then(function (r) { return r.accion || null; }).catch(function () { return null; }),
-      api().get('/api/esperas', { entrega: e.id, estado: 'todas' }).then(function (r) { return r.esperas || []; }).catch(function () { return []; })
+      api().get('/api/esperas', { entrega: e.id, estado: 'todas' }).then(function (r) { return r.esperas || []; }).catch(function () { return []; }),
+      e.origen === 'secretaria' && e.sid ? api().get('/api/acciones', { sid: e.sid }).then(function (r) { return r.acciones || []; }).catch(function () { return []; }) : Promise.resolve([])
     ]).then(function (r) {
       if (!abiertoPanel() || abierta !== e.id) return;
       extra.corrida = r[0]; extra.accion = r[1];
+      if (e.origen === 'propuesta' || e.origen === 'secretaria') pintarTexto(r[1], r[3]);
       pintarEspera(e, r[2], bloqueEspera);
       if (extra.corrida) {
         var c = extra.corrida;
@@ -305,41 +329,10 @@ App.Entregables = (function () {
   }
 
   /* ---------------- acción hacia afuera (plan §8) ---------------- */
-  var TEXTO_ACCION = { send_message: 'Mandar el mail', create_event: 'Crear el evento' };
-  function cortoHerramienta(h2) { return String(h2 || '').replace(/^mcp__.*__/, ''); }
+  function textoAprobar(ac) { return App.Propuestas.textoAprobar(ac); }
 
-  /* los argumentos de la acción como filas «Para: …», «Asunto: …» en vez de JSON; lo que no se conoce se muestra con su clave en palabras */
-  var CLAVES = { to: 'Para', cc: 'Con copia', bcc: 'Con copia oculta', subject: 'Asunto', body: 'Mensaje', message: 'Mensaje', text: 'Mensaje',
-    summary: 'Título', title: 'Título', start: 'Empieza', end: 'Termina', startTime: 'Empieza', endTime: 'Termina', when: 'Cuándo', date: 'Cuándo',
-    attendees: 'Invitados', location: 'Dónde', description: 'Detalle', calendarId: 'Calendario', threadId: 'Conversación', replyTo: 'Responder a',
-    name: 'Nombre', channel: 'Canal', url: 'Enlace' };
-  var ORDEN = ['to', 'cc', 'bcc', 'subject', 'summary', 'title', 'start', 'startTime', 'when', 'date', 'end', 'endTime', 'location', 'attendees', 'body', 'message', 'text', 'description'];
-  function claveHumana(k) {
-    if (CLAVES[k]) return CLAVES[k];
-    var t = String(k).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim().toLowerCase();
-    return t.charAt(0).toUpperCase() + t.slice(1);
-  }
-  function valorHumano(v) {
-    if (v === null || v === undefined || v === '') return '';
-    if (Array.isArray(v)) return v.map(valorHumano).filter(Boolean).join(', ');
-    if (typeof v === 'object') { var f = v.dateTime || v.date || v.email || v.nombre || v.name; return f ? valorHumano(f) : JSON.stringify(v); }
-    if (typeof v === 'boolean') return v ? 'Sí' : 'No';
-    if (typeof v === 'string' && /^\d{4}-\d\d-\d\d(T|$)/.test(v) && !isNaN(Date.parse(v))) return App.fecha ? App.fecha(v) : v;
-    return String(v);
-  }
-  function tablaDetalle(d) {
-    var ks = Object.keys(d).sort(function (a, b) {
-      var i = ORDEN.indexOf(a), j = ORDEN.indexOf(b);
-      return (i < 0 ? 99 : i) - (j < 0 ? 99 : j);
-    });
-    var filas = ks.map(function (k) {
-      var v = valorHumano(d[k]); if (!v) return null;
-      return h('div.acc-dato', h('div.acc-clave', claveHumana(k)), h('div.acc-valor', v));
-    }).filter(Boolean);
-    return filas.length ? h('div.acc-datos', filas) : null;
-  }
-  function textoAprobar(ac) { return TEXTO_ACCION[cortoHerramienta(ac.herramienta)] || 'Aprobar y ejecutar'; }
-
+  /* la acción propuesta con la forma de su tipo (docs: bocetos/secretaria, dirección A): ticket de evento, mail o tabla,
+     de dónde salió y lo que se comprobó; abajo, el resultado cuando ya se hizo */
   function pintarAccion(e, ac, caja) {
     App.vaciar(caja);
     if (!ac) return;
@@ -350,16 +343,11 @@ App.Entregables = (function () {
       error: h('span.insignia.error', 'Con error'),
       descartada: h('span.insignia', 'Descartada')
     }[ac.estado] || h('span.insignia', ac.estado);
-    var tiene = ac.detalle && Object.keys(ac.detalle).length;
-    var tabla = tiene ? tablaDetalle(ac.detalle) : null;
-    App.add(caja, h('div.entrega-accion',
-      h('h4', 'Acción propuesta'),
-      h('div.acc-res', ac.resumen),
-      h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' } },
-        h('span.insignia', { title: ac.herramienta }, App.humano.herramienta(ac.herramienta)), estado),
-      tabla,
-      tiene ? h('details.acc-tecnico', h('summary', 'Detalle técnico'), h('pre', JSON.stringify(ac.detalle, null, 2))) : null,
-      ac.resultado && ac.estado !== 'pendiente' ? App.htmlSeguro(h('div.md-doc.doc-panel'), App.markdown(ac.resultado)) : null));
+    App.add(caja, h('div.entrega-accion.prop-caja',
+      h('div.prop-cab', App.Propuestas.etiqueta(App.Propuestas.tipo(ac)), estado),
+      App.Propuestas.tarjeta(ac),
+      ac.resultado && ac.estado !== 'pendiente' ? h('div.prop-resultado', h('div.etiqueta-campo', ac.estado === 'error' ? 'Qué pasó' : 'Resultado'),
+        App.htmlSeguro(h('div.md-doc.doc-panel'), App.markdown(ac.resultado))) : null));
   }
 
   function vigilarAccion(id) {
@@ -538,7 +526,7 @@ App.Entregables = (function () {
     api().get('/api/entregas', { estado: 'sin_revisar', limite: 1 }).then(function (r) {
       var e = (r.entregas || [])[0]; if (e) abrir(e.id);
     }).catch(App.fallo);
-    if (App.Oficina3D && App.Oficina3D.enfocarLugar) App.Oficina3D.enfocarLugar('entregables');
+    if (App.Oficina && App.Oficina.enfocarLugar) App.Oficina.enfocarLugar('entregables');
     return true;
   }
 

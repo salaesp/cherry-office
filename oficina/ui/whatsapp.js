@@ -69,7 +69,7 @@
       ck.addEventListener('change', function () { vincular.disabled = !ck.checked; });
       App.add(cont,
         h('div.ayuda', { style: { marginTop: 0, marginBottom: '12px' } },
-          'Conectá tu WhatsApp para que los agentes que elijas puedan leer algunos chats: por ejemplo, que el secretario vea que tu mamá tiene turno con el médico y te sugiera agendarlo. La oficina solo lee: no manda mensajes ni marca nada como leído.'),
+          'Conectá tu WhatsApp para que los agentes que elijas puedan leer algunos chats: por ejemplo, que la secretaría vea que tu mamá tiene turno con el médico y te sugiera agendarlo. La oficina solo lee: no manda mensajes ni marca nada como leído.'),
         App.seccion('Antes de vincular', RIESGOS.map(function (r) {
           return h('div.ajuste', { style: { display: 'block' } }, h('div.ajuste-tit', r[0]), h('div.ajuste-ayuda', r[1]));
         })),

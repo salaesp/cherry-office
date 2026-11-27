@@ -16,7 +16,7 @@ import { decodificarTarea, type TareaProgramada } from './tareas.js'
 import { Slug, Validar, largo, plegar, prefijo } from './validar.js'
 
 export type Avatar = Partial<Record<(typeof clavesAvatar)[number], string>>
-/** Las claves `px*` son de la oficina pixel (peinado, prenda de arriba, de abajo y accesorio); los colores se comparten con la maqueta LEGO. */
+/** Las claves `px*` son de la oficina pixel (peinado, prenda de arriba, de abajo y accesorio); las demás vienen de la maqueta LEGO de antes y se conservan para leer avatares guardados. */
 export const clavesAvatar = ['semilla', 'pelo', 'colorPelo', 'cara', 'torso', 'colorTorso', 'colorPiernas', 'colorPiel',
   'colorBrazos', 'colorAccesorio', 'piernas', 'sombrero', 'cuello', 'pxPelo', 'pxArriba', 'pxAbajo', 'pxAccesorio'] as const
 
@@ -304,7 +304,8 @@ export function validarMemoria(m: MemoriaOficina) {
 /** Validaciones extra de secciones que se portan después (tareas, flujos, reglas): se registran al portarlas. */
 export const validacionesExtra: ((o: Oficina) => void)[] = []
 
-/** «Departamento» fijo de la recepción: ahí se sienta quien atiende la secretaría (secretaria.ts), en el mostrador. No
+/** «Departamento» fijo de quien atiende la secretaría (secretaria.ts): el id quedó de cuando se sentaba en la
+ *  recepción; ahora tiene su despacho al lado del de la persona (sala «Secretaría» en la oficina pixel). No
  *  es una sala de `departamentos`; si la oficina tiene un departamento con este id, manda el de la oficina. */
 export const deptoRecepcion = 'recepcion'
 export const existeDepto = (o: Oficina, id: string) => id === deptoRecepcion || o.departamentos.some((d) => d.id === id)

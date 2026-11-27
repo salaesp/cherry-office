@@ -17,7 +17,7 @@
       estadoMemoria = m;
       if (App.Memoria && App.Memoria.contar(m) !== antes) App.emit('memoria');
       /* el bibliotecario de la oficina pixel trabaja y avisa según esto; mientras ordena se mira más seguido */
-      if (App.Oficina3D && App.Oficina3D.bibliotecario) App.Oficina3D.bibliotecario(m);
+      if (App.Oficina && App.Oficina.bibliotecario) App.Oficina.bibliotecario(m);
       memoriaCorriendo = !!m.corriendo;
     }).catch(function () {});
     api.get('/api/biblioteca/estado').then(function (st) {

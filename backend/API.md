@@ -114,7 +114,7 @@ La app sigue viva con la ventana cerrada (el Dock o la bandeja la vuelven a abri
 - **Prompt del turno:** tema, participantes, memoria común (`conocimiento/oficina.md`, 2000 caracteres), últimas 15 decisiones, transcripción hasta ese momento y la consigna «Sos <nombre>, <rol>. Opiná desde tu rol en 120-180 palabras…».
 - **Persistencia:** tablas `reuniones` y `turnos` en `hq.db` (con la carpeta de la oficina). Al arrancar, las reuniones que estaban `en_curso` pasan a `esperando` (la ronda interrumpida queda con los turnos que alcanzó a registrar).
 - **Cierre:** `correrSinAgente` con el rol «secretario de actas» devuelve JSON estricto (se quitan los ```json y se recorta al primer `{` y último `}`). Se escribe `reuniones/AAAA-MM-DD-<tema>.md` (tema, participantes, transcripción, síntesis; si el nombre existe, `-2`, `-3`…) y las decisiones se anexan a `conocimiento/decisiones.md` con `Plantillas.anexarDecisiones`.
-- **3D:** mientras hay una reunión abierta, `oficina/ui/reunion.js` consulta su estado cada 2 s y se lo pasa a la maqueta con `App.Oficina3D.reunion(agentes, hablando)`: los participantes caminan por los pasillos hasta la sala, quien habla gesticula y al cerrar vuelven a su escritorio (`App.Oficina3D.finReunion()`). Cerrar el panel no detiene una ronda en curso; se retoma desde «Reuniones».
+- **En la oficina:** mientras hay una reunión abierta, `oficina/ui/reunion.js` consulta su estado cada 2 s y se lo pasa a la oficina pixel con `App.Oficina.reunion(agentes, hablando)`: los participantes caminan por los pasillos hasta la sala, quien habla gesticula y al cerrar vuelven a su escritorio (`App.Oficina.finReunion()`). Cerrar el panel no detiene una ronda en curso; se retoma desde «Reuniones».
 
 ## Dependencias entre agentes (pedidos y esperas)
 
@@ -484,7 +484,7 @@ Cerrar la secretaría **no** borra la memoria. Borrar la oficina (o crear otra e
 
 ## Abrir archivos y créditos (app de escritorio)
 - El front manda `window.webkit.messageHandlers.hq.postMessage({accion: 'abrir' | 'revelar', ruta})` (`App.nativo` en `oficina/ui/base.js`). `desktop/src/main.ts` (`abrirRuta`, con `abrir.ts`) valida la ruta (enlaces simbólicos resueltos) contra la carpeta de la oficina activa y las carpetas vinculadas (las pide al backend) y la abre con su aplicación; nunca abre aplicaciones, scripts ni archivos ejecutables. `revelar` sin ruta abre la carpeta de la oficina (menú de la app, ⇧⌘O / Ctrl+Shift+O, y botón en la barra lateral).
-- «Acerca de Oficina» (menú de la app y enlace en la barra lateral): LDraw parts library (CC BY 4.0), three.js (MIT), Poppins (OFL) y aviso de que el proyecto no está afiliado a LEGO.
+- «Acerca de Oficina» (menú de la app y enlace en la barra lateral): Poppins (OFL).
 
 - Al importar Próspera, si `~/Próspera` existe se vincula (`id: prospera`) para mario, don-armando, nicolas y sofia, y las rutas absolutas de sus `.md` apuntan a esa carpeta. Al abrir una oficina se reescanean sus carpetas vinculadas en segundo plano.
 

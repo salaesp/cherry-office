@@ -2,7 +2,6 @@
 
 Una oficina en pixel art isométrico donde trabajan tus agentes de Claude Code. Cada personaje es un agente real
 (`.claude/agents/<id>.md`): le hablás, lo llamás a reuniones, le das tareas y te deja lo que termina en tu bandeja.
-La maqueta 3D estilo LEGO de las versiones anteriores sigue disponible en Ajustes › Apariencia.
 Hay app para **Mac** y para **Windows**.
 
 ## Instalar
@@ -44,11 +43,11 @@ En los dos casos hace falta **Claude Code** instalado y con la sesión iniciada.
 ## Estructura del repo
 | Carpeta | Qué hay |
 |---|---|
-| `oficina/` | El front (HTML y JS, con `vendor/` offline): la oficina pixel (`ui/pixel/`), la maqueta 3D LEGO opcional (three.js) y todas las pantallas. |
+| `oficina/` | El front (HTML y JS, con `vendor/` offline): la oficina pixel (`ui/pixel/`) y todas las pantallas. |
 | `backend/` | El backend en TypeScript (Node): oficinas, agentes, chat, flujos, tareas, biblioteca. La API está en [backend/API.md](backend/API.md). |
 | `desktop/` | La app de escritorio: carcasa Electron alrededor de `backend/` y `oficina/`. De acá salen el `.dmg` y el `.exe` de las releases. Ver [desktop/README.md](desktop/README.md). |
 | `docs/` | Planes de diseño, `aprendizajes.md` (cómo se comporta el `claude` real) y `caso-prospera/` (el texto con el que se prueba armar una oficina con el Creador). |
-| `tools/` | Utilidades sueltas, como el empaquetado de piezas LDraw. |
+| `tools/` | Utilidades sueltas (pruebas de concepto, como `whatsapp-spike/`). |
 | `bocetos/` | Pruebas de diseño que no forman parte de la app. `bocetos/pixel/` es el boceto del que salió la oficina pixel, con su renderizador de sprites a PNG. Ver [bocetos/pixel/README.md](bocetos/pixel/README.md). |
 
 ## Dónde está qué
@@ -113,6 +112,3 @@ menú (Mac: menú Oficina; Windows: Ayuda). `HQ_SIN_ACTUALIZACIONES=1` las apaga
 - La primera versión con actualizador hay que instalarla a mano una vez; de ahí en adelante, ya no. En Windows, la
   1.0.0 se cae al abrir (el import de `electron-updater` quedaba `undefined` con esbuild), así que quien la tenga
   tiene que instalar a mano la versión siguiente.
-
-Repositorio privado recomendado: incluye el modelo `lego_man.json` (del repo
-3d-lego-configurator, sin licencia).

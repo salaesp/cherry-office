@@ -42,15 +42,15 @@ App.Paleta = (function () {
       var t = act[a.id], d = App.depto(a.departamento);
       ag('Equipo', 'Charla', 'charla', a.nombre, (t ? (t.tarea || t.estado) : a.rol + (d ? ' · ' + d.nombre : '')) + ' · charla · ficha en Equipo',
         a.nombre + ' ' + a.rol + ' ' + (d ? d.nombre : '') + ' ficha perfil editar charla hablar',
-        function () { App.Oficina3D.enfocarAgente(a.id); App.Agente.abrir(a.id); }, { activo: !!t });
+        function () { App.Oficina.enfocarAgente(a.id); App.Agente.abrir(a.id); }, { activo: !!t });
     });
     o.departamentos.forEach(function (d) {
       ag('Equipo', 'Departamento', 'capas', d.nombre, 'departamento', 'departamento departamentos ' + d.nombre, function () { App.Nav.ir('#/equipo/departamentos'); });
     });
     if (!o.departamentos.length) ag('Equipo', 'Departamento', 'capas', 'Departamentos', '', 'departamentos', function () { App.Nav.ir('#/equipo/departamentos'); });
-    ag('Equipo', 'Vos', 'personas', 'Tu perfil', App.Yo.nombre(), 'yo perfil quien dirige mi nombre dueño minifig', function () { App.Yo.abrir(); });
+    ag('Equipo', 'Vos', 'personas', 'Tu perfil', App.Yo.nombre(), 'yo perfil quien dirige mi nombre dueño apariencia', function () { App.Yo.abrir(); });
 
-    ag('Lugares', 'Sala', 'reunion', 'Sala de reuniones', '', 'sala reuniones', function () { App.Oficina3D.enfocarLugar('reunion'); App.Reunion.abrir(); });
+    ag('Lugares', 'Sala', 'reunion', 'Sala de reuniones', '', 'sala reuniones', function () { App.Oficina.enfocarLugar('reunion'); App.Reunion.abrir(); });
     ag('Lugares', 'Sala', 'libro', 'Biblioteca', 'Documentos y fichas', 'biblioteca archivos documentos', function () { App.Nav.ir('#/archivos/biblioteca'); });
     ag('Lugares', 'Archivos', 'carpeta', 'Carpeta de la oficina', '', 'carpeta oficina archivos', function () { App.Nav.ir('#/archivos/carpeta'); });
     ag('Lugares', 'Archivos', 'bombilla', 'Conocimiento de la oficina', 'Lo que ya se sabe', 'conocimiento preguntas frecuentes sabe', function () { App.Nav.ir('#/archivos/conocimiento'); });
@@ -69,7 +69,7 @@ App.Paleta = (function () {
      ['Siguiente aviso pendiente', 'chispa', '', 'siguiente aviso pendiente', function () { if (App.Avisos) App.Avisos.siguiente(); }],
      ['Revisar la próxima entrega', 'chispa', '', 'revisar proxima entrega', function () { if (!App.Entregables.siguiente()) App.aviso('No tenés entregas sin revisar.'); }],
      ['Exportar oficina', 'subir', '', 'exportar oficina', function () { App.exportarOficina(); }],
-     ['Ver toda la oficina', 'edificio', '', 'ver toda encuadrar oficina', function () { App.Oficina3D.encuadrar(); }]].forEach(function (x) {
+     ['Ver toda la oficina', 'edificio', '', 'ver toda encuadrar oficina', function () { App.Oficina.encuadrar(); }]].forEach(function (x) {
       ag('Acciones', 'Acción', x[1], x[0], x[2], x[0] + ' ' + x[3], x[4]);
     });
     App.opcionesOficina().forEach(function (op) { ag('Acciones', 'Acción', op.icono, op.texto, '', op.texto, op.accion); });
@@ -156,7 +156,7 @@ App.Paleta = (function () {
   /* ---------------- barra de pistas ---------------- */
   var esMac = /Mac/.test(navigator.platform || navigator.userAgent);
   function base() {
-    return (App.estiloOficina === 'pixel' ? 'Rueda o pellizco para acercarte · arrastrá para moverte · ' : 'Arrastrá para girar · dos dedos para moverte · pellizcá para acercarte · ') +
+    return 'Rueda o pellizco para acercarte · arrastrá para moverte · ' +
       (esMac ? '⌘K' : 'Ctrl+K') + ' buscar · N siguiente aviso';
   }
   var VERBO = { pensando: 'pensando', leyendo: 'leyendo', escribiendo: 'escribiendo', buscando: 'buscando', consultando: 'consultando a', trabajando: 'trabajando' };
@@ -172,10 +172,10 @@ App.Paleta = (function () {
     } else if (hov.tipo === 'reunion') t = 'Clic: abrir la sala de reuniones';
     else if (hov.tipo === 'biblioteca') t = hov.id === 'bibliotecario' ? 'El bibliotecario cuida la memoria de la oficina · clic: abrir la biblioteca' : 'Clic: abrir la biblioteca';
     else if (hov.tipo === 'direccion') t = 'Clic: lo que te espera para revisar';
-    else if (hov.tipo === 'yo') t = 'Sos vos' + (App.Yo.nombre() ? ', ' + App.Yo.nombre() : '') + ' · clic: cambiar tu nombre o ' + (App.estiloOficina === 'pixel' ? 'tu apariencia' : 'tu minifig');
+    else if (hov.tipo === 'yo') t = 'Sos vos' + (App.Yo.nombre() ? ', ' + App.Yo.nombre() : '') + ' · clic: cambiar tu nombre o ' + 'tu apariencia';
     else if (hov.tipo === 'creador') t = 'Clic: armar o cambiar la oficina con el Creador';
     else if (hov.tipo === 'juegos') t = 'Juegos y café: acá descansan los agentes sin trabajo';
-    else if (hov.texto) t = hov.texto;   // bandeja de entregables: el 3D ya arma el texto
+    else if (hov.texto) t = hov.texto;   // bandeja de entregables: la oficina ya arma el texto
     el.textContent = t || base();
     el.classList.toggle('viva', !!t);
   }
