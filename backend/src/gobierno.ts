@@ -1,7 +1,7 @@
 // Rutas de reglas, conectores y acciones (GobiernoRouter.swift):
 //   GET  /api/reglas · PUT /api/reglas                        → {reglas}
 //   GET  /api/conectores · POST /api/conectores/actualizar    → {detectado, detectando, servidores}
-//   GET  /api/acciones?entrega= | ?estado=                    → {accion} | {acciones}
+//   GET  /api/acciones?entrega= | ?sid= | ?estado=            → {accion} | {acciones}
 //   POST /api/entregas/:id/ejecutar | /descartar-accion       → {ejecucion} | {accion}
 // Es un router «extra»: atiende antes que el de entregas (que sigue siendo dueño del resto de /api/entregas/*).
 import { Acciones, accionJSON, accionesDe, AccionesStore, estadosAccion, herramientasAcciones } from './acciones.js'
@@ -157,6 +157,7 @@ export class GobiernoRouter implements SubRouter {
       const ac = store.porEntrega(a.carpeta, id)
       return [200, { accion: ac ? accionJSON(ac) : null }]
     }
+    if (q.sid !== undefined && q.sid !== '') return [200, { acciones: store.porSid(a.carpeta, q.sid).map(accionJSON) }]
     let estados: string[] | undefined
     if (q.estado !== undefined && q.estado !== '' && q.estado !== 'todas') {
       const l = q.estado.split(',').filter((x) => x !== '').map((x) => x.trim())

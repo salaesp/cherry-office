@@ -218,6 +218,32 @@ describe('Acciones (en proceso)', () => {
     expect(s.entregas.lista(carpeta, { origen: 'propuesta' }).length).toBe(1)
   })
 
+  test('proponer_accion: guarda de dónde salió y lo que comprobó, y se listan por sesión', async () => {
+    const { s, b, carpeta } = await preparar()
+    const mcp = mcpDe(s)!
+    const ident = { oficina: carpeta, agente: 'marce', sid: U.a, perfil: 'agente' }
+    const h = mcp.consultas.herramientas(mcp.tokens.emitir(ident), ident)
+    const r = (await h.llamar('proponer_accion', {
+      herramienta: crearCal, resumen: 'Agendar el turno', detalle: { summary: 'Cardiólogo' },
+      origen: { de: ' Mamá ', por: 'WhatsApp', cuando: 'hoy 9:41', cita: 'el jueves   a las 10', otra: 'x', n: 3 },
+      nota: 'Miré tu calendario: está libre.',
+    }))!
+    expect(r.esError, r.texto).toBe(false)
+    await h.llamar('proponer_accion', { herramienta: crearCal, resumen: 'Otra', origen: { de: '' } })
+    const [a1, a2] = accionesDe(s).porSid(carpeta, U.a)
+    expect(a1!.origen).toBe('{"cita":"el jueves a las 10","cuando":"hoy 9:41","de":"Mamá","por":"WhatsApp"}')
+    expect(a1!.nota).toBe('Miré tu calendario: está libre.')
+    expect(a2!.origen).toBeUndefined()
+    expect(a2!.nota).toBeUndefined()
+    const l = await llamar(b, 'GET', '/api/acciones', undefined, { sid: U.a })
+    expect(l.status).toBe(200)
+    const acs = l.obj.acciones as Record<string, unknown>[]
+    expect(acs.map((x) => x.resumen)).toEqual(['Agendar el turno', 'Otra'])
+    expect(acs[0]!.origen).toEqual({ de: 'Mamá', por: 'WhatsApp', cuando: 'hoy 9:41', cita: 'el jueves a las 10' })
+    expect(acs[1]!.origen).toBeNull()
+    expect(((await llamar(b, 'GET', '/api/acciones', undefined, { sid: 'otra' })).obj.acciones as unknown[]).length).toBe(0)
+  })
+
   test('detalleJSON y legible', () => {
     expect(Acciones.detalleJSON(undefined)).toBe('{}')
     expect(Acciones.detalleJSON(null)).toBe('{}')

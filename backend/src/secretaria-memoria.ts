@@ -854,8 +854,8 @@ export class MemoriaSecretaria {
       `- Las decisiones de ${p.persona} sobre tus propuestas (aprobadas o descartadas, más arriba) también mueven la memoria: si aprobó agendar algo, el tema pasa a esperando o resuelto con su fecha; si la descartó, cerralo como descartado o anotá por qué.`,
       p.puedeActuar
         ? '- Lo que tenga fecha no lo recordás vos: proponelo como evento del calendario con un recordatorio (proponer_accion), así avisa el calendario. Vos solo dejás el tema con su fecha.'
-        : `- Lo que tenga fecha no lo recordás vos: contalo en el reporte como evento del calendario con recordatorio que ${p.persona} podría agendar, y dejá el tema con su fecha.`,
-      '- Seguimiento: repasá los temas abiertos. Los que quedaron trabados o sin respuesta (marcados abajo, o que lo nuevo muestra sin avance) van en el reporte en una sección «Seguimiento», con qué se esperaba y desde cuándo. Si hay temas trabados, no respondas «Sin novedades»: dejá el reporte.',
+        : `- Lo que tenga fecha no lo recordás vos: contalo en «## Para hacer» como evento del calendario con recordatorio que ${p.persona} podría agendar, y dejá el tema con su fecha.`,
+      '- Seguimiento: repasá los temas abiertos. Los que quedaron trabados o sin respuesta (marcados abajo, o que lo nuevo muestra sin avance) van en el reporte en la sección «## Seguimiento», con qué se esperaba y desde cuándo. Si hay temas trabados, no respondas «Sin novedades»: dejá el reporte.',
       '- Si algo de tu memoria le serviría a toda la oficina (no solo a vos), no lo compartas por tu cuenta: sugerilo con memoria_sugerir_compartir y ' + p.persona + ' decide.',
     )
     if (trabados.length) {

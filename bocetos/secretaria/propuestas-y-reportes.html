@@ -1,0 +1,452 @@
+<title>Bandeja de la secretaria</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&display=swap">
+<style>
+/* Layout: arriba, cómo se ve hoy; abajo, tres direcciones. Cada dirección muestra el mismo trío (propuesta de evento,
+   propuesta de mail, reporte del día) dentro de paneles de 440 px, el ancho real del panel derecho de la app.
+   Los colores son los de oficina/ui/estilo.css. */
+:root {
+  --fondo: #f2f0ec; --panel: #ffffff; --panel-2: #f8f7f4; --linea: #e4e1db; --linea-fuerte: #d3cfc7;
+  --texto: #1d1d1f; --suave: #6d6962; --tenue: #9a958d; --acento: #1d1d1f; --sobre-acento: #ffffff;
+  --peligro: #b3362c; --ok: #3b7a4b; --aviso: #a46a12; --foco: rgba(29,29,31,.10);
+  --sombra: 0 1px 2px rgba(20,18,15,.06), 0 8px 24px rgba(20,18,15,.08);
+  --cal: #2f6db5; --cal-suave: #e8f0fa; --mail: #b3542c; --mail-suave: #fbeee7; --wa: #2e8a57; --wa-suave: #e6f4ec;
+  --papel: #fffbea; --papel-linea: #efe6c4; --papel-tinta: #2b3a67; --cinta: rgba(240, 220, 150, .75);
+  --urg: #b3362c; --urg-suave: #fbecea;
+  --f-texto: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --f-mano: "Caveat", "Segoe Print", "Bradley Hand", cursive;
+  --radio: 10px; --radio-chico: 7px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+  --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --acento: #f1f1f2; --sobre-acento: #1b1b1d;
+  --peligro: #e0675d; --ok: #6cbf80; --aviso: #e0a84a; --foco: rgba(255,255,255,.2);
+  --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  --cal: #7fb0ea; --cal-suave: #1f2b3a; --mail: #e79a74; --mail-suave: #3a2720; --wa: #6cc495; --wa-suave: #1c3127;
+  --papel: #2d2a20; --papel-linea: #423d2c; --papel-tinta: #c9d4ff; --cinta: rgba(140, 125, 70, .6);
+  --urg: #e0675d; --urg-suave: #3a2220; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+  --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --acento: #f1f1f2; --sobre-acento: #1b1b1d;
+  --peligro: #e0675d; --ok: #6cbf80; --aviso: #e0a84a; --foco: rgba(255,255,255,.2);
+  --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  --cal: #7fb0ea; --cal-suave: #1f2b3a; --mail: #e79a74; --mail-suave: #3a2720; --wa: #6cc495; --wa-suave: #1c3127;
+  --papel: #2d2a20; --papel-linea: #423d2c; --papel-tinta: #c9d4ff; --cinta: rgba(140, 125, 70, .6);
+  --urg: #e0675d; --urg-suave: #3a2220; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--fondo); color: var(--texto); font: 14px/1.5 var(--f-texto); }
+.pagina { max-width: 1440px; margin: 0 auto; padding-block: 28px 60px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font-size: 24px; margin: 0 0 6px; text-wrap: balance; }
+.intro { color: var(--suave); max-width: 70ch; margin: 0 0 22px; }
+.selector { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--fondo); padding: 8px 0; }
+.selector button { font: inherit; height: 34px; padding: 0 14px; border-radius: 17px; border: 1px solid var(--linea-fuerte); background: var(--panel); color: var(--texto); cursor: pointer; }
+.selector button[aria-pressed="true"] { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); }
+.selector button:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.dir-cab { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin: 0 0 6px; }
+.dir-cab h2 { font-size: 19px; margin: 0; }
+.dir-desc { color: var(--suave); max-width: 80ch; margin: 0 0 16px; }
+.fila { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.marco { width: 440px; max-width: 100%; flex: 0 1 440px; min-width: 0; }
+.marco-titulo { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--tenue); margin: 0 0 6px 2px; }
+.panel { background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); box-shadow: var(--sombra); overflow: hidden; }
+.por-dentro { margin-top: 18px; font-size: 13px; color: var(--suave); max-width: 90ch; border-top: 1px dashed var(--linea-fuerte); padding-top: 10px; }
+.por-dentro b { color: var(--texto); }
+
+/* piezas comunes de la app */
+.cab { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--linea); }
+.cab .t { font-weight: 600; font-size: 15px; line-height: 1.25; }
+.cab .s { font-size: 12px; color: var(--suave); }
+.cab .min { min-width: 0; flex: 1; }
+.cuerpo { padding: 12px 14px 16px; display: grid; gap: 12px; }
+.pie { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; padding: 10px 14px; border-top: 1px solid var(--linea); background: var(--panel-2); }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 13px; border-radius: var(--radio-chico); border: 1px solid var(--linea-fuerte); background: var(--panel); color: var(--texto); font: inherit; font-size: 13px; cursor: pointer; }
+.btn.primario { background: var(--acento); border-color: var(--acento); color: var(--sobre-acento); }
+.btn.fantasma { border-color: transparent; background: transparent; color: var(--suave); }
+.btn:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.insignia { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 10px; font-size: 11px; font-weight: 500; background: var(--panel-2); border: 1px solid var(--linea); color: var(--suave); white-space: nowrap; }
+.insignia.aviso { color: var(--aviso); }
+.insignia.ok { color: var(--ok); }
+.avatar { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 600; font-size: 13px; color: #fff; background: linear-gradient(160deg, #c27a5a, #8c4f3a); }
+.avatar.chico { width: 24px; height: 24px; font-size: 10px; }
+.ico { width: 16px; height: 16px; flex: none; }
+
+/* ---------- HOY ---------- */
+.hoy-acc { margin: 0; padding: 10px 12px; border: 1px solid var(--linea-fuerte); border-radius: var(--radio-chico); background: var(--panel-2); }
+.hoy-acc h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--tenue); margin: 0 0 4px; }
+.hoy-acc .r { font-weight: 600; margin-bottom: 4px; }
+.hoy-datos { display: grid; grid-template-columns: 90px 1fr; gap: 2px 10px; font-size: 13px; margin-top: 6px; }
+.hoy-datos div:nth-child(odd) { color: var(--suave); }
+.hoy-md { font-size: 14px; line-height: 1.6; }
+.hoy-md p { margin: 0 0 8px; }
+.hoy-md h3 { font-size: 15px; margin: 12px 0 4px; }
+.hoy-md ul { margin: 0; padding-left: 18px; }
+.hoy-md code { font: 12px ui-monospace, Menlo, monospace; background: var(--panel-2); padding: 1px 4px; border-radius: 4px; }
+.tachado { position: relative; }
+.globo { display: inline-block; margin-top: 8px; font-size: 12px; color: var(--peligro); border: 1px dashed var(--peligro); border-radius: 6px; padding: 2px 8px; }
+
+/* ---------- A · PROLIJO ---------- */
+.a-ticket { display: grid; grid-template-columns: 76px 1fr; border: 1px solid var(--linea); border-radius: var(--radio); overflow: hidden; }
+.a-dia { background: var(--cal); color: #fff; display: grid; align-content: center; justify-items: center; padding: 10px 4px; text-align: center; }
+.a-dia .m { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; opacity: .9; }
+.a-dia .n { font-size: 30px; font-weight: 700; line-height: 1; margin: 2px 0; }
+.a-dia .d { font-size: 12px; opacity: .9; }
+.a-info { padding: 10px 12px; display: grid; gap: 4px; min-width: 0; }
+.a-info .ti { font-weight: 600; font-size: 15px; }
+.a-linea { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--suave); }
+.a-linea svg { color: var(--tenue); }
+.a-por { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--suave); background: var(--panel-2); border-radius: var(--radio-chico); padding: 8px 10px; }
+.a-por q { color: var(--texto); font-style: italic; quotes: "«" "»"; }
+.a-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; padding: 3px 8px; border-radius: 10px; }
+.a-tag.cal { color: var(--cal); background: var(--cal-suave); }
+.a-tag.mail { color: var(--mail); background: var(--mail-suave); }
+.a-tag.wa { color: var(--wa); background: var(--wa-suave); }
+.a-mail { border: 1px solid var(--linea); border-radius: var(--radio); overflow: hidden; }
+.a-mail-cab { display: grid; grid-template-columns: 62px 1fr; gap: 3px 8px; padding: 10px 12px; font-size: 13px; background: var(--panel-2); border-bottom: 1px solid var(--linea); }
+.a-mail-cab div:nth-child(odd) { color: var(--tenue); }
+.a-mail-cab .asunto { font-weight: 600; color: var(--texto); }
+.a-mail-cuerpo { padding: 12px 14px; font-size: 14px; line-height: 1.6; white-space: pre-line; }
+.a-tecnico { font-size: 12px; color: var(--tenue); }
+.a-resumen { font-size: 15px; line-height: 1.45; }
+.a-fuentes { display: flex; gap: 6px; flex-wrap: wrap; }
+.a-seccion { display: grid; gap: 8px; }
+.a-seccion h3 { display: flex; align-items: center; gap: 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--tenue); margin: 0; }
+.a-seccion h3::after { content: ""; flex: 1; height: 1px; background: var(--linea); }
+.a-item { display: grid; grid-template-columns: 24px 1fr auto; gap: 10px; align-items: start; }
+.a-item .q { font-weight: 600; }
+.a-item .que { color: var(--suave); font-size: 13px; }
+.a-item .cu { font-size: 12px; color: var(--tenue); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.a-prop { display: flex; align-items: center; gap: 10px; border: 1px solid var(--linea-fuerte); border-radius: var(--radio-chico); padding: 8px 10px; }
+.a-prop .min { flex: 1; min-width: 0; font-size: 13px; }
+.a-urg { display: flex; gap: 8px; align-items: center; background: var(--urg-suave); color: var(--urg); border-radius: var(--radio-chico); padding: 8px 10px; font-weight: 600; font-size: 13px; }
+.a-seg { font-size: 13px; display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; }
+.a-seg .dias { color: var(--aviso); font-variant-numeric: tabular-nums; font-size: 12px; }
+
+/* ---------- B · RECEPCIÓN (conversacional) ---------- */
+.b-voz { display: flex; gap: 10px; align-items: flex-start; }
+.b-globo { background: var(--panel-2); border: 1px solid var(--linea); border-radius: 4px 14px 14px 14px; padding: 10px 12px; font-size: 15px; line-height: 1.45; min-width: 0; }
+.b-globo .quien { font-size: 12px; color: var(--suave); margin-bottom: 2px; }
+.b-pregunta { font-weight: 600; }
+.b-grandes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.b-grandes .btn { height: 42px; justify-content: center; font-size: 14px; }
+.b-chip-evento { display: flex; gap: 10px; align-items: center; border-left: 3px solid var(--cal); background: var(--cal-suave); border-radius: 0 var(--radio-chico) var(--radio-chico) 0; padding: 8px 10px; font-size: 13px; }
+.b-chip-evento b { display: block; font-size: 14px; color: var(--texto); }
+.b-chip-evento .h { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; color: var(--cal); font-weight: 600; }
+.b-detalles summary { cursor: pointer; font-size: 13px; color: var(--suave); }
+.b-detalles[open] summary { margin-bottom: 6px; }
+.b-origen { border-left: 2px solid var(--wa); padding: 2px 0 2px 10px; font-size: 13px; color: var(--suave); }
+.b-origen .wa { color: var(--wa); font-weight: 600; font-size: 12px; }
+.b-borrador { background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio-chico); padding: 10px 12px; font-size: 13px; line-height: 1.55; white-space: pre-line; }
+.b-borrador .para { color: var(--suave); font-size: 12px; margin-bottom: 6px; white-space: normal; }
+.b-hola { font-size: 18px; font-weight: 600; text-wrap: balance; }
+.b-bloque { display: grid; gap: 6px; }
+.b-bloque h3 { font-size: 13px; margin: 0; color: var(--suave); font-weight: 600; }
+.b-tarea { display: grid; grid-template-columns: 22px 1fr auto; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--linea); border-radius: var(--radio-chico); font-size: 13px; }
+.b-tarea .ok { color: var(--ok); }
+.b-saber { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 13px; }
+.b-saber li { display: grid; grid-template-columns: 8px 1fr; gap: 8px; align-items: baseline; }
+.b-saber li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--tenue); transform: translateY(-1px); }
+.b-saber li.wa::before { background: var(--wa); } .b-saber li.mail::before { background: var(--mail); } .b-saber li.cal::before { background: var(--cal); }
+.b-agenda { display: grid; grid-template-columns: 48px 1fr; gap: 0 10px; font-size: 13px; }
+.b-agenda .h { color: var(--cal); font-variant-numeric: tabular-nums; font-weight: 600; padding: 4px 0; }
+.b-agenda .e { padding: 4px 0 4px 10px; border-left: 2px solid var(--cal-suave); }
+
+/* ---------- C · PAPEL ---------- */
+.c-fondo { background: var(--panel-2); padding: 22px 18px 18px; }
+.c-hoja { position: relative; background: var(--papel); color: var(--texto); border-radius: 3px; padding: 26px 20px 18px; box-shadow: 0 1px 1px rgba(0,0,0,.06), 0 6px 18px rgba(80,60,10,.12);
+  background-image: repeating-linear-gradient(to bottom, transparent 0 27px, var(--papel-linea) 27px 28px); background-position: 0 14px; }
+.c-hoja::before { content: ""; position: absolute; top: -10px; left: 50%; width: 90px; height: 22px; transform: translateX(-50%) rotate(-2deg); background: var(--cinta); }
+.c-membrete { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--suave); margin-bottom: 8px; }
+.c-mano { font-family: var(--f-mano); color: var(--papel-tinta); font-size: 24px; line-height: 28px; }
+.c-hoja p { margin: 0; line-height: 28px; font-size: 14px; }
+.c-dato { display: grid; grid-template-columns: 70px 1fr; line-height: 28px; font-size: 14px; }
+.c-dato span:first-child { color: var(--suave); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.c-firma { font-family: var(--f-mano); color: var(--papel-tinta); font-size: 26px; text-align: right; line-height: 28px; margin-top: 4px; }
+.c-sello { display: inline-block; transform: rotate(-6deg); border: 2px solid var(--cal); color: var(--cal); font-weight: 700; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; padding: 2px 8px; border-radius: 4px; }
+.c-sello.mail { border-color: var(--mail); color: var(--mail); }
+.c-sello.urg { border-color: var(--urg); color: var(--urg); }
+.c-check { display: grid; grid-template-columns: 22px 1fr; line-height: 28px; font-size: 14px; }
+.c-check .caja { width: 14px; height: 14px; border: 1.5px solid var(--papel-tinta); border-radius: 2px; margin-top: 7px; }
+.c-titulo { font-family: var(--f-mano); color: var(--papel-tinta); font-size: 22px; line-height: 28px; margin-top: 0; }
+.c-cita { font-family: var(--f-mano); font-size: 20px; color: var(--suave); line-height: 28px; }
+.c-acciones { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+
+@media (max-width: 520px) { .b-grandes { grid-template-columns: 1fr; } .c-fondo { padding: 18px 10px 12px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-cal" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2 6.5h12M5 1.5v3M11 1.5v3" stroke="currentColor" stroke-width="1.4" fill="none"/></symbol>
+  <symbol id="i-reloj" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.5V8l2.5 1.5" stroke="currentColor" stroke-width="1.4" fill="none"/></symbol>
+  <symbol id="i-lugar" viewBox="0 0 16 16"><path d="M8 14s4.5-4.2 4.5-7.5a4.5 4.5 0 0 0-9 0C3.5 9.8 8 14 8 14z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="6.5" r="1.6" fill="currentColor"/></symbol>
+  <symbol id="i-campana" viewBox="0 0 16 16"><path d="M4 11V7a4 4 0 0 1 8 0v4l1 1.5H3z M6.5 14h3" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 16 16"><rect x="2" y="3.5" width="12" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2.5 4.5 8 9l5.5-4.5" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-wa" viewBox="0 0 16 16"><path d="M3 13.5l.8-2.6A5.5 5.5 0 1 1 6 13z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-alerta" viewBox="0 0 16 16"><path d="M8 2l6.5 11.5h-13z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 6.5v3.2M8 11.4v.1" stroke="currentColor" stroke-width="1.6"/></symbol>
+</svg>
+
+<main class="pagina">
+  <h1>Lo que te deja la secretaria, con más estilo</h1>
+  <p class="intro">Bocetos con datos de ejemplo. Cada dirección muestra las mismas tres entregas: una propuesta de evento, una propuesta de mail y el reporte del día, al ancho real del panel de la bandeja. Arriba de todo está cómo se ven hoy.</p>
+
+  <nav class="selector" aria-label="Elegir dirección">
+    <button type="button" data-ir="hoy" aria-pressed="false">Hoy</button>
+    <button type="button" data-ir="prolijo" aria-pressed="true">A · Prolijo</button>
+    <button type="button" data-ir="recepcion" aria-pressed="false">B · Recepción</button>
+    <button type="button" data-ir="papel" aria-pressed="false">C · Papel</button>
+  </nav>
+
+  <!-- ================= HOY ================= -->
+  <section data-dir="hoy" hidden>
+    <div class="dir-cab"><h2>Cómo se ve hoy</h2></div>
+    <p class="dir-desc">La tarjeta «Acción propuesta» y, abajo, el texto de la entrega, que repite lo mismo con «Herramienta: create_event». El reporte es markdown sin forma propia.</p>
+    <div class="fila">
+      <div class="marco"><div class="marco-titulo">Propuesta de evento</div>
+        <div class="panel">
+          <div class="cab"><div class="min"><div class="t">Propuesta: Agendar el turno de mamá con el cardiólogo</div><div class="s">Marta · Reporte de la secretaría · hace 12 min</div></div></div>
+          <div class="cuerpo">
+            <div><span class="insignia aviso">Sin revisar</span></div>
+            <div class="hoy-acc">
+              <h4>Acción propuesta</h4>
+              <div class="r">Agendar el turno de mamá con el cardiólogo</div>
+              <span class="insignia">Crear evento (Google Calendar)</span> <span class="insignia aviso">Esperando tu aprobación</span>
+              <div class="hoy-datos"><div>Título</div><div>Cardiólogo mamá</div><div>Empieza</div><div>jue 4 dic, 10:00</div><div>Termina</div><div>jue 4 dic, 11:00</div><div>Dónde</div><div>Hospital Italiano</div></div>
+              <div class="a-tecnico" style="margin-top:6px">▸ Detalle técnico</div>
+            </div>
+            <div class="hoy-md">
+              <p>Agendar el turno de mamá con el cardiólogo</p>
+              <p>Herramienta: <code>create_event</code><br>summary: Cardiólogo mamá<br>start: 2026-12-04T10:00:00-03:00<br>end: 2026-12-04T11:00:00-03:00<br>location: Hospital Italiano</p>
+              <span class="globo">lo mismo, dos veces</span>
+            </div>
+          </div>
+          <div class="pie"><button class="btn">Abrir en el chat</button><button class="btn">Descartar</button><button class="btn primario">Crear el evento</button></div>
+        </div>
+      </div>
+      <div class="marco"><div class="marco-titulo">Reporte del día</div>
+        <div class="panel">
+          <div class="cab"><div class="min"><div class="t">Revisión de la secretaría</div><div class="s">Marta · Reporte de la secretaría · hace 12 min</div></div></div>
+          <div class="cuerpo hoy-md">
+            <h3>WhatsApp</h3>
+            <ul><li>Mamá: tiene turno con el cardiólogo el jueves 4 a las 10 en el Italiano.</li><li>Juli preguntó si el sábado sigue en pie el asado.</li></ul>
+            <h3>Gmail</h3>
+            <ul><li>Banco Galicia: el resumen de la Visa vence el lunes 1 ($ 412.380).</li><li>Fede (trabajo) pide el presupuesto revisado antes del viernes.</li></ul>
+            <h3>Seguimiento</h3>
+            <ul><li>El plomero no contestó desde el 21/11.</li></ul>
+            <h3>Propuestas</h3>
+            <ul><li>Agendar el turno de mamá.</li><li>Responderle a Fede.</li></ul>
+          </div>
+          <div class="pie"><button class="btn">Abrir en el chat</button><button class="btn primario">Listo</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= A · PROLIJO ================= -->
+  <section data-dir="prolijo">
+    <div class="dir-cab"><h2>A · Prolijo</h2><span class="insignia">la misma app, ordenada</span></div>
+    <p class="dir-desc">Sigue el estilo de la app. Cada tipo de acción tiene su forma: el evento es un ticket con la fecha grande, el mail se ve como mail. De dónde salió va citado. El texto repetido desaparece y el detalle técnico queda al pie, chico.</p>
+    <div class="fila">
+      <div class="marco"><div class="marco-titulo">Propuesta de evento</div>
+        <div class="panel">
+          <div class="cab"><div class="avatar">M</div><div class="min"><div class="t">Agendar el turno de mamá</div><div class="s">Marta te lo propone · hace 12 min</div></div><span class="a-tag cal"><svg class="ico"><use href="#i-cal"/></svg>Evento</span></div>
+          <div class="cuerpo">
+            <div class="a-ticket">
+              <div class="a-dia"><span class="m">dic</span><span class="n">4</span><span class="d">jueves</span></div>
+              <div class="a-info">
+                <div class="ti">Cardiólogo mamá</div>
+                <div class="a-linea"><svg class="ico"><use href="#i-reloj"/></svg>10:00 a 11:00</div>
+                <div class="a-linea"><svg class="ico"><use href="#i-lugar"/></svg>Hospital Italiano</div>
+                <div class="a-linea"><svg class="ico"><use href="#i-campana"/></svg>Aviso el día antes</div>
+              </div>
+            </div>
+            <div class="a-por"><svg class="ico" style="color:var(--wa);margin-top:2px"><use href="#i-wa"/></svg><div>Mamá, por WhatsApp a las 9:41: <q>el jueves 4 a las 10 tengo turno con el cardiólogo en el Italiano</q></div></div>
+            <div class="a-linea"><svg class="ico" style="color:var(--ok)"><use href="#i-check"/></svg>Miré tu calendario: ese horario está libre.</div>
+            <div class="a-tecnico">En tu calendario principal · <u>detalle técnico</u></div>
+          </div>
+          <div class="pie"><button class="btn fantasma">Abrir en el chat</button><button class="btn">Descartar</button><button class="btn">Editar</button><button class="btn primario">Crear el evento</button></div>
+        </div>
+      </div>
+
+      <div class="marco"><div class="marco-titulo">Propuesta de mail</div>
+        <div class="panel">
+          <div class="cab"><div class="avatar">M</div><div class="min"><div class="t">Responderle a Fede por el presupuesto</div><div class="s">Marta te lo propone · hace 12 min</div></div><span class="a-tag mail"><svg class="ico"><use href="#i-mail"/></svg>Mail</span></div>
+          <div class="cuerpo">
+            <div class="a-mail">
+              <div class="a-mail-cab"><div>Para</div><div>Federico Ríos</div><div>Asunto</div><div class="asunto">Re: Presupuesto revisado</div></div>
+              <div class="a-mail-cuerpo">Hola Fede,
+
+Lo tengo casi listo. Te lo mando el jueves a la tarde así lo ves antes del viernes.
+
+Abrazo,
+Sala</div>
+            </div>
+            <div class="a-por"><svg class="ico" style="color:var(--mail);margin-top:2px"><use href="#i-mail"/></svg><div>Fede escribió ayer a las 18:02: <q>¿me pasás el presupuesto revisado antes del viernes?</q></div></div>
+          </div>
+          <div class="pie"><button class="btn fantasma">Abrir en el chat</button><button class="btn">Descartar</button><button class="btn">Editar</button><button class="btn primario">Mandar el mail</button></div>
+        </div>
+      </div>
+
+      <div class="marco"><div class="marco-titulo">Reporte del día</div>
+        <div class="panel">
+          <div class="cab"><div class="avatar">M</div><div class="min"><div class="t">Lo de hoy, jueves 27</div><div class="s">Marta · revisó a las 18:00</div></div></div>
+          <div class="cuerpo">
+            <div class="a-urg"><svg class="ico"><use href="#i-alerta"/></svg>La Visa vence el lunes 1: $ 412.380</div>
+            <div class="a-resumen">Tu mamá sacó turno, Fede espera el presupuesto y el plomero sigue sin contestar.</div>
+            <div class="a-fuentes"><span class="a-tag wa">WhatsApp · 2</span><span class="a-tag mail">Mails · 2</span><span class="a-tag cal">Mañana · 3</span></div>
+            <div class="a-seccion"><h3>Para hacer</h3>
+              <div class="a-prop"><svg class="ico" style="color:var(--cal)"><use href="#i-cal"/></svg><div class="min"><b>Agendar el turno de mamá</b><br><span style="color:var(--suave)">jue 4, 10:00 · Italiano</span></div><button class="btn">Ver</button></div>
+              <div class="a-prop"><svg class="ico" style="color:var(--mail)"><use href="#i-mail"/></svg><div class="min"><b>Responderle a Fede</b><br><span style="color:var(--suave)">borrador listo</span></div><button class="btn">Ver</button></div>
+            </div>
+            <div class="a-seccion"><h3>Para saber</h3>
+              <div class="a-item"><div class="avatar chico" style="background:var(--wa)">J</div><div><div class="q">Juli</div><div class="que">Pregunta si el sábado sigue en pie el asado.</div></div><div class="cu">16:20</div></div>
+              <div class="a-item"><div class="avatar chico" style="background:var(--mail)">G</div><div><div class="q">Banco Galicia</div><div class="que">Llegó el resumen de la Visa.</div></div><div class="cu">11:05</div></div>
+            </div>
+            <div class="a-seccion"><h3>Seguimiento</h3>
+              <div class="a-seg"><div>El plomero no contestó el pedido de presupuesto.</div><div class="dias">6 días</div></div>
+            </div>
+          </div>
+          <div class="pie"><button class="btn fantasma">Abrir en el chat</button><button class="btn primario">Listo</button></div>
+        </div>
+      </div>
+    </div>
+    <p class="por-dentro"><b>Qué cambia por dentro.</b> Las propuestas salen solas del <code>detalle</code> que ya guarda cada acción (título, fechas, para, asunto): solo hay que dibujarlas por tipo y dejar de repetir el texto. Para el reporte con secciones y la línea de resumen, la secretaria tendría que responder con un formato fijo (urgente, resumen, para saber, seguimiento) en vez de markdown libre; es un cambio en la consigna.</p>
+  </section>
+
+  <!-- ================= B · RECEPCIÓN ================= -->
+  <section data-dir="recepcion" hidden>
+    <div class="dir-cab"><h2>B · Recepción</h2><span class="insignia">te habla ella</span></div>
+    <p class="dir-desc">La secretaria te pregunta en una frase y vos contestás con dos botones grandes. Los datos van en una tira chica y el resto queda plegado. El reporte se lee como un mensaje suyo: primero lo que te pide, después lo que te cuenta y lo que viene mañana.</p>
+    <div class="fila">
+      <div class="marco"><div class="marco-titulo">Propuesta de evento</div>
+        <div class="panel">
+          <div class="cuerpo" style="padding-top:16px">
+            <div class="b-voz"><div class="avatar">M</div>
+              <div class="b-globo"><div class="quien">Marta · hace 12 min</div>Tu mamá tiene turno con el cardiólogo el jueves. <span class="b-pregunta">¿Lo agendo?</span></div></div>
+            <div class="b-chip-evento"><svg class="ico" style="color:var(--cal)"><use href="#i-cal"/></svg><div><b>Cardiólogo mamá</b>Hospital Italiano</div><div class="h">jue 4<br>10:00</div></div>
+            <div class="b-grandes"><button class="btn">No, gracias</button><button class="btn primario">Sí, agendalo</button></div>
+            <details class="b-detalles"><summary>Por qué te lo propongo</summary>
+              <div class="b-origen"><div class="wa">Mamá · WhatsApp · 9:41</div>el jueves 4 a las 10 tengo turno con el cardiólogo en el Italiano</div>
+            </details>
+            <details class="b-detalles"><summary>Cambiar algo antes</summary></details>
+          </div>
+        </div>
+      </div>
+
+      <div class="marco"><div class="marco-titulo">Propuesta de mail</div>
+        <div class="panel">
+          <div class="cuerpo" style="padding-top:16px">
+            <div class="b-voz"><div class="avatar">M</div>
+              <div class="b-globo"><div class="quien">Marta · hace 12 min</div>Fede te pidió el presupuesto para el viernes. Te dejé una respuesta escrita. <span class="b-pregunta">¿La mando así?</span></div></div>
+            <div class="b-borrador"><div class="para">Para Federico Ríos · Re: Presupuesto revisado</div>Hola Fede,
+Lo tengo casi listo. Te lo mando el jueves a la tarde así lo ves antes del viernes.
+Abrazo, Sala</div>
+            <div class="b-grandes"><button class="btn">Lo escribo yo</button><button class="btn primario">Mandala</button></div>
+            <details class="b-detalles"><summary>Por qué te lo propongo</summary></details>
+          </div>
+        </div>
+      </div>
+
+      <div class="marco"><div class="marco-titulo">Reporte del día</div>
+        <div class="panel">
+          <div class="cuerpo" style="padding-top:16px">
+            <div class="b-voz"><div class="avatar">M</div><div class="b-hola">Buenas tardes, Sala. Hoy hay dos cosas para decidir.</div></div>
+            <div class="b-bloque"><h3>Te pido</h3>
+              <div class="b-tarea"><svg class="ico" style="color:var(--cal)"><use href="#i-cal"/></svg><span>Agendar el turno de mamá (jue 4, 10:00)</span><button class="btn">Sí</button></div>
+              <div class="b-tarea"><svg class="ico" style="color:var(--mail)"><use href="#i-mail"/></svg><span>Mandarle a Fede la respuesta</span><button class="btn">Ver</button></div>
+              <div class="b-tarea" style="color:var(--suave)"><svg class="ico ok"><use href="#i-check"/></svg><span><s>Pagar la luz</s> · lo aprobaste ayer</span><span></span></div>
+            </div>
+            <div class="b-bloque"><h3>Te cuento</h3>
+              <ul class="b-saber">
+                <li class="mail"><span><b>La Visa vence el lunes 1:</b> $ 412.380.</span></li>
+                <li class="wa"><span>Juli pregunta si sigue el asado del sábado.</span></li>
+                <li><span>El plomero lleva 6 días sin contestar.</span></li>
+              </ul>
+            </div>
+            <div class="b-bloque"><h3>Mañana</h3>
+              <div class="b-agenda"><div class="h">09:30</div><div class="e">Daily con el equipo</div><div class="h">13:00</div><div class="e">Almuerzo con Caro</div><div class="h">17:00</div><div class="e">Dentista</div></div>
+            </div>
+          </div>
+          <div class="pie"><button class="btn fantasma">Contestarle</button><button class="btn primario">Listo</button></div>
+        </div>
+      </div>
+    </div>
+    <p class="por-dentro"><b>Qué cambia por dentro.</b> La frase de la secretaria («¿Lo agendo?») tendría que venir de ella: <code>proponer_accion</code> sumaría un campo corto para la pregunta y otro para la cita de origen. El reporte necesita el mismo formato fijo que en A, más la agenda de mañana del calendario.</p>
+  </section>
+
+  <!-- ================= C · PAPEL ================= -->
+  <section data-dir="papel" hidden>
+    <div class="dir-cab"><h2>C · Papel</h2><span class="insignia">notitas de la recepción</span></div>
+    <p class="dir-desc">Va con la oficina en pixel art: la secretaria te deja notitas en papel, como las que se apilan en tu bandeja del escritorio. Saludo y firma escritos a mano, un sello por tipo, renglones. Los botones siguen siendo los de la app.</p>
+    <div class="fila">
+      <div class="marco"><div class="marco-titulo">Propuesta de evento</div>
+        <div class="panel"><div class="c-fondo">
+          <div class="c-hoja">
+            <div class="c-membrete"><span>Recepción · de Marta</span><span>jue 27 · 18:00</span></div>
+            <div class="c-mano">Sala:</div>
+            <p>Llamó tu mamá, tiene turno con el cardiólogo. ¿Te lo anoto?</p>
+            <div class="c-dato"><span>Cuándo</span><span><b>jueves 4 de dic, 10 h</b></span></div>
+            <div class="c-dato"><span>Dónde</span><span>Hospital Italiano</span></div>
+            <div class="c-cita">«el jueves 4 a las 10 tengo turno…»</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px"><span class="c-sello">Calendario</span><span class="c-firma">Marta</span></div>
+          </div>
+          <div class="c-acciones"><button class="btn">Descartar</button><button class="btn">Editar</button><button class="btn primario">Anotalo</button></div>
+        </div></div>
+      </div>
+
+      <div class="marco"><div class="marco-titulo">Propuesta de mail</div>
+        <div class="panel"><div class="c-fondo">
+          <div class="c-hoja">
+            <div class="c-membrete"><span>Recepción · de Marta</span><span>jue 27 · 18:00</span></div>
+            <div class="c-mano">Sala:</div>
+            <p>Fede quiere el presupuesto para el viernes. Te escribí esto para mandarle:</p>
+            <div class="c-dato"><span>Para</span><span>Federico Ríos</span></div>
+            <div class="c-dato"><span>Asunto</span><span>Re: Presupuesto revisado</span></div>
+            <p style="padding-left:12px;border-left:2px solid var(--papel-linea)">Hola Fede, lo tengo casi listo. Te lo mando el jueves a la tarde así lo ves antes del viernes. Abrazo, Sala</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px"><span class="c-sello mail">Mail</span><span class="c-firma">Marta</span></div>
+          </div>
+          <div class="c-acciones"><button class="btn">Descartar</button><button class="btn">Editar</button><button class="btn primario">Mandalo</button></div>
+        </div></div>
+      </div>
+
+      <div class="marco"><div class="marco-titulo">Reporte del día</div>
+        <div class="panel"><div class="c-fondo">
+          <div class="c-hoja">
+            <div class="c-membrete"><span>Parte de la recepción</span><span>jueves 27 de noviembre</span></div>
+            <div class="c-mano">Buenas tardes, Sala.</div>
+            <div style="margin:2px 0"><span class="c-sello urg">Urgente</span> <span style="font-size:14px">La Visa vence el lunes: $ 412.380.</span></div>
+            <div class="c-titulo">Para decidir</div>
+            <div class="c-check"><span class="caja"></span><span>Agendar el turno de mamá (jue 4, 10 h)</span></div>
+            <div class="c-check"><span class="caja"></span><span>Contestarle a Fede</span></div>
+            <div class="c-titulo">Te cuento</div>
+            <p>Juli pregunta si sigue el asado del sábado.</p>
+            <p>El plomero lleva 6 días sin contestar.</p>
+            <div class="c-titulo">Mañana</div>
+            <p>9:30 daily · 13 h almuerzo con Caro · 17 h dentista</p>
+            <div class="c-firma">Marta</div>
+          </div>
+          <div class="c-acciones"><button class="btn">Contestarle</button><button class="btn primario">Listo</button></div>
+        </div></div>
+      </div>
+    </div>
+    <p class="por-dentro"><b>Qué cambia por dentro.</b> Igual que A en datos. Suma una tipografía manuscrita (solo para saludo, títulos y firma) y la estética de papel, que conviene usar solo en lo que deja la secretaria para que se distinga de las entregas de los demás agentes.</p>
+  </section>
+</main>
+
+<script>
+(function () {
+  var botones = document.querySelectorAll('[data-ir]');
+  var secciones = document.querySelectorAll('[data-dir]');
+  function mostrar(id) {
+    var hay = false;
+    secciones.forEach(function (s) { var es = s.getAttribute('data-dir') === id; s.hidden = !es; if (es) hay = true; });
+    if (!hay) return mostrar('prolijo');
+    botones.forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-ir') === id)); });
+  }
+  botones.forEach(function (b) {
+    b.addEventListener('click', function () { var id = b.getAttribute('data-ir'); history.replaceState(null, '', '#' + id); mostrar(id); });
+  });
+  window.addEventListener('hashchange', function () { mostrar(location.hash.slice(1)); });
+  mostrar(location.hash.slice(1) || 'prolijo');
+})();
+</script>

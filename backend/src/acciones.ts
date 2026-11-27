@@ -32,6 +32,10 @@ export type AccionPropuesta = {
   estado: string
   resultado?: string
   ejecucion?: number
+  /** De dónde salió (objeto JSON como texto: de, por, cuando, cita), si el agente lo contó. */
+  origen?: string
+  /** Lo que ya comprobó el agente («miré tu calendario: ese horario está libre»), si lo contó. */
+  nota?: string
   creada: number
   actualizada: number
 }
@@ -41,14 +45,17 @@ export const estadosAccion = ['pendiente', 'ejecutando', 'hecha', 'error', 'desc
 export function accionJSON(a: AccionPropuesta): Obj {
   let detalle: unknown = {}
   try { const d = JSON.parse(a.detalle); if (esObjeto(d)) detalle = d } catch {}
+  let origen: unknown = null
+  try { const d = a.origen ? JSON.parse(a.origen) : null; if (esObjeto(d)) origen = d } catch {}
   return {
     id: a.id, agente: a.agente, sid: a.sid, herramienta: a.herramienta, resumen: a.resumen, detalle, estado: a.estado,
     creada: iso(a.creada), actualizada: iso(a.actualizada),
     entrega: a.entrega ?? null, resultado: a.resultado ?? null, ejecucion: a.ejecucion ?? null,
+    origen, nota: a.nota ?? null,
   }
 }
 
-const columnas = 'id,oficina,agente,sid,entrega,herramienta,resumen,detalle,estado,resultado,ejecucion,creada,actualizada'
+const columnas = 'id,oficina,agente,sid,entrega,herramienta,resumen,detalle,estado,resultado,ejecucion,origen,nota,creada,actualizada'
 
 function deFila(f: Fila): AccionPropuesta {
   const a: AccionPropuesta = {
@@ -58,6 +65,8 @@ function deFila(f: Fila): AccionPropuesta {
   if (f.entrega !== null && f.entrega !== undefined) a.entrega = num(f.entrega)
   if (f.resultado !== null && f.resultado !== undefined) a.resultado = txt(f.resultado)
   if (f.ejecucion !== null && f.ejecucion !== undefined) a.ejecucion = num(f.ejecucion)
+  if (f.origen !== null && f.origen !== undefined && txt(f.origen) !== '') a.origen = txt(f.origen)
+  if (f.nota !== null && f.nota !== undefined && txt(f.nota) !== '') a.nota = txt(f.nota)
   return a
 }
 
@@ -65,6 +74,8 @@ function deFila(f: Fila): AccionPropuesta {
 export class AccionesStore {
   /** Acciones que se están aprobando ahora (evita que dos pedidos aprueben la misma). */
   readonly tomadas = new Set<string>()
+
+  private columnasListas = false
 
   constructor(private readonly store: Store) { this.preparar() }
 
@@ -77,16 +88,21 @@ export class AccionesStore {
       resultado TEXT, ejecucion INTEGER, creada REAL NOT NULL, actualizada REAL NOT NULL);
     CREATE INDEX IF NOT EXISTS acciones_entrega ON acciones(entrega);
     `)
+    if (this.columnasListas) return
+    // origen y nota llegaron después: las bases viejas no las tienen
+    const cols = this.store.db.query("SELECT name FROM pragma_table_info('acciones')").map((f) => txt(f.name))
+    for (const c of ['origen', 'nota']) if (!cols.includes(c)) this.store.db.exec(`ALTER TABLE acciones ADD COLUMN ${c} TEXT`)
+    this.columnasListas = true
   }
 
-  crear(p: { oficina: string; agente: string; sid: string; herramienta: string; resumen: string; detalle: string; entrega?: number }): AccionPropuesta | undefined {
+  crear(p: { oficina: string; agente: string; sid: string; herramienta: string; resumen: string; detalle: string; entrega?: number; origen?: string; nota?: string }): AccionPropuesta | undefined {
     try {
       this.preparar()
       const ahora = Date.now() / 1000
       this.store.db.run(`
-        INSERT INTO acciones(oficina,agente,sid,entrega,herramienta,resumen,detalle,estado,creada,actualizada)
-        VALUES(?,?,?,?,?,?,?,'pendiente',?,?)`,
-      [p.oficina, p.agente, p.sid, p.entrega ?? null, p.herramienta, p.resumen, p.detalle, ahora, ahora])
+        INSERT INTO acciones(oficina,agente,sid,entrega,herramienta,resumen,detalle,estado,origen,nota,creada,actualizada)
+        VALUES(?,?,?,?,?,?,?,'pendiente',?,?,?,?)`,
+      [p.oficina, p.agente, p.sid, p.entrega ?? null, p.herramienta, p.resumen, p.detalle, p.origen ?? null, p.nota ?? null, ahora, ahora])
       const id = num(this.store.db.query('SELECT last_insert_rowid() AS id')[0]?.id)
       return this.una(p.oficina, id)
     } catch {
@@ -119,6 +135,16 @@ export class AccionesStore {
       return f ? deFila(f) : undefined
     } catch {
       return undefined
+    }
+  }
+
+  /** Las que propuso una sesión (por ejemplo, una revisión de la secretaría), en el orden en que las propuso. */
+  porSid(oficina: string, sid: string): AccionPropuesta[] {
+    try {
+      this.preparar()
+      return this.store.db.query(`SELECT ${columnas} FROM acciones WHERE oficina=? AND sid=? ORDER BY id`, [oficina, sid]).map(deFila)
+    } catch {
+      return []
     }
   }
 
@@ -159,7 +185,21 @@ export const Acciones = {
   maxPorCorrida: 5,
   maxResumen: 300,
   maxDetalle: 8000,
+  maxCita: 400,
+  maxNota: 200,
   claveCupo: 'accion',
+
+  /** El origen que cuenta el agente ({de, por, cuando, cita}) como JSON compacto, solo con los campos de texto que
+   *  vinieron; undefined si no vino ninguno. */
+  origenJSON(v: unknown): string | undefined {
+    if (!esObjeto(v)) return undefined
+    const o: Obj = {}
+    for (const [k, max] of [['de', 80], ['por', 40], ['cuando', 40], ['cita', Acciones.maxCita]] as const) {
+      const x = typeof v[k] === 'string' ? sanear(v[k]).trim().replace(/\s+/g, ' ') : ''
+      if (x !== '') o[k] = largo(x) > max ? prefijo(x, max) : x
+    }
+    return Object.keys(o).length ? jsonCompacto(o) : undefined
+  },
 
   /** `accion:<id>` -> id. */
   deAccion(tarea: string): number | undefined {
@@ -272,6 +312,17 @@ export class HerramientasAcciones implements MCPHerramientas {
           herramienta: { type: 'string', description: 'nombre completo de la herramienta (mcp__claude_ai_...)' },
           resumen: { type: 'string', description: 'qué querés hacer, en una frase' },
           detalle: { type: 'object', description: 'los argumentos exactos con los que se llamaría a la herramienta' },
+          origen: {
+            type: 'object',
+            description: 'de dónde sale la propuesta, si viene de un mensaje: se muestra citado para que la persona entienda por qué',
+            properties: {
+              de: { type: 'string', description: 'quién lo dijo o lo mandó («Mamá», «Federico Ríos»)' },
+              por: { type: 'string', description: 'por dónde llegó («WhatsApp», «mail»)' },
+              cuando: { type: 'string', description: 'cuándo, corto («hoy 9:41», «ayer 18:02»)' },
+              cita: { type: 'string', description: 'la frase textual que lo motiva, corta' },
+            },
+          },
+          nota: { type: 'string', description: 'lo que ya comprobaste, en una frase corta (por ejemplo «Miré tu calendario: ese horario está libre.»)' },
         },
         required: ['herramienta', 'resumen'],
       },
@@ -305,6 +356,9 @@ export class HerramientasAcciones implements MCPHerramientas {
     if (tokens && !tokens.tomar(this.token, Acciones.claveCupo, Acciones.maxPorCorrida)) {
       return MCPResultados.error(`Ya propusiste ${Acciones.maxPorCorrida} acciones en este mensaje y no podés proponer más.`)
     }
+    const origen = Acciones.origenJSON(args.origen)
+    let nota = typeof args.nota === 'string' ? sanear(args.nota).trim() : ''
+    if (largo(nota) > Acciones.maxNota) nota = prefijo(nota, Acciones.maxNota)
     const jefe = o.duenio.trim()
     const texto = resumen + `\n\nHerramienta: ${cortoHerramienta(h)}\n` + Acciones.legible(detalle)
     const e = s.entregas.registrar({
@@ -312,7 +366,7 @@ export class HerramientasAcciones implements MCPHerramientas {
       titulo: 'Propuesta: ' + resumen, texto, sid: this.identidad.sid,
     })
     if (!e) return MCPResultados.error('No pude guardar la propuesta.')
-    const ac = accionesDe(s).crear({ oficina: this.identidad.oficina, agente: ag.id, sid: this.identidad.sid, herramienta: h, resumen, detalle, entrega: e.id })
+    const ac = accionesDe(s).crear({ oficina: this.identidad.oficina, agente: ag.id, sid: this.identidad.sid, herramienta: h, resumen, detalle, entrega: e.id, ...(origen ? { origen } : {}), ...(nota ? { nota } : {}) })
     if (!ac) return MCPResultados.error('No pude guardar la acción.')
     return MCPResultados.ok(`Propuesta #${ac.id} guardada: ${jefe === '' ? 'la persona' : jefe} la revisa y, si la aprueba, se ejecuta. Todavía no se hizo nada.`)
   }
