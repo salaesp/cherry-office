@@ -491,7 +491,7 @@ Se arregló el seguro del auto.
 | GET | `/api/secretaria/memoria/archivo?ruta=<rel>` | | `{ruta, texto}` (el `.md`). 400 si la ruta no es de la memoria, 404 si no existe |
 | PUT | `/api/secretaria/memoria/archivo` | `{ruta, texto}` | `{ruta, texto}`. Guarda un archivo editado a mano (o crea uno) y lo reindexa. 400 si falta el título (`# …`), el estado, la fecha o el tipo son inválidos; 413 si pasa de 64 KB |
 | DELETE | `/api/secretaria/memoria/archivo?ruta=<rel>` | | `{ok}`. Borra un tema, ficha, día o semana (y su fila del índice y su sugerencia). 404 si no existe |
-| POST | `/api/secretaria/memoria/tema` | `{slug, estado?, fecha?, proximo?, nota?}` | `{slug, estado}`. La persona cambia un tema (deja una línea en el historial a su nombre) |
+| POST | `/api/secretaria/memoria/tema` | `{slug, estado?, fecha?, proximo?, nota?}` o `{titulo, estado?, fecha?, proximo?, nota?}` | `{slug, titulo, estado, nuevo}`. La persona cambia un tema (deja una línea en el historial a su nombre). Con `titulo` y sin `slug` lo crea (o, si ya hay uno con título parecido, actualiza ese): es «Anotar en seguimiento», «Ya lo hice» y «No hace falta» de un «Para hacer» del reporte. 404 si el `slug` no existe |
 | POST | `/api/secretaria/memoria/compartir` | `{ruta}` (`temas/…` o `fichas/…`) | `{tema, ruta}`. Pasa un resumen a la memoria de la oficina como un aporte sin consolidar (`anotarEnTema` de `memoria-estructura.ts`, autor «Secretaría (compartido)»); el tema o la ficha de la secretaría no se mueven y se quita la sugerencia. 409 si la memoria de la oficina no se migró o el tema de la oficina está lleno de aportes |
 | POST | `/api/secretaria/memoria/sugerencia/descartar` | `{ruta}` | `{ok}`. «Ahora no» |
 

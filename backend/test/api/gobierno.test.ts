@@ -346,9 +346,9 @@ describe('Gobierno: instrucciones, conectores y acciones', () => {
     // las reglas van como mensaje de sistema; en la charla queda solo la acción
     expect((Sandbox.valor(l, '--append-system-prompt') ?? '').normalize('NFC')).toContain('Ana aprobó la acción del mensaje. Ejecutá exactamente eso')
     expect(msg).not.toContain('Ejecutá exactamente')
-    // en la lista, la entrega del resultado tiene origen «accion»
+    // el resultado queda en la propuesta: no hay una entrega aparte de origen «accion»
     const origenes = (await entregas(f)).map((x) => str(x.origen))
-    expect(origenes.includes('accion') && origenes.includes('propuesta')).toBe(true)
+    expect(origenes).toEqual(['propuesta'])
     // ya no está pendiente
     expect((await f.post(`/api/entregas/${id}/ejecutar`)).status).toBe(409)
     expect((await f.post(`/api/entregas/${id}/descartar-accion`)).status).toBe(409)
@@ -367,7 +367,7 @@ describe('Gobierno: instrucciones, conectores y acciones', () => {
     expect((await f.post(`/api/entregas/${id}/ejecutar`)).status).toBe(409)
     expect(str((await accionDe(f, id)).estado)).toBe('pendiente')
     expect(str((await entregaDe(f, id)).estado)).toBe('sin_revisar')
-    expect(conPrompt(f, 'exactamente esto')).toEqual([])
+    expect(conPrompt(f, 'Acción aprobada (')).toEqual([])
     expect(f.sb.llamadas.length).toBe(antes)
     expect((await llamar(f.b, 'GET', `/api/entregas/${id}/ejecutar`)).status).toBe(405)
     // otras rutas de entregas siguen siendo del router de entregas

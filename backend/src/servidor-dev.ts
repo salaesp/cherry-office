@@ -20,6 +20,9 @@ export type OpcionesServidor = {
   /** `oficina/vendor` (fuentes). */
   raizVendor: string
   puerto: number
+  /** Nombres extra por los que se entra (HQ_HOSTS), p. ej. `alfred.tu-red.ts.net` detrás de `tailscale serve`: se
+   *  aceptan como `Host` (con y sin el puerto) y como `Origin` por http y https. Por defecto, solo localhost. */
+  hostsExtra?: string[]
 }
 
 export class ServidorDev {
@@ -30,6 +33,15 @@ export class ServidorDev {
   constructor(private readonly op: OpcionesServidor) {
     this.hosts = new Set([`localhost:${op.puerto}`, `127.0.0.1:${op.puerto}`])
     this.origenes = new Set([...this.hosts].map((h) => `http://${h}`))
+    for (const x of op.hostsExtra ?? []) {
+      const h = x.trim().toLowerCase()
+      if (!/^[a-z0-9.-]+(:\d+)?$/.test(h)) continue
+      for (const v of h.includes(':') ? [h] : [h, `${h}:${op.puerto}`]) {
+        this.hosts.add(v)
+        this.origenes.add(`http://${v}`)
+        this.origenes.add(`https://${v}`)
+      }
+    }
   }
 
   /** Empieza a escuchar en 127.0.0.1:puerto. Rechaza si el puerto está ocupado. */

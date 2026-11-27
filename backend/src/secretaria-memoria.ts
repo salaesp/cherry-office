@@ -994,13 +994,19 @@ export class MemoriaSecretariaRouter implements SubRouter {
       const b = objeto(body)
       const persona = act.oficina.duenio === '' ? 'Vos' : act.oficina.duenio
       const slug = typeof b.slug === 'string' ? b.slug : ''
-      const t = this.m.leerTema(c, slug)
-      if (!t) throw new ErrorSec('No encontré ese tema.', 404)
+      // sin slug y con título: lo anota la persona (desde un «Para hacer» del reporte); si ya hay uno parecido, es ese
+      let titulo: string
+      if (slug === '' && typeof b.titulo === 'string') titulo = b.titulo
+      else {
+        const t = this.m.leerTema(c, slug)
+        if (!t) throw new ErrorSec('No encontré ese tema.', 404)
+        titulo = t.titulo
+      }
       const r = this.m.guardarTema(c, {
-        tema: t.titulo, ...(typeof b.estado === 'string' ? { estado: b.estado } : {}), ...(typeof b.fecha === 'string' ? { fecha: b.fecha } : {}),
+        tema: titulo, ...(typeof b.estado === 'string' ? { estado: b.estado } : {}), ...(typeof b.fecha === 'string' ? { fecha: b.fecha } : {}),
         ...(typeof b.proximo === 'string' ? { proximo: b.proximo } : {}), ...(typeof b.nota === 'string' ? { nota: b.nota } : {}), origen: persona,
       })
-      return [200, { slug: r.slug, estado: r.estado }]
+      return [200, { slug: r.slug, titulo: r.titulo, estado: r.estado, nuevo: r.nuevo }]
     }
     if (sub === '/compartir') {
       if (method !== 'POST') return no405

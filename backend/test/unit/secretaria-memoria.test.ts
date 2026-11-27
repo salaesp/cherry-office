@@ -455,6 +455,15 @@ describe('API', () => {
     expect(t.historial.at(-1)).toMatchObject({ origen: 'Ana', texto: 'Fue al turno (pasó a «resuelto»)' })
     expect((await llamar(b, 'POST', raiz + '/tema', { slug: 'nada', estado: 'resuelto' })).status).toBe(404)
 
+    // desde un «Para hacer» del reporte: con título y sin slug lo crea; con un título parecido actualiza ese
+    const n = await llamar(b, 'POST', raiz + '/tema', { titulo: 'Responderle a Mamá por el café', proximo: 'Responderle y coordinar la entrega', nota: 'Lo anotó desde el reporte' })
+    expect(n.obj).toMatchObject({ slug: 'responderle-a-mama-por-el-cafe', titulo: 'Responderle a Mamá por el café', estado: 'abierto', nuevo: true })
+    const n2 = await llamar(b, 'POST', raiz + '/tema', { titulo: 'Responderle a Mamá por el café', estado: 'resuelto', nota: 'Ya lo hizo' })
+    expect(n2.obj).toMatchObject({ slug: 'responderle-a-mama-por-el-cafe', estado: 'resuelto', nuevo: false })
+    expect(mem.leerTema(carpeta, 'responderle-a-mama-por-el-cafe')!.historial.at(-1)).toMatchObject({ origen: 'Ana' })
+    expect((await llamar(b, 'POST', raiz + '/tema', { titulo: '' })).status).toBe(400)
+    expect((await llamar(b, 'DELETE', raiz + '/archivo', undefined, { ruta: 'temas/responderle-a-mama-por-el-cafe.md' })).status).toBe(200)
+
     // borrar
     expect((await llamar(b, 'DELETE', raiz + '/archivo', undefined, { ruta: 'temas/viejo.md' })).status).toBe(200)
     expect((await llamar(b, 'DELETE', raiz + '/archivo', undefined, { ruta: 'fichas/papa.md' })).status).toBe(200)
