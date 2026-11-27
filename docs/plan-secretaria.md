@@ -324,6 +324,30 @@ Detalle (formato de los `.md`, índice, topes, herramientas y API) en la secció
 - **Sin probar todavía:** una semana de uso real con las revisiones de verdad (la calidad de lo que anota y qué tan bien
   respeta los topes y las consolidaciones); lo probado es el almacén, la consigna y las herramientas con el claude falso.
 
+## Importar notas a la memoria
+Detalle en «Importar notas a la memoria de la secretaría» de [backend/API.md](../backend/API.md). La persona tenía una carpeta de
+Obsidian con las notas de un agente anterior que leía WhatsApp de su mamá (resúmenes por día, datos de salud) y quería pasar
+ese conocimiento a la memoria de la secretaria sin tocar la carpeta. Cómo quedó:
+- **Importador genérico:** cualquier carpeta de la misma máquina (campo con la ruta y «Elegir…», en Ajustes › Secretaría ›
+  Memoria › «Importar notas…»). Valida la ruta (no la oficina, no la carpeta de datos, no `/` ni la carpeta personal). Solo
+  lee; saltea ocultos, enlaces, imágenes, binarios y archivos de más de 5 MB, y dice cuáles.
+- **Analizar y confirmar:** antes de gastar nada se muestra cuántos archivos, cuántos caracteres y cuántas tandas; la
+  pantalla aclara que usa Claude en proporción al texto.
+- **Por tandas de ~24.000 caracteres** (los chicos se agrupan, los grandes se parten): cada tanda es una corrida de quien
+  atiende la secretaría, en su carril, sin entrega propia, con el texto de las notas como datos de terceros (ruta relativa,
+  fecha del archivo, fecha del nombre y del encabezado) y la lista de temas y fichas que ya hay para no duplicar. Ordena en
+  fichas, temas (lo viejo y cerrado, `resuelto`) y diario en el día de la nota, con el origen «Importado · <ruta>».
+  `memoria_diario_anotar` acepta `dia` solo en esas corridas, y el tope de escrituras de una corrida sube de 80 a 400.
+- **Registro en `hq.db` con el hash de cada archivo:** «Volver a importar» procesa solo lo nuevo o cambiado. Si la app se
+  cierra a mitad queda «cortada» y se puede reanudar sin perder las tandas hechas. Se puede cancelar (la tanda en curso
+  termina).
+- **Una entrega al final** en la bandeja, con archivos, temas, fichas y días tocados, y lo que no se pudo leer.
+- **Sin probar todavía:** una importación real con el claude de verdad (qué tan bien ordena notas de salud y respeta el
+  tope de 200 temas y 200 fichas; cuánto gasta una carpeta grande); lo probado es todo el circuito con el claude falso.
+- **Agentes y la carpeta de datos:** además, ningún agente puede leer ni escribir la carpeta de datos de la app (reglas
+  `--disallowedTools` sobre `<datosDir>/**` en todas las corridas con herramientas de archivos; ver «Carpeta de datos vedada»
+  en API.md). `Bash` queda como límite conocido: la regla que nombra la ruta es de mejor esfuerzo.
+
 ## Pruebas
 - Unitarias (vitest):
   - WhatsApp: filtro por chat con `@lid` y por grupo, descartando estados y canales; mapeo de mensajes de Baileys con

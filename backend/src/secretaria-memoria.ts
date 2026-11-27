@@ -45,6 +45,8 @@ export const LimitesSecretaria = {
   maxHistorial: 100,
   maxArchivo: 64 * 1024,
   maxEscriturasPorCorrida: 80,
+  /** Tope de escrituras de una tanda de importación (secretaria-importar.ts): ordena mucho más texto que una revisión. */
+  maxEscriturasImportacion: 400,
   maxLeer: 12000,
   /** Los días más viejos que esto se condensan en un resumen semanal (y se borran). */
   diasCondensar: 30,
@@ -290,8 +292,15 @@ export type Pendientes = { dia?: string; semana?: { semana: string; desde: strin
 
 // MARK: - el almacén
 
+/** Lo que escribió una corrida de importación (se cuenta por sesión de la corrida). */
+export type ContadorImportacion = { temasNuevos: Set<string>; temasActualizados: Set<string>; fichasNuevas: Set<string>; fichasActualizadas: Set<string>; dias: Set<string>; escrituras: number }
+export const contadorVacio = (): ContadorImportacion => ({ temasNuevos: new Set(), temasActualizados: new Set(), fichasNuevas: new Set(), fichasActualizadas: new Set(), dias: new Set(), escrituras: 0 })
+
 export class MemoriaSecretaria {
   readonly db: SQLiteDB
+  /** Corridas de importación en curso (id de sesión de la corrida -> lo que va escribiendo). Con una de estas, la
+   *  herramienta de diario acepta un `dia` y el tope de escrituras es el de las importaciones. */
+  readonly importando = new Map<string, ContadorImportacion>()
 
   constructor(private readonly s: Servicios) {
     this.db = s.store.db
@@ -413,13 +422,21 @@ export class MemoriaSecretaria {
   // ---- diario
 
   /** Agrega `- HH:MM · [origen] texto` al diario de hoy (con su encabezado si falta). */
-  anotarDiario(carpeta: string, p: { texto: string; origen?: string; fecha?: Date }) {
+  anotarDiario(carpeta: string, p: { texto: string; origen?: string; fecha?: Date; dia?: string }) {
     const texto = this.hecho(p.texto, 'texto')
     const f = p.fecha ?? new Date()
-    const d = diaLocal(f)
+    let d = diaLocal(f)
+    let hora = horaLocal(f)
+    if (p.dia !== undefined) {
+      // un día que ya pasó (notas importadas): la entrada va a ese día, sin hora
+      const x = p.dia.trim()
+      if (!diaValido(x)) throw new ErrorSec('«dia» va como AAAA-MM-DD.')
+      if (x > d) throw new ErrorSec('«dia» no puede ser un día que todavía no pasó.')
+      d = x; hora = '00:00'
+    }
     const arch = this.archivo(carpeta, 'diario', d)
     const x = parsearDia(this.leer(arch) ?? '', d)
-    x.entradas.push({ cuando: horaLocal(f), origen: this.origen(p.origen), texto })
+    x.entradas.push({ cuando: hora, origen: this.origen(p.origen), texto })
     this.escribir(arch, armarDia(x))
     return { dia: d }
   }
@@ -901,13 +918,13 @@ const claveCupo = 'memoria_secretaria'
 const str = (descripcion: string) => ({ type: 'string', description: descripcion })
 
 export class HerramientasMemoriaSecretaria implements MCPHerramientas {
-  constructor(private readonly m: MemoriaSecretaria, private readonly s: Servicios, private readonly token: string, private readonly carpeta: string) {}
+  constructor(private readonly m: MemoriaSecretaria, private readonly s: Servicios, private readonly token: string, private readonly carpeta: string, private readonly sid = '') {}
 
   readonly definiciones: Obj[] = [
     {
       name: 'memoria_diario_anotar',
       description: 'Anotá en tu diario de hoy algo relevante que viste en una fuente (WhatsApp, Gmail, Calendario) o que la persona te contó en la charla. Una línea corta con lo que importa; el origen dice de dónde salió. Tu memoria es privada: los demás agentes no la ven.',
-      inputSchema: { type: 'object', properties: { texto: str('lo relevante, en una o dos oraciones'), origen: str('de dónde salió, por ejemplo «WhatsApp · Mamá», «Gmail · Colegio», «Calendario» o «Charla»') }, required: ['texto'] },
+      inputSchema: { type: 'object', properties: { texto: str('lo relevante, en una o dos oraciones'), origen: str('de dónde salió, por ejemplo «WhatsApp · Mamá», «Gmail · Colegio», «Calendario» o «Charla»'), dia: str('AAAA-MM-DD: solo al importar notas viejas (anota en ese día en vez de hoy)') }, required: ['texto'] },
     },
     {
       name: 'memoria_diario_leer',
@@ -985,11 +1002,13 @@ export class HerramientasMemoriaSecretaria implements MCPHerramientas {
 
   async llamar(nombre: string, a: Obj): Promise<MCPResultado | undefined> {
     if (!MemoriaSecretariaAgente.nombresMCP.includes(nombre)) return undefined
-    if (escrituras.includes(nombre) && !mcpDe(this.s)?.tokens.tomar(this.token, claveCupo, L.maxEscriturasPorCorrida)) {
-      return MCPResultados.error(`Ya escribiste ${L.maxEscriturasPorCorrida} veces en tu memoria en esta corrida: dejá el resto para la próxima.`)
+    const imp = this.m.importando.get(this.sid)
+    const cupo = imp ? L.maxEscriturasImportacion : L.maxEscriturasPorCorrida
+    if (escrituras.includes(nombre) && !mcpDe(this.s)?.tokens.tomar(this.token, claveCupo, cupo)) {
+      return MCPResultados.error(`Ya escribiste ${cupo} veces en tu memoria en esta corrida: dejá el resto para la próxima.`)
     }
     try {
-      return this.hacer(nombre, a)
+      return this.hacer(nombre, a, imp)
     } catch (e) {
       if (e instanceof ErrorMemoria) return MCPResultados.error(e.message)
       this.s.log.error(`secretaria: memoria: ${e instanceof Error ? e.message : e}`)
@@ -997,16 +1016,20 @@ export class HerramientasMemoriaSecretaria implements MCPHerramientas {
     }
   }
 
-  private hacer(nombre: string, a: Obj): MCPResultado {
+  private hacer(nombre: string, a: Obj, imp?: ContadorImportacion): MCPResultado {
     const c = this.carpeta, m = this.m
     switch (nombre) {
       case 'memoria_diario_anotar': {
-        const r = m.anotarDiario(c, { texto: a.texto as string, origen: a.origen as string })
+        const dia = opc(a.dia)
+        if (dia !== undefined && dia.trim() !== '' && !imp) return MCPResultados.error('«dia» solo se usa al importar notas viejas: acá anotás en el diario de hoy.')
+        const r = m.anotarDiario(c, { texto: a.texto as string, origen: a.origen as string, ...(dia !== undefined && dia.trim() !== '' ? { dia } : {}) })
+        if (imp) { imp.dias.add(r.dia); imp.escrituras++ }
         return MCPResultados.ok(`Anotado en tu diario del ${r.dia}.`)
       }
       case 'memoria_diario_leer': return MCPResultados.ok(this.leerDiario(a))
       case 'memoria_dia_resumir': {
         m.resumirDia(c, typeof a.dia === 'string' ? a.dia.trim() : '', a.resumen as string)
+        if (imp) { imp.dias.add(String(a.dia).trim()); imp.escrituras++ }
         return MCPResultados.ok(`Resumen del ${String(a.dia).trim()} guardado.`)
       }
       case 'memoria_semana_resumir': {
@@ -1016,6 +1039,7 @@ export class HerramientasMemoriaSecretaria implements MCPHerramientas {
       case 'memoria_tema': {
         const p = { tema: a.tema as string, estado: opc(a.estado), fecha: opc(a.fecha), proximo: opc(a.proximo), nota: opc(a.nota), personas: a.personas === undefined || a.personas === null ? undefined : (a.personas as string[]), origen: opc(a.origen) }
         const r = m.guardarTema(c, p)
+        if (imp) { (r.nuevo ? imp.temasNuevos : imp.temasActualizados).add(r.slug); imp.escrituras++ }
         return MCPResultados.ok(`${r.nuevo ? 'Tema creado' : 'Tema actualizado'}: «${r.titulo}» (${r.estado}, temas/${r.slug}.md).`)
       }
       case 'memoria_temas': {
@@ -1033,6 +1057,7 @@ export class HerramientasMemoriaSecretaria implements MCPHerramientas {
       }
       case 'memoria_ficha': {
         const r = m.guardarFicha(c, { nombre: a.nombre as string, tipo: opc(a.tipo), hecho: a.hecho as string, origen: opc(a.origen), reemplaza: opc(a.reemplaza) })
+        if (imp) { (r.nuevo ? imp.fichasNuevas : imp.fichasActualizadas).add(r.slug); imp.escrituras++ }
         return MCPResultados.ok(`${r.nuevo ? 'Ficha creada' : 'Ficha actualizada'}: «${r.titulo}» (fichas/${r.slug}.md).`)
       }
       case 'memoria_ficha_leer': {
@@ -1101,7 +1126,7 @@ export function herramientasMemoriaSecretaria(s: Servicios, token: string, ident
   try { o = OficinaStore.leer(identidad.oficina) } catch { return undefined }
   const ag = o.agentes.find((a) => a.id === identidad.agente)
   if (!ag || !MemoriaSecretariaAgente.atiende(o, ag)) return undefined
-  return new HerramientasMemoriaSecretaria(m, s, token, identidad.oficina)
+  return new HerramientasMemoriaSecretaria(m, s, token, identidad.oficina, identidad.sid)
 }
 
 export const memoriaSecretariaDe = (s: Servicios) => s.huecos.secretariaMemoria as MemoriaSecretaria | undefined
@@ -1116,6 +1141,7 @@ export class MemoriaSecretariaRouter implements SubRouter {
 
   async handle(method: string, p: string, q: Query, body?: Buffer) {
     if (p !== base && !p.startsWith(base + '/')) return null
+    if (p === base + '/importar' || p.startsWith(base + '/importar/')) return null   // las atiende secretaria-importar.ts
     return atrapar(async () => {
       try {
         return this.despachar(method, p, q, body)

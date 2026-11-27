@@ -20,4 +20,5 @@ import './chat-tareas.js' // [chat-tareas]
 import './whatsapp.js' // [whatsapp]
 import './secretaria.js' // [secretaria]
 import './secretaria-memoria.js' // [secretaria-memoria]
+import './secretaria-importar.js' // [secretaria-importar]
 export {}

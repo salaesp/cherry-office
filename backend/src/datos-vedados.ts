@@ -22,12 +22,12 @@ export function fijarAvisoDatos(f: (m: string) => void) { aviso = f }
 
 const sinCase = process.platform === 'win32' || process.platform === 'darwin'
 const norm = (p: string) => { const r = path.resolve(p); return sinCase ? r.toLowerCase() : r }
-/** `a` es `b` o está adentro de `b`. */
-function adentro(a: string, b: string): boolean {
+/** `a` es `b` o está adentro de `b` (sin mirar enlaces; ver `real`). */
+export function adentro(a: string, b: string): boolean {
   const x = norm(a), y = norm(b)
   return x === y || x.startsWith(y.endsWith(path.sep) ? y : y + path.sep)
 }
-function real(p: string): string {
+export function real(p: string): string {
   try { return fs.realpathSync(p) } catch { return path.resolve(p) }
 }
 

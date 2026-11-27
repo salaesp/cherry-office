@@ -226,6 +226,8 @@ export class Programador implements ProgramadorEntregas {
   static readonly prefijoPedido = 'pedido:'
   static readonly prefijoEspera = 'espera:'
   static readonly prefijoSecretaria = 'secretaria:'
+  /** Una tanda de la importación de notas a la memoria de la secretaría: `secretaria-importar:<importación>:<tanda>`. */
+  static readonly prefijoImportar = 'secretaria-importar:'
 
   readonly ejecuciones: Ejecuciones
   /** Pedidos de permiso de las corridas que esperan a la persona (permisos-tareas.ts). */
@@ -238,6 +240,8 @@ export class Programador implements ProgramadorEntregas {
   private readonly ganchosEntregar: GanchoEntregar[] = []
   /** Deciden si la entrega de una corrida va sin notificación (p. ej. una revisión de la secretaría sin novedades). */
   private readonly silenciadores: ((tarea: string, texto: string) => boolean)[] = []
+  /** Las corridas cuyo id dice que no dejan entrega (p. ej. las tandas de una importación: la entrega es una sola, al final). */
+  private readonly sinEntrega: ((tarea: string) => boolean)[] = []
   private preparado = false
   private cerrado = false
   private revisando = false
@@ -267,6 +271,9 @@ export class Programador implements ProgramadorEntregas {
 
   /** La entrega de una corrida va sin notificación si algún silenciador lo dice. */
   silenciar(f: (tarea: string, texto: string) => boolean) { this.silenciadores.push(f) }
+
+  /** Una corrida sin entrega: termina, queda guardada y sale en la actividad y el costo, pero no deja nada en la bandeja. */
+  sinEntregar(f: (tarea: string) => boolean) { this.sinEntrega.push(f) }
 
   /** Reloj inyectable (tests). */
   fijarReloj(r: () => Date) { this.reloj = r }
@@ -369,10 +376,10 @@ export class Programador implements ProgramadorEntregas {
   }
 
   /** «Probar ahora»: crea la ejecución y devuelve enseguida (la corrida sigue en segundo plano). */
-  async correrAhora(act: OficinaActiva, t: TareaProgramada, def: AgenteDef, actuar: string[] = []): Promise<Ejecucion> {
+  async correrAhora(act: OficinaActiva, t: TareaProgramada, def: AgenteDef, actuar: string[] = [], sid?: string): Promise<Ejecucion> {
     this.verificar(act.carpeta)
     this.preparar()
-    return this.lanzar(act, t, def, new Date(), true, actuar)
+    return this.lanzar(act, t, def, new Date(), true, actuar, sid)
   }
 
   /** Una tarea única que se crea «para ahora» (o con la hora ya pasada): corre enseguida como su corrida programada (no
@@ -416,9 +423,9 @@ export class Programador implements ProgramadorEntregas {
 
   /** Una corrida única con un id de tarea cualquiera (`encargo:`, `flujo:`, `accion:`, `coord:`, `parte:`): misma maquinaria
    *  que una tarea. `actuar`: herramientas de conectores de actuar que esta corrida puede usar. */
-  encargarLibre(act: OficinaActiva, def: AgenteDef, p: { id: string; nombre: string; consigna: string; actuar?: string[] }): Promise<Ejecucion> {
+  encargarLibre(act: OficinaActiva, def: AgenteDef, p: { id: string; nombre: string; consigna: string; actuar?: string[]; sid?: string }): Promise<Ejecucion> {
     const t: TareaProgramada = { id: p.id, agente: def.id, nombre: p.nombre, consigna: p.consigna, dias: [1], hora: '00:00', activa: false }
-    return this.correrAhora(act, t, def, p.actuar ?? [])
+    return this.correrAhora(act, t, def, p.actuar ?? [], p.sid)
   }
 
   // MARK: pedir cambios (E4)
@@ -523,6 +530,7 @@ export class Programador implements ProgramadorEntregas {
     if (id.startsWith(Programador.prefijoPedido)) return 'pedido'
     if (id.startsWith(Programador.prefijoEspera)) return 'espera'
     if (id.startsWith(Programador.prefijoSecretaria)) return 'secretaria'
+    if (id.startsWith(Programador.prefijoImportar)) return 'importacion'
     return 'tarea'
   }
 
@@ -549,7 +557,7 @@ export class Programador implements ProgramadorEntregas {
 
   // MARK: corrida
 
-  private lanzar(act: OficinaActiva, t: TareaProgramada, def: AgenteDef, programada: Date, manual: boolean, actuar: string[] = []): Ejecucion {
+  private lanzar(act: OficinaActiva, t: TareaProgramada, def: AgenteDef, programada: Date, manual: boolean, actuar: string[] = [], sidPedido?: string): Ejecucion {
     if (this.cerrado) throw new ErrorAPI(409, 'La app se está cerrando.')
     const clave = Programador.clave(act.carpeta, t.id)
     if (this.reservadas.has(clave)) throw new ErrorAPI(409, 'Esa tarea ya se está corriendo.')
@@ -557,7 +565,7 @@ export class Programador implements ProgramadorEntregas {
       throw new ErrorAPI(409, 'Esa tarea está esperando tu permiso para seguir.')
     }
     this.reservadas.add(clave)
-    const sid = randomUUID().toLowerCase()
+    const sid = sidPedido ?? randomUUID().toLowerCase()
     const inicio = Date.now() / 1000
     let id: number
     try {
@@ -650,7 +658,7 @@ export class Programador implements ProgramadorEntregas {
       this.ejecuciones.terminar(ej.id, r.error === undefined ? 'ok' : 'error', r.texto, r.error, costo)
     } catch {}
     this.s.log.info(`tarea ${ej.tarea} agente=${agente} estado=${r.error === undefined ? 'ok' : 'error'}`)
-    if (r.error === undefined) {
+    if (r.error === undefined && !this.sinEntrega.some((f) => { try { return f(ej.tarea) } catch { return false } })) {
       const entrega = entregas.registrar({
         oficina: carpeta, agente, nombre: def.nombre, origen, ref: ej.tarea, titulo: nombre, texto: r.texto, sid,
         archivos: ArchivosEntrega.relativos(archivos, carpeta), costo,
@@ -772,6 +780,7 @@ export function nombreCorrida(id: string): string {
   if (id.startsWith(Programador.prefijoPedido)) return 'Pedido de un colega'
   if (id.startsWith(Programador.prefijoEspera)) return 'Versión completa'
   if (id.startsWith(Programador.prefijoSecretaria)) return 'Revisión de la secretaría'
+  if (id.startsWith(Programador.prefijoImportar)) return 'Importación a la memoria de la secretaría'
   return id
 }
 

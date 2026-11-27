@@ -2,6 +2,7 @@
    «Memoria» y la hoja con tres vistas: Seguimiento (temas por estado y fecha: cambiar el estado, ver el historial, editar,
    compartir con la oficina, borrar), Días (el diario y los resúmenes semanales) y Personas y cosas (fichas). Editar es
    escribir el .md tal cual. Es privada: no pasa por la Biblioteca ni por la memoria de la oficina salvo que se comparta acá.
+   «Importar notas…»: pasa una carpeta de notas de la compu (Obsidian, etc.) a esta memoria, en segundo plano y con progreso.
    API: /api/secretaria/memoria (ver backend/API.md). */
 (function () {
   var h = App.h;
@@ -232,9 +233,156 @@
     }
     App.add(hj.pie,
       h('button.btn.fantasma.peligro', { style: { marginRight: 'auto' }, onclick: function () { borrarTodo(cargar); } }, 'Borrar la memoria'),
+      h('button.btn', { onclick: function () { importar(cargar); } }, App.icono('abrir'), 'Importar notas…'),
       h('button.btn.primario', { onclick: hj.cerrar }, 'Listo'));
     cargar();
   }
+
+  /* ---------------- importar notas ---------------- */
+  /* Una carpeta de notas de tu compu (por ejemplo de Obsidian) que la secretaria lee y ordena en su memoria. Nunca se toca la
+     carpeta: solo se lee. Primero «Analizar» (cuántos archivos y cuánto texto, sin gastar nada), después confirmar. En segundo
+     plano, por tandas, con progreso y «Cancelar». API: /api/secretaria/memoria/importar* (ver backend/API.md). */
+  var imp = '/importar';
+  function num(n) { return Number(n || 0).toLocaleString('es-AR'); }
+  function plural(n, uno, varios) { return num(n) + ' ' + (n === 1 ? uno : varios); }
+  var ESTADO_IMP = { pendiente: 'Por empezar', corriendo: 'Importando', terminada: 'Terminada', fallida: 'Falló', cancelada: 'Cancelada', cortada: 'Se cortó' };
+
+  function importar(alCerrar) {
+    var vivo = true, timer = null, analisis = null, ruta = '';
+    var hj = App.hoja({ titulo: 'Importar notas a la memoria', ancho: 640, clave: 'secretaria-memoria-importar', alCerrar: function () { vivo = false; if (timer) clearTimeout(timer); if (alCerrar) alCerrar(); } });
+    var caja = h('div'), err = h('div.error-txt');
+    App.add(hj.cuerpo, caja, err);
+    App.add(hj.pie, h('button.btn.primario', { onclick: hj.cerrar }, 'Cerrar'));
+
+    function cargar() {
+      return api().get(base + imp).then(function (r) { if (vivo) dibujar(r); })
+        .catch(function (e) { if (vivo) { App.vaciar(caja); caja.appendChild(h('div.error-txt', e.message)); } });
+    }
+    function sondear() {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(function () { if (vivo) cargar(); }, 2000);
+    }
+
+    function dibujar(r) {
+      App.vaciar(caja); err.textContent = '';
+      var u = r.importacion;
+      if (u && (u.estado === 'pendiente' || u.estado === 'corriendo')) { progreso(u); sondear(); return; }
+      if (u && u.estado === 'cortada') cortada(u);
+      else if (u) ultima(u);
+      formulario(r, u);
+    }
+
+    /* ---- en curso ---- */
+    function progreso(u) {
+      var pct = u.tandasTotal ? Math.round(100 * u.tandasHechas / u.tandasTotal) : 0;
+      caja.appendChild(h('div.ajuste-tit', u.cancelando ? 'Cancelando…' : 'Importando las notas…'));
+      caja.appendChild(h('div.ajuste-ayuda', { style: { margin: '2px 0 10px' } }, 'De «' + u.carpeta + '»: ' + plural(u.archivos, 'archivo', 'archivos') + ' en ' + plural(u.tandasTotal, 'tanda', 'tandas')
+        + '. Sigue sola, aunque cierres esta ventana. ' + (u.cancelando ? 'La tanda que está corriendo termina y no sale ninguna más.' : 'Podés seguir usando la oficina.')));
+      caja.appendChild(h('div', { style: { height: '10px', borderRadius: '6px', background: 'var(--panel-2)', border: '1px solid var(--linea)', overflow: 'hidden' } },
+        h('div', { style: { height: '100%', width: pct + '%', background: 'var(--acento, #0a5fb4)', transition: 'width .3s' } })));
+      caja.appendChild(h('div.ajuste-ayuda', { style: { margin: '6px 0 10px' } }, 'Tanda ' + Math.min(u.tandasHechas + 1, u.tandasTotal) + ' de ' + u.tandasTotal + ' · ' + pct + '%'
+        + ' · ' + plural(u.resultado.temasNuevos + u.resultado.temasActualizados, 'tema', 'temas') + ', ' + plural(u.resultado.fichasNuevas + u.resultado.fichasActualizadas, 'ficha', 'fichas') + ' y ' + plural(u.resultado.dias, 'día', 'días') + ' del diario hasta ahora'
+        + (u.errores.length ? ' · ' + plural(u.errores.length, 'tanda con error', 'tandas con error') : '')));
+      var cancelar = h('button.btn', { disabled: !!u.cancelando, onclick: function () {
+        cancelar.disabled = true;
+        api().post(base + imp + '/cancelar', {}).then(cargar).catch(function (e) { err.textContent = e.message; cancelar.disabled = false; });
+      } }, u.cancelando ? 'Cancelando…' : 'Cancelar');
+      caja.appendChild(cancelar);
+    }
+
+    /* ---- se cortó: se puede seguir ---- */
+    function cortada(u) {
+      caja.appendChild(h('div', { style: { border: '1px solid var(--linea-fuerte)', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px', background: 'var(--panel-2)' } },
+        h('div', { style: { fontWeight: 500 } }, 'La importación se cortó en la tanda ' + (u.tandasHechas + 1) + ' de ' + u.tandasTotal),
+        h('div.ajuste-ayuda', { style: { margin: '2px 0 8px' } }, 'Se cerró la app a mitad. Lo que ya se importó está guardado y no se repite: seguís desde donde quedó, o la dejás así.'),
+        h('div', { style: { display: 'flex', gap: '8px' } },
+          h('button.btn.chico.primario', { onclick: function () { api().post(base + imp + '/reanudar', {}).then(cargar).catch(function (e) { err.textContent = e.message; }); } }, 'Seguir'),
+          h('button.btn.chico', { onclick: function () { api().post(base + imp + '/cancelar', {}).then(cargar).catch(function (e) { err.textContent = e.message; }); } }, 'Dejarla así'))));
+    }
+
+    /* ---- la última importación ---- */
+    function ultima(u) {
+      var r = u.resultado;
+      var detalle = u.estado === 'terminada' || u.estado === 'cancelada' || u.estado === 'fallida'
+        ? plural(r.temasNuevos, 'tema nuevo', 'temas nuevos') + ' y ' + num(r.temasActualizados) + ' actualizados · ' + plural(r.fichasNuevas, 'ficha nueva', 'fichas nuevas') + ' y ' + num(r.fichasActualizadas) + ' actualizadas · ' + plural(r.dias, 'día', 'días') + ' del diario'
+        : '';
+      caja.appendChild(h('div', { style: { border: '1px solid var(--linea)', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px' } },
+        h('div', { style: { fontWeight: 500 } }, 'Última importación: ' + (ESTADO_IMP[u.estado] || u.estado).toLowerCase() + ' · «' + u.carpeta + '»'),
+        h('div.ajuste-ayuda', { style: { margin: '2px 0' } }, plural(u.archivos, 'archivo', 'archivos') + ' · ' + plural(u.tandasHechas, 'tanda', 'tandas') + ' de ' + num(u.tandasTotal) + (detalle ? ' · ' + detalle : '')),
+        u.errores.length ? h('div.error-txt', plural(u.errores.length, 'tanda no se pudo hacer', 'tandas no se pudieron hacer') + ': ' + u.errores.map(function (e) { return e.mensaje; }).filter(function (x, i, a) { return a.indexOf(x) === i; }).slice(0, 2).join(' · ')) : null,
+        h('div', { style: { marginTop: '8px' } }, h('button.btn.chico', { onclick: function () { ruta = u.carpeta; analizar(true); } }, 'Volver a importar'),
+          h('span.ajuste-ayuda', { style: { marginLeft: '8px' } }, 'Procesa solo lo nuevo o lo que cambió.'))));
+    }
+
+    /* ---- elegir la carpeta y analizar ---- */
+    function formulario(r, u) {
+      if (!r.secretaria) {
+        caja.appendChild(h('div.vacio', 'Primero configurá la secretaría (Ajustes › Secretaría): la importación la hace quien la atiende.'));
+        return;
+      }
+      if (!ruta && u) ruta = u.carpeta;
+      var campo = h('input.campo', { type: 'text', placeholder: '/Users/vos/Documents/Obsidian/Notas', spellcheck: 'false', value: ruta, style: { flex: 1 } });
+      campo.addEventListener('input', function () { ruta = campo.value; if (analisis) { analisis = null; App.vaciar(resultado); } });
+      campo.addEventListener('keydown', function (e) { if (e.key === 'Enter') analizar(false); });
+      var elegir = App.elegirCarpeta ? h('button.btn', { onclick: function () {
+        App.elegirCarpeta('Elegí la carpeta con las notas', { inicio: ruta || undefined }).then(function (x) { if (x) { ruta = x; campo.value = x; analizar(false); } });
+      } }, App.icono('carpeta'), 'Elegir…') : null;
+      caja.appendChild(h('div.ajuste-tit', 'Una carpeta de notas'));
+      caja.appendChild(h('div.ajuste-ayuda', { style: { margin: '2px 0 8px' } },
+        'Pasá a la memoria de la secretaria lo que tengas anotado en otro lado: resúmenes por día, datos de salud, trámites… Lee los .md, .txt, PDF y Word de la carpeta y sus subcarpetas (no las ocultas ni las imágenes) y lo ordena en fichas, temas en seguimiento y el diario. La carpeta no se toca: solo se lee. Tiene que estar en esta misma compu.'));
+      caja.appendChild(h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center' } }, campo, elegir,
+        h('button.btn.primario', { onclick: function () { analizar(false); } }, 'Analizar')));
+      resultado = h('div', { style: { marginTop: '12px' } });
+      caja.appendChild(resultado);
+    }
+    var resultado = h('div');
+
+    function analizar(desdeUltima) {
+      if (!ruta.trim()) { err.textContent = 'Poné la ruta de la carpeta con las notas.'; return; }
+      err.textContent = '';
+      var pedido = ruta;
+      App.vaciar(resultado).appendChild(App.cargando('Leyendo la carpeta…'));
+      api().post(base + imp + '/analizar', { ruta: pedido }).then(function (a) {
+        if (!vivo || pedido !== ruta) return;
+        analisis = a; App.vaciar(resultado); mostrarAnalisis(a, desdeUltima);
+      }).catch(function (e) { App.vaciar(resultado); err.textContent = e.message; });
+    }
+
+    function mostrarAnalisis(a, desdeUltima) {
+      if (a.activa) { resultado.appendChild(h('div.vacio', 'Ya hay una importación en curso.')); return; }
+      var partes = [];
+      if (a.iguales) partes.push(plural(a.iguales, 'ya está importado', 'ya están importados'));
+      if (a.nuevos && a.cambiados) partes.push(num(a.nuevos) + ' nuevos y ' + num(a.cambiados) + ' cambiados');
+      var cuadro = h('div', { style: { border: '1px solid var(--linea-fuerte)', borderRadius: '10px', padding: '10px 12px', background: 'var(--panel-2)' } });
+      if (!a.archivos) {
+        cuadro.appendChild(h('div', { style: { fontWeight: 500 } }, a.iguales ? 'No hay nada nuevo para importar' : 'No encontré archivos de texto para importar'));
+        cuadro.appendChild(h('div.ajuste-ayuda', a.iguales ? 'Todo lo de esa carpeta ya está en la memoria de la secretaria.' : 'Busqué .md, .txt, PDF, Word y similares, sin las carpetas ocultas.'));
+      } else {
+        cuadro.appendChild(h('div', { style: { fontWeight: 500 } }, (desdeUltima || a.iguales ? 'Hay para importar: ' : 'Para importar: ') + plural(a.archivos, 'archivo', 'archivos') + ', ' + num(a.caracteres) + ' caracteres'));
+        cuadro.appendChild(h('div.ajuste-ayuda', { style: { margin: '2px 0 4px' } }, 'Va en ' + plural(a.tandas, 'tanda', 'tandas') + ' de unos ' + num(a.tandaChars) + ' caracteres' + (partes.length ? ' · ' + partes.join(' · ') : '') + '.'));
+        cuadro.appendChild(h('div.ajuste-ayuda', { style: { margin: '4px 0 8px' } },
+          'Ojo: usa Claude en proporción al texto. Cada tanda es una corrida de ' + (a.secretaria ? a.secretaria.nombre : 'la secretaria') + ' con su memoria (un chat de unos minutos), así que ' + plural(a.tandas, 'tanda gasta', 'tandas gastan') + ' del plan, y las notas largas más. Corre en segundo plano y la podés cancelar. Lo que importa es lo que va a la memoria, no una copia de las notas.'));
+        var ir = h('button.btn.primario', { onclick: function () {
+          ir.disabled = true;
+          api().post(base + imp + '/empezar', { ruta: a.carpeta }).then(function () { App.guardado('Empezó la importación.'); return cargar(); })
+            .catch(function (e) { err.textContent = e.message; ir.disabled = false; });
+        } }, 'Importar ' + plural(a.archivos, 'archivo', 'archivos'));
+        cuadro.appendChild(ir);
+      }
+      resultado.appendChild(cuadro);
+      if (a.salteadosTotal) {
+        var por = Object.keys(a.resumenSalteados || {}).map(function (m) { return a.resumenSalteados[m] + ' ' + m; }).join(' · ');
+        var lista = h('div', { style: { display: 'none', margin: '6px 0 0', padding: '8px 10px', background: 'var(--panel-2)', borderRadius: '8px', fontSize: '12.5px', lineHeight: '1.5', maxHeight: '180px', overflow: 'auto' } },
+          a.salteados.map(function (s) { return h('div', h('span', { style: { color: 'var(--suave)' } }, s.motivo + ' — '), s.ruta); }),
+          a.salteadosTotal > a.salteados.length ? h('div.ajuste-ayuda', 'Y ' + num(a.salteadosTotal - a.salteados.length) + ' más.') : null);
+        var ver_ = h('button.btn.chico.fantasma', { onclick: function () { var abierto = lista.style.display !== 'none'; lista.style.display = abierto ? 'none' : 'block'; ver_.textContent = abierto ? 'Ver cuáles' : 'Ocultar'; } }, 'Ver cuáles');
+        resultado.appendChild(h('div', { style: { marginTop: '10px' } }, h('span.ajuste-ayuda', 'No se importan: ' + por + '. '), ver_, lista));
+      }
+    }
+
+    cargar();
+  }
+
 
   function borrarTodo(alBorrar) {
     return App.confirmar('¿Borrar toda la memoria de la secretaría?', 'Se borran su diario, los temas en seguimiento y las fichas. No se puede deshacer, y la secretaria empieza de cero. Lo que ya compartiste con la oficina queda ahí.', 'Borrar la memoria', true).then(function (si) {
@@ -246,7 +394,7 @@
   /* ---------------- bloque para Ajustes › Secretaría ---------------- */
   /* `siempre`: mostrarlo aunque todavía no haya nada (con secretaría). Sin eso, solo si hay memoria guardada. */
   function bloque(siempre) {
-    var caja = h('div');
+    var caja = h('div'), estadoImp = h('div.ajuste-ayuda', { style: { marginTop: '6px' } });
     function cargar() {
       api().get(base).then(function (r) {
         App.vaciar(caja);
@@ -262,12 +410,20 @@
           h('div.ajuste-ayuda', { style: { margin: '2px 0 8px' } }, 'Lo que la secretaria va sabiendo de vos, de WhatsApp, Gmail, el calendario y la charla con ella: un diario, los temas en seguimiento y fichas de personas y cosas. Es privada: no la ven los demás agentes ni pasa por la Biblioteca.'),
           h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' } },
             h('button.btn', { onclick: function () { abrir({ alCerrar: cargar }); } }, App.icono('carpeta'), 'Ver la memoria'),
-            h('span.ajuste-ayuda', { style: { flex: 1 } }, resumen))));
+            h('button.btn', { onclick: function () { importar(cargar); } }, App.icono('abrir'), 'Importar notas…'),
+            h('span.ajuste-ayuda', { style: { flex: 1 } }, resumen)),
+          estadoImp));
+      }).catch(function () {});
+      api().get(base + imp).then(function (r) {
+        var u = r.importacion;
+        if (!u || (u.estado !== 'pendiente' && u.estado !== 'corriendo' && u.estado !== 'cortada')) return;
+        estadoImp.textContent = u.estado === 'cortada' ? 'Hay una importación de notas cortada en la tanda ' + (u.tandasHechas + 1) + ' de ' + u.tandasTotal + ': abrí «Importar notas…» para seguirla.'
+          : 'Importando notas: tanda ' + Math.min(u.tandasHechas + 1, u.tandasTotal) + ' de ' + u.tandasTotal + '.';
       }).catch(function () {});
     }
     cargar();
     return caja;
   }
 
-  App.SecretariaMemoria = { abrir: abrir, bloque: bloque };
+  App.SecretariaMemoria = { abrir: abrir, bloque: bloque, importar: importar };
 })();
