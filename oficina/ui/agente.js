@@ -533,6 +533,7 @@
   function ocupado(id, si) {
     if (si) { enCurso[id] = true; App.E.ocupados[id] = true; } else { delete enCurso[id]; delete App.E.ocupados[id]; }
     App.Oficina.ocupado(id, si);
+    if (App.Actividad) App.Actividad.repintar();
     App.marcarEstados();
   }
 

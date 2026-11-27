@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boceto · Qué está haciendo cada agente</title>
+<style>
+:root {
+  --fondo: #f2f0ec; --panel: #ffffff; --panel-2: #f8f7f4; --linea: #e4e1db; --linea-fuerte: #d3cfc7;
+  --texto: #1d1d1f; --suave: #6d6962; --tenue: #9a958d; --ok: #3b7a4b; --aviso: #a46a12; --radio: 10px; --radio-chico: 7px;
+  --sombra: 0 1px 2px rgba(20,18,15,.06), 0 8px 24px rgba(20,18,15,.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+    --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --ok: #6cbf80; --aviso: #e0a84a;
+    --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35); }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fondo); color: var(--texto); font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; padding: 28px 16px 60px; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.intro { color: var(--suave); max-width: 760px; margin: 0 0 28px; }
+.tablero { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 22px; max-width: 1000px; }
+.col h2 { font-size: 14px; margin: 0 0 2px; }
+.col .que { color: var(--suave); font-size: 12px; margin: 0 0 10px; min-height: 34px; }
+.lateral { background: var(--panel-2); border: 1px solid var(--linea); border-radius: var(--radio); padding: 4px 6px 10px; width: 100%; max-width: 284px; }
+
+/* copiado de estilo.css */
+.grupo-tit { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; padding: 12px 8px 6px; }
+.grupo-tit .cuenta { margin-left: auto; font-weight: 500; color: var(--tenue); }
+.punto { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.persona { position: relative; display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: var(--radio-chico); }
+.persona:hover { background: var(--panel); }
+.retrato { width: 34px; height: 34px; border-radius: 8px; flex: none; display: grid; place-items: center; font-weight: 650; font-size: 12px; color: #fff; }
+.persona-txt { min-width: 0; flex: 1; }
+.persona-nombre { font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.persona-rol { font-size: 12px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.estado-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; opacity: 0; }
+.ocupada .estado-dot { opacity: 1; background: var(--aviso); animation: latir 1.2s ease-in-out infinite; }
+.reunida .estado-dot { opacity: 1; background: var(--ok); }
+@keyframes latir { 50% { opacity: .3; } }
+
+/* nuevo */
+.vivo { color: var(--texto); }
+.vivo b { font-weight: 600; }
+.vivo .sep { color: var(--tenue); padding: 0 3px; }
+.esperando { color: var(--suave); font-style: italic; }
+.origen { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.origen .ico { width: 12px; height: 12px; flex: none; color: var(--tenue); }
+.paso { display: flex; font-size: 12px; color: var(--texto); white-space: nowrap; min-width: 0; }
+.paso .txt { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.paso .seg { flex: none; color: var(--tenue); font-variant-numeric: tabular-nums; margin-left: 6px; }
+
+.globo { position: absolute; right: 2px; top: calc(100% - 2px); z-index: 2; background: var(--panel); border: 1px solid var(--linea-fuerte); box-shadow: var(--sombra); border-radius: 8px; padding: 8px 10px; width: 230px; font-size: 12px; }
+.globo::before { content: ''; position: absolute; top: -5px; right: 10px; width: 8px; height: 8px; background: var(--panel); border-left: 1px solid var(--linea-fuerte); border-top: 1px solid var(--linea-fuerte); transform: rotate(45deg); }
+.globo .g-tit { font-weight: 600; margin-bottom: 2px; }
+.globo .g-fila { display: flex; justify-content: space-between; gap: 8px; color: var(--suave); }
+.globo .g-fila span:last-child { color: var(--texto); text-align: right; }
+.globo .g-mas { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--linea); color: var(--suave); }
+.con-globo { margin-bottom: 92px; }
+.nota { font-size: 11.5px; color: var(--tenue); padding: 2px 8px 0; }
+.tag { display: inline-block; font-size: 10.5px; font-weight: 600; color: var(--aviso); border: 1px solid color-mix(in srgb, var(--aviso) 40%, transparent); border-radius: 4px; padding: 0 4px; margin: 0 0 6px; }
+ul.notas { color: var(--suave); font-size: 12px; padding-left: 18px; margin: 10px 0 0; max-width: 284px; }
+ul.notas li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<h1>Qué está haciendo cada agente</h1>
+<p class="intro">Boceto de la lista de Equipo con los mismos cinco agentes en tres versiones. Ana chatea con vos (recién le escribiste); Bruno corre una tarea programada; Caro responde una consulta de Ana; Dani está en una reunión; Eze no está haciendo nada. El globo muestra lo que aparecería al pasar el mouse.</p>
+
+<div class="tablero">
+
+  <!-- HOY -->
+  <section class="col">
+    <span class="tag">HOY</span>
+    <h2>Como está ahora</h2>
+    <p class="que">Solo el paso del momento. No dice de qué es el trabajo, y Ana se ve con su rol hasta que llega la actividad.</p>
+    <div class="lateral">
+      <div class="grupo-tit"><span class="punto" style="background:#c0632b"></span>Comercial<span class="cuenta">3</span></div>
+      <div class="persona ocupada"><div class="retrato" style="background:#c0632b">AN</div><div class="persona-txt"><div class="persona-nombre">Ana</div><div class="persona-rol">Ventas y clientes</div></div><span class="estado-dot"></span></div>
+      <div class="persona ocupada"><div class="retrato" style="background:#7b5bb5">BR</div><div class="persona-txt"><div class="persona-nombre">Bruno</div><div class="persona-rol">Leyendo informe-octubre.md</div></div><span class="estado-dot"></span></div>
+      <div class="persona ocupada"><div class="retrato" style="background:#2f7f8f">CA</div><div class="persona-txt"><div class="persona-nombre">Caro</div><div class="persona-rol">Buscando…</div></div><span class="estado-dot"></span></div>
+      <div class="grupo-tit"><span class="punto" style="background:#3b7a4b"></span>Operaciones<span class="cuenta">2</span></div>
+      <div class="persona reunida"><div class="retrato" style="background:#3b7a4b">DA</div><div class="persona-txt"><div class="persona-nombre">Dani</div><div class="persona-rol">Pensando…</div></div><span class="estado-dot"></span></div>
+      <div class="persona"><div class="retrato" style="background:#8a8378">EZ</div><div class="persona-txt"><div class="persona-nombre">Eze</div><div class="persona-rol">Compras y proveedores</div></div><span class="estado-dot"></span></div>
+    </div>
+  </section>
+
+  <!-- A -->
+  <section class="col">
+    <span class="tag">BOCETO A</span>
+    <h2>Un renglón: de qué es y qué paso</h2>
+    <p class="que">El renglón sigue siendo uno (la lista no cambia de alto). Primero de qué es, en negrita; después el paso. El detalle va en el globo.</p>
+    <div class="lateral con-globo">
+      <div class="grupo-tit"><span class="punto" style="background:#c0632b"></span>Comercial<span class="cuenta">3</span></div>
+      <div class="persona ocupada"><div class="retrato" style="background:#c0632b">AN</div><div class="persona-txt"><div class="persona-nombre">Ana</div><div class="persona-rol esperando">Respondiéndote…</div></div><span class="estado-dot"></span></div>
+      <div class="persona ocupada"><div class="retrato" style="background:#7b5bb5">BR</div><div class="persona-txt"><div class="persona-nombre">Bruno</div><div class="persona-rol vivo"><b>Parte semanal</b><span class="sep">·</span>Leyendo informe-octubre.md</div></div><span class="estado-dot"></span></div>
+      <div class="persona ocupada"><div class="retrato" style="background:#2f7f8f">CA</div><div class="persona-txt"><div class="persona-nombre">Caro</div><div class="persona-rol vivo"><b>Consulta de Ana</b><span class="sep">·</span>Buscando…</div></div><span class="estado-dot"></span></div>
+      <div class="grupo-tit"><span class="punto" style="background:#3b7a4b"></span>Operaciones<span class="cuenta">2</span></div>
+      <div class="persona reunida"><div class="retrato" style="background:#3b7a4b">DA</div><div class="persona-txt"><div class="persona-nombre">Dani</div><div class="persona-rol vivo"><b>Reunión: precios 2027</b><span class="sep">·</span>Pensando…</div></div><span class="estado-dot"></span>
+        <div class="globo">
+          <div class="g-tit">Reunión: precios 2027</div>
+          <div class="g-fila"><span>Ahora</span><span>Pensando su turno</span></div>
+          <div class="g-fila"><span>Con</span><span>vos</span></div>
+          <div class="g-fila"><span>Empezó</span><span>hace 14 min</span></div>
+          <div class="g-mas">Tocá para ir a la reunión</div>
+        </div>
+      </div>
+      <div class="persona"><div class="retrato" style="background:#8a8378">EZ</div><div class="persona-txt"><div class="persona-nombre">Eze</div><div class="persona-rol">Compras y proveedores</div></div><span class="estado-dot"></span></div>
+    </div>
+    <ul class="notas">
+      <li>Si el título es largo, se corta el paso, no lo de negrita.</li>
+      <li>Ana muestra «Respondiéndote…» apenas le escribís, sin esperar al backend.</li>
+    </ul>
+  </section>
+
+  <!-- B -->
+  <section class="col">
+    <span class="tag">BOCETO B</span>
+    <h2>Dos renglones mientras trabaja</h2>
+    <p class="que">Solo mientras trabaja, la fila suma un renglón: arriba de dónde viene (con ícono), abajo el paso y cuánto lleva. Se lee sin pasar el mouse.</p>
+    <div class="lateral">
+      <div class="grupo-tit"><span class="punto" style="background:#c0632b"></span>Comercial<span class="cuenta">3</span></div>
+      <div class="persona ocupada"><div class="retrato" style="background:#c0632b">AN</div><div class="persona-txt"><div class="persona-nombre">Ana</div>
+        <div class="origen"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg>Charla con vos</div>
+        <div class="paso esperando">Respondiéndote…</div></div><span class="estado-dot"></span></div>
+      <div class="persona ocupada"><div class="retrato" style="background:#7b5bb5">BR</div><div class="persona-txt"><div class="persona-nombre">Bruno</div>
+        <div class="origen"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3l2 1.5"/></svg>Tarea · Parte semanal</div>
+        <div class="paso"><span class="txt">Leyendo informe-octubre.md</span><span class="seg">2 min</span></div></div><span class="estado-dot"></span></div>
+      <div class="persona ocupada"><div class="retrato" style="background:#2f7f8f">CA</div><div class="persona-txt"><div class="persona-nombre">Caro</div>
+        <div class="origen"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 6.2a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.5"/><circle cx="8" cy="11.6" r=".4" fill="currentColor"/><circle cx="8" cy="8" r="6"/></svg>Consulta de Ana</div>
+        <div class="paso"><span class="txt">Buscando…</span><span class="seg">25 s</span></div></div><span class="estado-dot"></span></div>
+      <div class="grupo-tit"><span class="punto" style="background:#3b7a4b"></span>Operaciones<span class="cuenta">2</span></div>
+      <div class="persona reunida"><div class="retrato" style="background:#3b7a4b">DA</div><div class="persona-txt"><div class="persona-nombre">Dani</div>
+        <div class="origen"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="5.5" cy="6" r="2"/><circle cx="10.5" cy="6" r="2"/><path d="M2 13c.5-2 2-3 3.5-3s3 1 3.5 3M7 13c.5-2 2-3 3.5-3s3 1 3.5 3"/></svg>Reunión · precios 2027</div>
+        <div class="paso"><span class="txt">Pensando…</span><span class="seg">1 min</span></div></div><span class="estado-dot"></span></div>
+      <div class="persona"><div class="retrato" style="background:#8a8378">EZ</div><div class="persona-txt"><div class="persona-nombre">Eze</div><div class="persona-rol">Compras y proveedores</div></div><span class="estado-dot"></span></div>
+    </div>
+    <ul class="notas">
+      <li>La lista se mueve un poco cuando alguien empieza o termina (la fila crece y se achica).</li>
+      <li>No necesita globo: todo está a la vista.</li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>
