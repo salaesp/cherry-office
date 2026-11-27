@@ -1430,9 +1430,7 @@ textarea.campo.skill-contenido { font-family: ui-monospace, SFMono-Regular, Menl
   .hoja-cab { height: 48px; }
   .hoja-cab .btn.icono { width: 40px; height: 40px; }
   .hoja-cab .btn.icono svg { width: 18px; height: 18px; }
-  /* las pantallas de lectura (Tareas, Flujos, la Carpeta) con margen a los costados */
-  .app.en-seccion .derecho[data-modo="tareas"] .der-cuerpo,
-  .app.en-seccion .derecho[data-modo="flujos"] .der-cuerpo { padding-left: 14px; padding-right: 14px; }
+  /* la Carpeta con margen a los costados (Tareas y Flujos ya lo tienen: .der-cuerpo > .seccion-ui) */
   .carpeta-panel { margin-left: 12px; margin-right: 12px; }
   /* objetivos táctiles: fichitas de elegir y filtrar, la casilla «Activa», las filas de la carpeta y los menús */
   .chip, .rev-pestana { min-height: 34px; height: auto; }
