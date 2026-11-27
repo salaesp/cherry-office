@@ -1,6 +1,8 @@
 /* Tarjetas de lo que hizo un agente en una charla (docs/plan-recados.md, U2 y U3): pasarle trabajo a un colega (con unos
    segundos para deshacer, o como propuesta), preguntarle algo a la persona con opciones, o proponer una acción (evento,
    mail). Se ven debajo de la respuesta en la charla y, lo que espera a la persona, en Bandeja › Hoy («Te esperan»).
+   También arrancar un flujo (arrancar_flujo) y los cambios en la oficina que propone un agente (proponer_tarea, y la
+   secretaría todo lo del Creador; docs/plan-secretaria-creadora.md).
    Usa POST /api/charlas/tarjetas/<id>; elegir una opción manda «Elijo: …» en esa charla (App.Agente.enviarEn). */
 window.App = window.App || {};
 App.Tarjetas = (function () {
@@ -91,7 +93,27 @@ App.Tarjetas = (function () {
       [h('div.tj-tit', ac.resumen), App.Propuestas ? App.Propuestas.tarjeta(ac) : null], bs);
   }
 
-  function de(t, op) { return t.tipo === 'pregunta' ? pregunta(t, op) : delegacion(t, op); }
+  /* arrancar un flujo de la oficina (arrancar_flujo): como una delegación, con ventana para deshacer o como propuesta */
+  var EST_FLUJO = { propuesta: 'Te espera', esperando: '', arrancado: 'Arrancó', fallida: 'Falló', cancelada: 'Cancelado' };
+  function flujo(t, op) {
+    op = op || {};
+    var fl = '«' + (t.flujoNombre || t.flujo) + '»';
+    var cab = op.enBandeja ? nombre(t.agente) + ' te propone arrancar ' + fl
+      : t.estado === 'propuesta' ? '¿Arranco ' + fl + '?' : t.estado === 'cancelada' ? 'No arrancó ' + fl : t.estado === 'fallida' ? 'No pudo arrancar ' + fl : 'Flujo ' + fl;
+    var estado = t.estado === 'esperando' ? h('span', { 'data-empieza': t.empieza || 0 }, 'Empieza en…') : EST_FLUJO[t.estado] || t.estado;
+    var cuerpo = [h('div.tj-tit', t.nombre)];
+    if (t.contexto) cuerpo.push(h('details.tj-consigna', h('summary', 'Con qué arranca'), h('div', t.contexto)));
+    if (t.estado === 'fallida' && t.error) cuerpo.push(h('div.tj-nota.error', t.error));
+    var bs = [];
+    if (op.enBandeja) bs.push(enlaceCharla(t));
+    if (t.estado === 'propuesta') bs.push(boton('Descartar', 'fantasma', function () { return decidir(t, 'descartar', undefined, op.alCambiar); }), boton('Arrancarlo', 'primario', function () { return decidir(t, 'confirmar', undefined, op.alCambiar); }));
+    if (t.estado === 'esperando') bs.push(boton('Deshacer', '', function () { return decidir(t, 'cancelar', undefined, op.alCambiar); }), boton('Arrancar ya', 'primario', function () { return decidir(t, 'ya', undefined, op.alCambiar); }));
+    if (t.estado === 'arrancado' && t.corrida && App.Flujos && App.Flujos.verCorrida) bs.push(boton('Ver el flujo', '', function () { App.Flujos.verCorrida(t.corrida); }));
+    if (t.estado === 'esperando') vigilarReloj();
+    return caja('flujo' + (t.estado === 'cancelada' ? '.apagada' : ''), 'flujo', cab, estado, cuerpo, bs);
+  }
+
+  function de(t, op) { return t.tipo === 'pregunta' ? pregunta(t, op) : t.tipo === 'flujo' ? flujo(t, op) : delegacion(t, op); }
 
   /* ---- cambios en la oficina que propuso la secretaría (docs/plan-secretaria-creadora.md) ----
      Son tarjetas del Creador: hasta 3 y sin nada en borrador se ven enteras (datos clave y la cita); si son más o a alguna le
@@ -137,7 +159,12 @@ App.Tarjetas = (function () {
     var listas = vivas.filter(function (t) { return t.estado === 'lista'; });
     var borr = vivas.filter(function (t) { return t.estado === 'borrador'; });
     var compacto = vivas.length > MAX_ENTERAS || borr.length > 0;
-    var cab = op.enBandeja ? nombre(op.agente) + ' te propone cambios en la oficina'
+    /* los demás agentes solo proponen tareas programadas: la cabecera lo dice así */
+    var soloTareas = vivas.every(function (t) { return t.tipo === 'tarea'; });
+    var cab = soloTareas
+      ? (op.enBandeja ? nombre(op.agente) + (vivas.length === 1 ? ' te propone una tarea programada' : ' te propone tareas programadas')
+        : vivas.length === 1 ? 'Tarea programada' : 'Tareas programadas · ' + vivas.length)
+      : op.enBandeja ? nombre(op.agente) + ' te propone cambios en la oficina'
       : vivas.length === 1 ? 'Propuesta para la oficina' : 'Propuestas para la oficina · ' + vivas.length;
     var estado = !pend.length ? (vivas.every(function (t) { return t.estado === 'creada'; }) ? 'Creado' : '')
       : borr.length ? (borr.length === 1 ? '1 con dudas' : borr.length + ' con dudas') : 'Te espera';
@@ -174,5 +201,5 @@ App.Tarjetas = (function () {
     return caja('cambio' + (pend.length ? '' : '.apagada'), 'chispa', cab, estado, cuerpo, bs);
   }
 
-  return { delegacion: delegacion, pregunta: pregunta, accion: accion, de: de, cambios: cambios };
+  return { delegacion: delegacion, pregunta: pregunta, accion: accion, flujo: flujo, de: de, cambios: cambios };
 })();

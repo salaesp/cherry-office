@@ -1,14 +1,14 @@
-// La secretaría arma la oficina (secretaria-creadora.ts, docs/plan-secretaria-creadora.md): quien atiende la secretaría tiene
-// las herramientas del Creador solo mientras le responde a la persona en una charla; sus tarjetas van debajo de la respuesta,
+// Cambios en la oficina desde la charla (secretaria-creadora.ts, docs/plan-secretaria-creadora.md): quien atiende la secretaría
+// tiene las herramientas del Creador, y los demás agentes solo proponer tareas, mientras le responden a la persona en una charla; sus tarjetas van debajo de la respuesta,
 // en lo que espera a la persona y en el borrador del Creador, y se aplican con /api/creador/aplicar. Sin red: el claude falso
 // responde y, cuando el mensaje lleva MCP_LLAMAR, hace las llamadas que se le dejan.
 import { describe, expect, test } from 'vitest'
 import { mcpDe } from '../../src/consultas.js'
 import { delegacionesDe } from '../../src/delegar.js'
 import { OficinaStore } from '../../src/oficina.js'
-import { HerramientasMCPAgente, SecretariaCreadora } from '../../src/permisos.js'
+import { CambiosCharla, HerramientasMCPAgente } from '../../src/permisos.js'
 import { Creador } from '../../src/creador.js'
-import { herramientasSecretariaCreadora, instruccionesCreadora } from '../../src/secretaria-creadora.js'
+import { herramientasCambiosCharla, instruccionesCreadora } from '../../src/secretaria-creadora.js'
 import { Sandbox } from '../support/sandbox.js'
 import { arrancar, llamar, oficina } from '../support/en-proceso.js'
 
@@ -96,30 +96,51 @@ describe('armar la oficina desde la charla', () => {
     expect((await tarjetas()).cambios).toEqual([])
   })
 
-  test('otro agente no puede proponer, ni en su charla', async () => {
-    const { sb, chat, tarjetas } = await preparar()
-    sb.llamadasMCP('nico', [agente])
+  test('otro agente no puede contratar, pero sí proponer una tarea en su charla', async () => {
+    const { sb, b, carpeta, chat, tarjetas } = await preparar()
+    const tareaNico = { name: 'proponer_tarea', arguments: { accion: 'crear', origen: 'todos los lunes mire los mails de proveedores',
+      datos: { agente: 'nico', nombre: 'Lista de pagos', consigna: 'Armá la lista de pagos de la semana.', dias: [1], hora: '09:00' } } }
+    sb.llamadasMCP('nico', [agente, tareaNico])
     await chat('MCP_LLAMAR ' + pedido, { agent: 'nico' })
     const s = sb.salidasMCP('nico') as any[]
     expect(s[0]?.result?.isError ?? s[0]?.error).toBeTruthy()
-    expect((await tarjetas()).cambios).toEqual([])
+    expect(s[1].result.isError ?? false).toBe(false)
+    const c = (await tarjetas()).cambios
+    expect(c.map((t: any) => [t.tipo, t.estado, t.turno])).toEqual([['tarea', 'lista', 1]])
+    expect((await llamar(b, 'GET', '/api/charlas/pendientes')).obj.cambios[0]).toMatchObject({ agente: 'nico', session: S1 })
+    expect((await llamar(b, 'POST', '/api/creador/aplicar', { ids: [c[0].id] })).obj.resultados[0].ok).toBe(true)
+    expect(OficinaStore.leer(carpeta).tareas?.find((t) => t.nombre === 'Lista de pagos')).toMatchObject({ agente: 'nico', dias: [1] })
+  })
+
+  test('desde una charla solo se tocan las tarjetas de esa charla', async () => {
+    const { sb, chat, tarjetas } = await preparar()
+    sb.llamadasMCP('sofia', [agente])
+    await chat('MCP_LLAMAR ' + pedido)
+    sb.llamadasMCP('sofia', [{ name: 'descartar_tarjeta', arguments: { id: 't1' } },
+      { name: 'marcar_faltante', arguments: { ref: 't1', campo: 'rol', pregunta: '¿Qué rol?' } },
+      { ...agente, arguments: { ...agente.arguments, ref: 't1' } }])
+    await chat('MCP_LLAMAR ' + pedido, { session: S2 })
+    const s = (sb.salidasMCP('sofia') as any[]).slice(-3)
+    expect(s.every((x) => x.result.isError)).toBe(true)
+    expect(s[0].result.content[0].text).toContain('no es de esta charla')
+    expect((await tarjetas()).cambios[0]).toMatchObject({ id: 't1', estado: 'lista' })
   })
 })
 
 describe('cuándo existen las herramientas', () => {
-  test('solo para quien atiende la secretaría, mientras le responde a la persona en esa charla', async () => {
+  test('todas para la secretaría y solo tareas para los demás, mientras le responden a la persona en esa charla', async () => {
     const { b, carpeta } = await preparar()
     const s = b.servicios
     const d = delegacionesDe(s)!
     const id = (agente: string, sid = S1) => ({ oficina: carpeta, agente, sid, perfil: 'agente', interactivo: true })
-    expect(herramientasSecretariaCreadora(s, 't', id('sofia'))).toBeUndefined()   // revisión, reporte, tarea: sin la persona
+    expect(herramientasCambiosCharla(s, 't', id('sofia'))).toBeUndefined()   // revisión, reporte, tarea: sin la persona
     d.empezarCharla(carpeta, 'sofia', S1)
     d.empezarCharla(carpeta, 'nico', S1)
-    expect(herramientasSecretariaCreadora(s, 't', id('sofia'))?.definiciones.map((x) => x.name)).toEqual(Creador.nombresCortos)
-    expect(herramientasSecretariaCreadora(s, 't', id('sofia', S2))).toBeUndefined()
-    expect(herramientasSecretariaCreadora(s, 't', id('nico'))).toBeUndefined()
+    expect(herramientasCambiosCharla(s, 't', id('sofia'))?.definiciones.map((x: any) => x.name)).toEqual(Creador.nombresCortos)
+    expect(herramientasCambiosCharla(s, 't', id('sofia', S2))).toBeUndefined()
+    expect(herramientasCambiosCharla(s, 't', id('nico'))?.definiciones.map((x) => x.name)).toEqual(CambiosCharla.nombresTodos)
     d.terminarCharla(carpeta, 'sofia', S1)
-    expect(herramientasSecretariaCreadora(s, 't', id('sofia'))).toBeUndefined()
+    expect(herramientasCambiosCharla(s, 't', id('sofia'))).toBeUndefined()
   })
 
   test('el servidor MCP las compone con las de hq solo en la charla', async () => {
@@ -134,17 +155,19 @@ describe('cuándo existen las herramientas', () => {
     expect(new Set(nombres).size).toBe(nombres.length)   // sin nombres repetidos
   })
 
-  test('los nombres permitidos son los del Creador, y solo para la secretaría', async () => {
+  test('los nombres permitidos: los del Creador para la secretaría, los de tareas para los demás', async () => {
     const { b, carpeta } = await preparar()
-    expect(SecretariaCreadora.nombresMCP).toEqual(Creador.nombresCortos)
+    expect(CambiosCharla.nombresSecretaria).toEqual(Creador.nombresCortos)
+    expect(CambiosCharla.nombresTodos.every((n) => Creador.nombresCortos.includes(n))).toBe(true)
     const o = OficinaStore.leer(carpeta)
     const sofia = o.agentes.find((a) => a.id === 'sofia')!, nico = o.agentes.find((a) => a.id === 'nico')!
     expect(HerramientasMCPAgente.lista(o, sofia)).toEqual(expect.arrayContaining(Creador.nombresMCP))
     expect(HerramientasMCPAgente.lista(o, nico)).not.toContain('mcp__hq__proponer_agente')
+    expect(HerramientasMCPAgente.lista(o, nico)).toContain('mcp__hq__proponer_tarea')
     void b
   })
 
-  test('las instrucciones van en la charla de la secretaría y no en la de otro', async () => {
+  test('la secretaría recibe las de armar la oficina; los demás, las de tareas', async () => {
     const { sb, chat, b, carpeta } = await preparar()
     await chat('hola')
     let l = sb.llamadas.at(-1)!
@@ -153,6 +176,7 @@ describe('cuándo existen las herramientas', () => {
     await chat('hola', { agent: 'nico', session: S2 })
     l = sb.llamadas.at(-1)!
     expect(l[l.indexOf('--append-system-prompt') + 1]).not.toContain('## Armar la oficina')
+    expect(l[l.indexOf('--append-system-prompt') + 1]).toContain('## Tareas programadas')
     const o = OficinaStore.leer(carpeta)
     expect(instruccionesCreadora(o, o.agentes.find((a) => a.id === 'sofia')!)).toContain('te lo pide')
     void b

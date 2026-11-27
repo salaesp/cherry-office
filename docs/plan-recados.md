@@ -304,7 +304,8 @@ Lo planeado:
 - Tema de memoria por delegación abierta.
 
 ### R1b: flujos
-- `arrancar_flujo` (ahora), con `origen: {recado}` en la corrida.
+- `arrancar_flujo` (hecho, `docs/plan-secretaria-creadora.md` S5): en la charla con la persona, para todos los agentes, con las
+  reglas de `delegar` (explícito → ventana para deshacer; deducido → propuesta). La corrida todavía no lleva `origen`.
 - Aviso de paso con aprobación o paso tuyo, con botones; `aprobar_paso`, `pedir_cambios` y `paso_hecho` en el hilo.
 - Estado de corridas para «¿cómo va…?» y aviso al terminar o al trabarse.
 - Ajuste: avisar por recados solo de las corridas que nacieron de un recado (por defecto) o de todas.

@@ -5,7 +5,7 @@ import { HerramientasCoordinador, herramientasCoordinador, maxRespuesta, respues
 import { mcpDe } from '../../src/consultas.js'
 import { corridasDe } from '../../src/parte.js'
 import type { MCPHerramientas } from '../../src/mcp-protocolo.js'
-import { Coordinador, Dependencias, HerramientasMCPAgente, Seguimiento, contexto, herramientaProponerSkill, herramientasDelegar, herramientasMCP } from '../../src/permisos.js'
+import { CambiosCharla, Coordinador, Dependencias, HerramientasMCPAgente, Seguimiento, contexto, herramientaProponerSkill, herramientasDelegar, herramientasMCP } from '../../src/permisos.js'
 import { OficinaStore, type AgenteDef, type Oficina } from '../../src/oficina.js'
 import { Sandbox, U, esperar } from '../support/sandbox.js'
 import { arrancar, oficina } from '../support/en-proceso.js'
@@ -37,8 +37,8 @@ describe('Coordinador', () => {
     expect(Coordinador.perfil(o, coordi)).toBe('coordinador')
     expect(Coordinador.herramientasMCP(o, marce)).toEqual([])
     expect(Coordinador.herramientasMCP(o, coordi)).toEqual(['mcp__hq__estado_oficina', 'mcp__hq__entregas', 'mcp__hq__corridas', 'mcp__hq__bloqueos'])
-    expect(HerramientasMCPAgente.lista(o, coordi)).toEqual([...herramientasMCP, ...herramientasDelegar, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, coordi), ...Seguimiento.herramientasMCP(o, coordi), herramientaProponerSkill])
-    expect(HerramientasMCPAgente.lista(o, marce)).toEqual([...herramientasMCP, ...herramientasDelegar, ...Dependencias.herramientasMCP(), ...Seguimiento.herramientasMCP(o, marce), herramientaProponerSkill])
+    expect(HerramientasMCPAgente.lista(o, coordi)).toEqual([...herramientasMCP, ...herramientasDelegar, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, coordi), ...Seguimiento.herramientasMCP(o, coordi), ...CambiosCharla.herramientasMCP(o, coordi), herramientaProponerSkill])
+    expect(HerramientasMCPAgente.lista(o, marce)).toEqual([...herramientasMCP, ...herramientasDelegar, ...Dependencias.herramientasMCP(), ...Seguimiento.herramientasMCP(o, marce), ...CambiosCharla.herramientasMCP(o, marce), herramientaProponerSkill])
   })
 
   test('el perfil agente no ve las herramientas del coordinador, ni siquiera llamándolas por nombre', async () => {

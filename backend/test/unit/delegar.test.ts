@@ -9,6 +9,7 @@ import { accionesDe } from '../../src/acciones.js'
 import { audioDe, leerWav } from '../../src/audio.js'
 import { mcpDe } from '../../src/consultas.js'
 import { Delegaciones, delegacionesDe, herramientasDelegar, instruccionesCharla, leerCuando } from '../../src/delegar.js'
+import { motorDe } from '../../src/flujos.js'
 import { OficinaStore, type Oficina } from '../../src/oficina.js'
 import { Sandbox, esperar } from '../support/sandbox.js'
 import { arrancar, llamar, oficina } from '../support/en-proceso.js'
@@ -219,7 +220,7 @@ describe('cuándo existen las herramientas', () => {
     expect(herramientasDelegar(s, 't', id('coordi', 'coordinador'))?.definiciones.map((x) => x.name)).toEqual(['delegar'])
     expect(herramientasDelegar(s, 't', id('coordi', 'coordinador', true))).toBeUndefined()
     d.empezarCharla(carpeta, 'marce', S1)
-    expect(herramientasDelegar(s, 't', id('marce', 'agente', true))?.definiciones.map((x) => x.name)).toEqual(['delegar', 'preguntar'])
+    expect(herramientasDelegar(s, 't', id('marce', 'agente', true))?.definiciones.map((x) => x.name)).toEqual(['delegar', 'arrancar_flujo', 'preguntar'])
     expect(herramientasDelegar(s, 't', { ...id('marce', 'agente', true), sid: S2 })).toBeUndefined()
     expect(herramientasDelegar(s, 't', id('nico', 'agente', true))).toBeUndefined()
     d.terminarCharla(carpeta, 'marce', S1)
@@ -279,5 +280,97 @@ describe('audio', () => {
     expect(f.obj.error).toContain('sin motor')
     a.transcribir = async () => '   '
     expect((await post(wav(1))).status).toBe(422)
+  })
+})
+
+describe('arrancar un flujo desde la charla', () => {
+  /** Un flujo «Alta de cliente» que arranca con un paso de la persona (así la corrida no lanza a ningún agente). */
+  async function conFlujo(activo = true) {
+    const x = await preparar()
+    const f = await llamar(x.b, 'POST', '/api/flujos', { nombre: 'Alta de cliente', descripcion: 'Incorporar un cliente nuevo', activo, pasos: [
+      { nombre: 'Firmar el contrato', quien: 'persona', entrega: 'Contrato firmado' },
+      { nombre: 'Bienvenida', quien: 'nico', entrega: 'Mail de bienvenida' },
+    ] })
+    expect(f.status, JSON.stringify(f.obj)).toBe(200)
+    return { ...x, flujo: String(f.obj.flujo.id) }
+  }
+  const contexto = 'Cliente: Prospera. Contacto: Laura Gómez (laura@prospera.com). Arrancan en enero con 3 licencias.'
+
+  test('pedido explícito: espera la ventana y arranca la corrida con su contexto', async () => {
+    Delegaciones.ventana = 0
+    const { sb, b, carpeta, chat, tarjetas, flujo } = await conFlujo()
+    sb.llamadasMCP('marce', [{ name: 'arrancar_flujo', arguments: { flujo: 'Alta de cliente', nombre: 'Alta Prospera', contexto, explicito: true } }])
+    await chat('MCP_LLAMAR arrancá el alta de cliente para Prospera')
+    const out = JSON.parse((sb.salidasMCP('marce')[0] as any).result.content[0].text)
+    expect(out).toMatchObject({ ok: true, flujo, estado: 'esperando' })
+    expect(await esperar(async () => (await tarjetas()).tarjetas[0]?.estado === 'arrancado', 20)).toBe(true)
+    const t = (await tarjetas()).tarjetas[0]
+    expect(t).toMatchObject({ tipo: 'flujo', agente: 'marce', turno: 1, flujo, flujoNombre: 'Alta de cliente', nombre: 'Alta Prospera', contexto })
+    const c = motorDe(b.servicios)!.store.corrida(carpeta, t.corrida)!
+    expect(c).toMatchObject({ flujo, nombre: 'Alta Prospera' })
+    expect(c.contexto).toContain('Laura Gómez')
+  })
+
+  test('deducido: queda como propuesta (y en lo que te espera) hasta que se confirma; descartar la cierra', async () => {
+    Delegaciones.ventana = 0
+    const { sb, b, chat, tarjetas, decidir } = await conFlujo()
+    sb.llamadasMCP('marce', [
+      { name: 'arrancar_flujo', arguments: { flujo: 'alta-de-cliente', nombre: 'Alta Prospera', contexto, explicito: false } },
+      { name: 'arrancar_flujo', arguments: { flujo: 'alta-de-cliente', nombre: 'Alta Norte', contexto, explicito: false } },
+    ])
+    await chat('MCP_LLAMAR sumamos a Prospera y a Norte como clientes')
+    const [t1, t2] = (await tarjetas()).tarjetas
+    expect([t1.estado, t2.estado]).toEqual(['propuesta', 'propuesta'])
+    expect((await llamar(b, 'GET', '/api/charlas/pendientes')).obj.tarjetas).toHaveLength(2)
+    expect((await llamar(b, 'GET', '/api/actividad')).obj.teEsperan).toBe(2)
+    expect((await decidir(t1.id, 'confirmar')).status).toBe(200)
+    expect((await tarjetas()).tarjetas[0].estado).toBe('arrancado')
+    expect((await decidir(t2.id, 'descartar')).status).toBe(200)
+    expect((await tarjetas()).tarjetas[1].estado).toBe('cancelada')
+    expect((await decidir(t1.id, 'cancelar')).status).toBe(409)
+    expect((await llamar(b, 'GET', '/api/actividad')).obj.teEsperan).toBe(0)
+  })
+
+  test('dentro de la ventana se puede deshacer y la corrida nunca arranca', async () => {
+    Delegaciones.ventana = 300
+    const { sb, b, carpeta, chat, tarjetas, decidir } = await conFlujo()
+    sb.llamadasMCP('marce', [{ name: 'arrancar_flujo', arguments: { flujo: 'Alta de cliente', nombre: 'Alta Prospera', contexto, explicito: true } }])
+    await chat('MCP_LLAMAR arrancá el alta de cliente')
+    const t = (await tarjetas()).tarjetas[0]
+    expect(t.estado).toBe('esperando')
+    expect((await decidir(t.id, 'cancelar')).status).toBe(200)
+    expect((await tarjetas()).tarjetas[0].estado).toBe('cancelada')
+    expect(motorDe(b.servicios)!.store.corridas(carpeta)).toHaveLength(0)
+  })
+
+  test('errores: flujo que no está, pausado, sin «explicito» y más de 2 por mensaje', async () => {
+    Delegaciones.ventana = 300
+    const { sb, chat, tarjetas, b } = await conFlujo()
+    await llamar(b, 'POST', '/api/flujos', { nombre: 'Cierre de mes', activo: false, pasos: [{ nombre: 'Cerrar', quien: 'persona', entrega: 'Cierre' }] })
+    const f = (args: Record<string, unknown>) => ({ name: 'arrancar_flujo', arguments: { flujo: 'Alta de cliente', nombre: 'X', contexto, explicito: true, ...args } })
+    sb.llamadasMCP('marce', [f({ flujo: 'nada' }), f({ flujo: 'Cierre de mes' }), f({ explicito: undefined }), f({}), f({}), f({})])
+    await chat('MCP_LLAMAR muchos flujos')
+    const textos = (sb.salidasMCP('marce') as any[]).map((x) => [x.result.isError ?? false, x.result.content[0].text as string])
+    expect(textos[0]).toEqual([true, expect.stringContaining('No hay un flujo «nada»')])
+    expect(textos[1]).toEqual([true, expect.stringContaining('pausado')])
+    expect(textos[2]).toEqual([true, expect.stringContaining('explicito')])
+    expect(textos[3]![0]).toBe(false)
+    expect(textos[4]![0]).toBe(false)
+    expect(textos[5]).toEqual([true, expect.stringContaining('Ya arrancaste 2')])
+    expect((await tarjetas()).tarjetas).toHaveLength(2)
+  })
+
+  test('las instrucciones listan los flujos activos con su primer paso; sin flujos no hablan de arrancar_flujo', async () => {
+    const o: Oficina = { version: 1, nombre: 'O', duenio: 'Ana', departamentos: [], agentes: [
+      { id: 'marce', nombre: 'Marce', rol: 'Ventas', departamento: 'd' }, { id: 'nico', nombre: 'Nico', rol: 'Diseño', departamento: 'd' }] }
+    expect(instruccionesCharla(o, o.agentes[0]!)).not.toContain('arrancar_flujo')
+    const conFlujos: Oficina = { ...o, flujos: [
+      { id: 'alta', nombre: 'Alta de cliente', descripcion: 'Cliente nuevo', activo: true, pasos: [{ id: 'p1', nombre: 'Cargar datos', quien: 'nico', entrega: 'Ficha', aprobacion: false }] },
+      { id: 'cierre', nombre: 'Cierre', activo: false, pasos: [{ id: 'p1', nombre: 'Cerrar', quien: 'persona', entrega: 'x', aprobacion: false }] },
+    ] }
+    const t = instruccionesCharla(conFlujos, conFlujos.agentes[0]!)
+    expect(t).toContain('arrancar_flujo')
+    expect(t).toContain('- Alta de cliente (id alta): Cliente nuevo · arranca con «Cargar datos» (Nico)')
+    expect(t).not.toContain('(id cierre)')
   })
 })

@@ -1,14 +1,15 @@
 /* Tarjetas de lo que hizo un agente en una charla (tarjetas.js): delegación, pregunta y propuesta de acción, en la charla y
    en Bandeja › Hoy. Y la grabación de audio (grabadora.js) y el micrófono flotante de la secretaría (microfono.js). */
-:root { --tj-deleg: #a46a12; --tj-deleg-suave: #fbf2e2; --tj-cal: #2f6db5; --tj-cal-suave: #e8f0fa; --tj-crea: #2d7f86; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; --tj-crea: #6cc3ca; } }
-:root[data-theme="dark"] { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; --tj-crea: #6cc3ca; }
+:root { --tj-deleg: #a46a12; --tj-deleg-suave: #fbf2e2; --tj-cal: #2f6db5; --tj-cal-suave: #e8f0fa; --tj-crea: #2d7f86; --tj-flujo: #6b4fb3; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; --tj-crea: #6cc3ca; --tj-flujo: #b8a2f0; } }
+:root[data-theme="dark"] { --tj-deleg: #e0a84a; --tj-deleg-suave: #352a18; --tj-cal: #7fb0ea; --tj-cal-suave: #1f2b3a; --tj-crea: #6cc3ca; --tj-flujo: #b8a2f0; }
 
 .tj { background: var(--panel); border: 1px solid var(--linea); border-left: 3px solid var(--tj-tinta, var(--linea-fuerte)); border-radius: var(--radio); overflow: hidden; }
 .tj.deleg { --tj-tinta: var(--tj-deleg); --tj-tinta-suave: var(--tj-deleg-suave); }
 .tj.accion { --tj-tinta: var(--tj-cal); --tj-tinta-suave: var(--tj-cal-suave); }
 .tj.preg { --tj-tinta: var(--acento); }
 .tj.cambio { --tj-tinta: var(--tj-crea); }
+.tj.flujo { --tj-tinta: var(--tj-flujo); }
 .tj.apagada { opacity: .62; }
 .tj-cab { display: flex; align-items: center; gap: 6px; padding: 9px 12px 0; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--tj-tinta, var(--suave)); }
 .tj-cab svg { width: 14px; height: 14px; }
