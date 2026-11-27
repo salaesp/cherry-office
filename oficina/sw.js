@@ -2,7 +2,9 @@
    - la interfaz (index, ui/, vendor/, íconos) se pide siempre a la red primero y se guarda una copia solo como respaldo,
      así `actualizar.sh` o una versión nueva de la app de escritorio se ven al recargar, sin quedar pegado a JS viejo;
    - sin conexión, en vez del error del navegador, muestra la última copia o una pantalla que explica qué pasa.
-   /api/* no se toca nunca: va directo a la red. */
+   /api/* no se toca nunca: va directo a la red.
+   Además (fase 3) muestra los avisos push que manda la oficina (backend/src/push.ts) y, al tocarlos, abre la app en lo
+   que corresponde; un permiso se puede contestar desde el aviso (Permitir / No) donde el sistema muestra botones. */
 'use strict';
 var CACHE = 'oficina-ui-v1';
 
@@ -46,5 +48,40 @@ self.addEventListener('fetch', function (ev) {
       if (req.mode === 'navigate') return new Response(SIN_RED, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
       return Response.error();
     });
+  }));
+});
+
+/* ---------------- avisos push ---------------- */
+self.addEventListener('push', function (ev) {
+  var m = {};
+  try { m = ev.data ? ev.data.json() : {}; } catch (e) { m = { titulo: 'Oficina', texto: ev.data ? ev.data.text() : '' }; }
+  var op = {
+    body: m.texto || '', icon: 'iconos/icono-192.png', lang: 'es',
+    tag: m.tag || undefined, renotify: !!m.tag,
+    data: { url: m.url || '/?movil=1#/bandeja/hoy', permiso: m.permiso || null }
+  };
+  if (m.permiso && m.acciones) op.actions = [{ action: 'una_vez', title: 'Permitir' }, { action: 'rechazar', title: 'No' }];
+  ev.waitUntil(self.registration.showNotification(m.titulo || 'Oficina', op));
+});
+
+self.addEventListener('notificationclick', function (ev) {
+  var n = ev.notification, d = n.data || {};
+  n.close();
+  /* Permitir / No desde el aviso: se contesta sin abrir la app */
+  if (d.permiso && (ev.action === 'una_vez' || ev.action === 'rechazar')) {
+    ev.waitUntil(fetch('/api/permisos/' + encodeURIComponent(d.permiso), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: ev.action })
+    }).catch(function () {}));
+    return;
+  }
+  var url = new URL(d.url || '/?movil=1#/bandeja/hoy', self.location.origin).href;
+  ev.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (cs) {
+    for (var i = 0; i < cs.length; i++) {
+      if (new URL(cs[i].url).origin === self.location.origin && 'focus' in cs[i]) {
+        cs[i].postMessage({ tipo: 'ir', url: url });
+        return cs[i].focus();
+      }
+    }
+    return self.clients.openWindow(url);
   }));
 });

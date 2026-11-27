@@ -217,6 +217,9 @@ App.Parte = (function () {
     var vacio = !esperan.length && !accionesP.length && !(App.Permisos && App.Permisos.cuantos()) && !necesita.length && !entregas.length && !flujos.length && !esperas.length && !bloq.length && !prox.length && !narrado;
     var desde = p.desde ? App.hace(p.desde) : '';
     App.add(App.vaciar(der), cabecera('Lo que te espera y lo que pasó' + (desde ? (desde === 'recién' ? ' desde recién' : ' desde ' + desde) : '')), cuerpo, pie);
+    /* en el celular, una vez: instalar la app o prender los avisos (push.js) */
+    var tjPush = App.Push && App.Push.tarjeta ? App.Push.tarjeta(function () { cargar(false); }) : null;
+    if (tjPush) App.add(cuerpo, tjPush);
     /* primero lo urgente: los permisos que piden los agentes, con sus botones acá mismo */
     var perms = App.Permisos && App.Permisos.pendientes ? App.Permisos.pendientes() : [];
     if (perms.length) App.add(cuerpo, seccion('Te piden permiso', h('div.permisos-lista.en-hoy', perms.map(App.Permisos.tarjeta))));
@@ -239,7 +242,7 @@ App.Parte = (function () {
       App.add(cuerpo, h('div.nav-vacio', App.icono('ok'), h('b', 'Todo en orden'), h('p', 'No hay nada que te espere. Cuando un agente te entregue algo o te pida permiso, aparece acá.'),
         h('div.acciones', { style: { justifyContent: 'center' } },
           h('button.btn', { onclick: function (ev) { App.Nav.elegirAgente(ev.currentTarget, function (id) { App.Agente.nueva(id); }); } }, App.icono('charla'), 'Charlar con alguien'),
-          h('button.btn', { onclick: function () { App.Reunion.nueva(); } }, App.icono('reunion'), 'Llamar a reunión'))));
+          h('button.btn.solo-compu', { onclick: function () { App.Reunion.nueva(); } }, App.icono('reunion'), 'Llamar a reunión'))));
     } else {
       if (necesita.length) App.add(cuerpo, seccion('Te necesita', h('div.parte-filas', necesita.map(filaAviso))));
       if (entregas.length) {

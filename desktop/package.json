@@ -11,7 +11,6 @@
     "electron-builder": "^26.18.0",
     "electron-updater": "6.8.11",
     "esbuild": "^0.28.2",
-    "qrcode-generator": "2.0.4",
     "typescript": "^7.0.2"
   },
   "author": "Oficina",

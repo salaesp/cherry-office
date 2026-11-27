@@ -92,12 +92,13 @@ App.Flujos = (function () {
       if (fs === null) catalogo.appendChild(h('div.error-txt', 'No pude traer los flujos.'));
       else if (!fs.length) {
         catalogo.appendChild(App.vacio('flujo', 'Todavía no hay flujos', 'Un flujo pasa un trabajo de agente en agente, con tu aprobación donde haga falta.',
+          App.movil ? [h('span.ayuda', 'Los flujos se arman desde la compu.')] :
           [h('button.btn', { onclick: function () { App.Creador.abrir(); } }, App.icono('chispa'), 'Armar un flujo con el Creador'),
             h('button.btn.primario', { onclick: function () { editor(null); } }, App.icono('mas'), 'Crear uno')]));
       } else fs.forEach(function (f) { catalogo.appendChild(filaFlujo(f)); });
       App.add(App.vaciar(zona),
         App.seccion('En marcha', [h('div.entregas-filtros', chip('abiertas', 'En curso'), chip('terminadas', 'Terminadas'), chip('todas', 'Todas')), lista]),
-        App.seccion('Flujos de la oficina', catalogo, { accion: fs && fs.length ? h('button.btn.chico.fantasma', { onclick: function () { editor(null); } }, App.icono('mas'), 'Nuevo flujo') : null }));
+        App.seccion('Flujos de la oficina', catalogo, { accion: fs && fs.length && !App.movil ? h('button.btn.chico.fantasma', { onclick: function () { editor(null); } }, App.icono('mas'), 'Nuevo flujo') : null }));
     }).catch(function (e) { App.vaciar(zona).appendChild(h('div.error-txt', e.message)); });
   }
 
@@ -106,11 +107,12 @@ App.Flujos = (function () {
     var n = (f.pasos || []).length, activo = f.activo !== false;
     var txt = n + (n === 1 ? ' paso' : ' pasos') + (f.descripcion ? ' · ' + f.descripcion : '');
     return App.filaDecision({
-      marca: 'flujo', titulo: f.nombre, sub: txt, clase: 'flu-def', alTocar: function () { editor(f.id); },
+      /* en el celular los flujos solo se corren: editarlos es cosa de la compu */
+      marca: 'flujo', titulo: f.nombre, sub: txt, clase: 'flu-def', alTocar: function () { if (App.movil) { if (activo) nuevaCorrida(f.id); } else editor(f.id); },
       estado: activo ? null : h('span.insignia', 'Pausado'),
       principal: activo ? h('button.btn.chico.primario', { onclick: function () { nuevaCorrida(f.id); } }, 'Correr')
-        : h('button.btn.chico', { onclick: function () { editor(f.id); } }, 'Editar'),
-      mas: [{ texto: 'Editar…', icono: 'lapiz', accion: function () { editor(f.id); } }]
+        : App.movil ? null : h('button.btn.chico', { onclick: function () { editor(f.id); } }, 'Editar'),
+      mas: App.movil ? null : [{ texto: 'Editar…', icono: 'lapiz', accion: function () { editor(f.id); } }]
     });
   }
 

@@ -5,6 +5,7 @@
 import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
+import QRCode from 'qrcode'
 
 /** Dónde suele estar el comando `tailscale` en cada sistema (el primero que exista). */
 export function candidatos(plataforma: NodeJS.Platform, env: NodeJS.ProcessEnv = process.env): string[] {
@@ -87,4 +88,9 @@ export class Tailscale {
 
 function limpiar(s: string): string {
   return s.split('\n').map((x) => x.trim()).filter((x) => x !== '').slice(0, 4).join(' ').slice(0, 400)
+}
+
+/** QR (como <svg>) con la dirección para abrir la oficina en el celular. */
+export async function qrSvg(texto: string): Promise<string | undefined> {
+  try { return await QRCode.toString(texto, { type: 'svg', errorCorrectionLevel: 'M', margin: 2 }) } catch { return undefined }
 }

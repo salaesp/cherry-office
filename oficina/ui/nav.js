@@ -14,8 +14,14 @@ App.Nav = (function () {
   var h = function () { return App.h.apply(null, arguments); };
   var api = function () { return App.api; };
 
-  /* `movil`: en el celular la barra de abajo muestra solo estas; el resto va en «Más» */
-  var SECCIONES = [
+  /* `movil`: en el celular la barra de abajo muestra solo estas; el resto va en «Más».
+     En el modo celular (movil.js) no hay oficina pixel: la barra es Bandeja · Charlas · Trabajo y Archivos va en «Más». */
+  var SECCIONES = App.movil ? [
+    { id: 'bandeja', texto: 'Bandeja', icono: 'bandeja', ruta: '#/bandeja', movil: true },
+    { id: 'equipo', texto: 'Charlas', icono: 'charla', ruta: '#/equipo', movil: true },
+    { id: 'trabajo', texto: 'Trabajo', icono: 'reloj', ruta: '#/trabajo', movil: true },
+    { id: 'archivos', texto: 'Archivos', icono: 'carpeta', ruta: '#/archivos' }
+  ] : [
     { id: 'bandeja', texto: 'Bandeja', icono: 'bandeja', ruta: '#/bandeja', movil: true },
     { id: 'oficina', texto: 'Oficina', icono: 'edificio', ruta: '#/oficina' },
     { id: 'equipo', texto: 'Equipo', icono: 'personas', ruta: '#/equipo', movil: true },
@@ -82,6 +88,7 @@ App.Nav = (function () {
   }
   /* celular: lo que no entra en la barra de abajo */
   function menuMas(ancla) {
+    if (App.movil) return menuMasMovil(ancla);
     var items = SECCIONES.filter(function (s) { return !s.movil; }).map(function (s) {
       return { texto: s.texto, icono: s.icono, accion: function () { ir(s.id === 'oficina' ? s.ruta : rutaSeccion(s.id)); } };
     });
@@ -91,6 +98,25 @@ App.Nav = (function () {
       { texto: 'Cambiar de oficina…', icono: 'edificio', accion: function () { App.menuOficina(ancla); } });
     App.menu(ancla, items);
   }
+  /* modo celular: lo poco que no va en la barra; lo demás (contratar, departamentos, flujos, Creador, Ajustes) es de la compu */
+  function menuMasMovil(ancla) {
+    var items = [
+      { texto: 'Archivos', icono: 'carpeta', nota: 'solo leer', accion: function () { ir('#/archivos'); } },
+      { texto: 'Reuniones', icono: 'reunion', nota: 'solo leer', accion: function () { ir('#/equipo/reuniones'); } }];
+    if (App.Push && App.Push.itemMenu) { var p = App.Push.itemMenu(); if (p) items.push('-', p); }
+    items.push('-', { texto: 'Cambiar de oficina…', icono: 'edificio', accion: function () { App.menuOficina(ancla); } },
+      { titulo: 'Lo demás, en la compu' });
+    App.menu(ancla, items);
+  }
+  /* rutas que en el celular no se abren (pantallas de la compu): van a la Bandeja */
+  function deLaCompu(r) {
+    if (r.sec === 'oficina') return true;
+    if (r.sec === 'equipo' && ['departamentos', 'contratar', 'creador', 'nueva-reunion'].indexOf(r.a) >= 0) return true;
+    if (r.sec === 'equipo' && r.a && r.b && App.Agente.PESTANAS.indexOf(r.b) >= 0) return true;   // la ficha del agente
+    if (r.sec === 'trabajo' && r.a === 'flujos' && r.b === 'editar') return true;
+    return false;
+  }
+
   /* la última subsección que miraste de cada sección (Archivos › Biblioteca, Trabajo › Flujos…) */
   var ultimaSub = { bandeja: 'hoy', archivos: 'biblioteca', trabajo: 'tareas' };
   function rutaSeccion(id) {
@@ -158,7 +184,7 @@ App.Nav = (function () {
       archivos: ['carpeta', 'Archivos de la oficina', 'La carpeta de la oficina, la biblioteca y lo que sabe la oficina.'],
       trabajo: ['reloj', 'Lo que los agentes hacen solos', 'Tareas programadas y flujos que pasan de un agente a otro.']
     }[seccion] || ['edificio', '', ''];
-    var accion = seccion === 'equipo' && eqTab === 'reuniones' ? h('button.btn.primario', { onclick: function () { App.Reunion.nueva(); } }, App.icono('reunion'), 'Llamar a reunión')
+    var accion = App.movil ? null : seccion === 'equipo' && eqTab === 'reuniones' ? h('button.btn.primario', { onclick: function () { App.Reunion.nueva(); } }, App.icono('reunion'), 'Llamar a reunión')
       : seccion === 'equipo' ? h('button.btn.primario', { onclick: function () { App.Contratar.abrir(); } }, App.icono('mas'), 'Contratar un agente') : null;
     App.add(App.vaciar(der), esMovil() ? null : h('button.btn.fantasma.icono.nav-vacio-cerrar', { title: 'Cerrar', onclick: App.cerrarVentana }, App.icono('cerrar')),
       h('div.nav-vacio', App.icono(txt[0]), h('b', txt[1]), h('p', txt[2]), accion));
@@ -170,6 +196,9 @@ App.Nav = (function () {
     var r = leer(), m = App.modoDerecho();
     aplicando = true;
     try {
+      /* modo celular: sin oficina ni pantallas de la compu; la Bandeja abre directo en Hoy (que junta todo lo que espera) */
+      if (App.movil && deLaCompu(r)) { empujar('#/bandeja/hoy', true); r = leer(); }
+      if (App.movil && r.sec === 'bandeja' && !r.a) { empujar('#/bandeja/hoy', true); r = leer(); }
       /* rutas viejas: lo que esperaba tu revisión vivía en Archivos */
       if (r.sec === 'archivos' && r.a === 'revisar') { empujar('#/bandeja/revisar' + (r.b ? '/' + r.b : ''), true); r = leer(); }
       /* rutas viejas: Charlas ya no existe; las charlas y las reuniones viven en Equipo */
@@ -181,7 +210,7 @@ App.Nav = (function () {
         ponerSeccion('oficina');
         if (m) App.cerrarDerecho(true);
       } else if (r.sec === 'bandeja') {
-        if (!r.a && !esMovil()) { empujar('#/bandeja/hoy', true); r.a = 'hoy'; }   // en la compu, la Bandeja abre en Hoy
+        if (!r.a && (!esMovil() || App.movil)) { empujar('#/bandeja/hoy', true); r.a = 'hoy'; }   // en la compu (y en el modo celular), la Bandeja abre en Hoy
         ponerSeccion('bandeja', r.a === 'parte' ? 'hoy' : r.a);
         if (r.a === 'revisar') {
           var ab = m === 'entregables' ? App.Entregables.abierta() : undefined;
@@ -387,7 +416,7 @@ App.Nav = (function () {
     var items = [{ titulo: 'Charlar con' }];
     (App.E.oficina.agentes || []).forEach(function (a) { items.push({ texto: a.nombre, nota: a.rol, retrato: a, accion: function () { nuevaCharla(a.id); } }); });
     items.push('-');
-    items.push({ texto: 'Llamar a reunión…', icono: 'reunion', accion: function () { App.Reunion.nueva(); } });
+    if (!App.movil) items.push({ texto: 'Llamar a reunión…', icono: 'reunion', accion: function () { App.Reunion.nueva(); } });
     if ((App.E.oficina.agentes || []).length === 0) items = [{ texto: 'Contratar un agente…', icono: 'mas', accion: function () { ir('#/equipo/contratar'); } }];
     App.menu(ancla, items);
   }
@@ -425,8 +454,8 @@ App.Nav = (function () {
       var nDeps = (App.E.oficina.departamentos || []).length;
       var grupoOficina = h('div.lista-grupo', 'La oficina', h('span.cuenta', nDeps + ' ' + (nDeps === 1 ? 'departamento' : 'departamentos')),
         h('button.btn.icono.chico', { title: 'Nuevo departamento', 'aria-label': 'Nuevo departamento', onclick: function () { App.Departamentos.agregar(); } }, App.icono('mas')));
-      App.add(cuerpo, App.dom.equipo, grupoOficina,
-        filtroFila('capas', 'Departamentos', sub === 'departamentos', function () { ir('#/equipo/departamentos'); }));
+      App.add(cuerpo, App.dom.equipo, App.movil ? null : grupoOficina,
+        App.movil ? null : filtroFila('capas', 'Departamentos', sub === 'departamentos', function () { ir('#/equipo/departamentos'); }));
       /* filtrar a la gente sin rearmar la lista (las filas las pinta app.js) */
       App.dom.equipo.querySelectorAll('.persona[data-id]').forEach(function (el) {
         var a = App.agente(el.getAttribute('data-id'));
@@ -440,7 +469,7 @@ App.Nav = (function () {
     }
     inp.addEventListener('input', function () { buscarEq = inp.value; llenar(); });
     llenar();
-    var accion = eqTab === 'reuniones'
+    var accion = App.movil ? null : eqTab === 'reuniones'
       ? h('button.btn.chico', { title: 'Llamar a una reunión', onclick: function () { App.Reunion.nueva(); } }, App.icono('mas'), 'Nueva reunión')
       : h('button.btn.chico', { title: 'Contratar un agente', onclick: function () { ir('#/equipo/contratar'); } }, App.icono('mas'), 'Contratar');
     App.add(App.vaciar(col),
@@ -498,7 +527,7 @@ App.Nav = (function () {
     function verTodas(cual, n, texto) { return n > MAX_LADO ? h('button.lat-mas', { onclick: function () { App.Agente.verLado(cual); } }, (texto || 'Ver todas') + ' (' + n + ')', App.icono('flecha')) : null; }
     function cuenta(n) { return h('em', n == null ? '' : String(n)); }
     /* «nuevo» de cada sección: con borde y texto (no un «+» suelto), todos iguales */
-    var botonMas = function (texto, titulo_, accion) { return h('button.btn.chico.lat-nueva', { title: titulo_, onclick: accion }, App.icono('mas'), texto); };
+    var botonMas = function (texto, titulo_, accion) { return App.movil ? null : h('button.btn.chico.lat-nueva', { title: titulo_, onclick: accion }, App.icono('mas'), texto); };
 
     /* charlas */
     var charlas = h('div'), charlasVer = h('div'), charlasN = cuenta(null);

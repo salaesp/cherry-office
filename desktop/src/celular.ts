@@ -9,10 +9,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { powerSaveBlocker } from 'electron'
-import qrcode from 'qrcode-generator'
 import type { APIHandler } from '../../backend/src/router.js'
 import { ServidorDev } from '../../backend/src/servidor-dev.js'
-import { Tailscale, buscarComando } from '../../backend/src/tailscale.js'
+import { Tailscale, buscarComando, qrSvg } from '../../backend/src/tailscale.js'
 import type { Raices } from './estaticos.js'
 
 export type EstadoCelular = {
@@ -90,7 +89,7 @@ export class AccesoCelular {
     }
     if (this.bloqueo === undefined || !powerSaveBlocker.isStarted(this.bloqueo)) this.bloqueo = powerSaveBlocker.start('prevent-app-suspension')
     const url = `https://${e.nombre}/`
-    this.poner({ prendido: true, estado: 'listo', url, qr: qr(url + '?movil=1#/bandeja') })
+    this.poner({ prendido: true, estado: 'listo', url, qr: await qrSvg(url + '?movil=1#/bandeja') })
     return this.actual
   }
 
@@ -146,11 +145,4 @@ export class AccesoCelular {
   private guardar(cambios: Guardado) {
     try { fs.writeFileSync(this.archivo(), JSON.stringify({ ...this.leer(), ...cambios })) } catch {}
   }
-}
-
-function qr(texto: string): string {
-  const q = qrcode(0, 'M')
-  q.addData(texto)
-  q.make()
-  return q.createSvgTag({ cellSize: 4, margin: 4, scalable: true })
 }

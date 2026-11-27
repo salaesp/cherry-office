@@ -65,7 +65,7 @@
   /* «Convertir en skill»: guarda lo que sirve de esta charla como skill propia del agente (skills-propias.js) */
   function botonSkill(a, fantasma) {
     if (!App.SkillsPropias) return null;
-    return h('button.btn.chico.convertir-skill' + (fantasma ? '.fantasma' : ''), { title: 'Guardar lo que sirve de esta charla como skill de ' + a.nombre + ', para la próxima vez',
+    return h('button.btn.chico.convertir-skill.solo-compu' + (fantasma ? '.fantasma' : ''), { title: 'Guardar lo que sirve de esta charla como skill de ' + a.nombre + ', para la próxima vez',
       onclick: function () { App.SkillsPropias.desdeCharla(a, sesiones[a.id]); } }, App.icono('libro'), 'Convertir en skill');
   }
 
@@ -301,7 +301,7 @@
       return c;
     };
     if (lado === 'detalles') {
-      var lapiz = esCompu() ? null : h('button.btn.fantasma.icono', { title: 'Perfil, apariencia y permisos de ' + a.nombre, onclick: function () { verLado('perfil'); } }, App.icono('lapiz'));
+      var lapiz = esCompu() ? null : h('button.btn.fantasma.icono.solo-compu', { title: 'Perfil, apariencia y permisos de ' + a.nombre, onclick: function () { verLado('perfil'); } }, App.icono('lapiz'));
       App.add(caja, latCab(h('b', 'Detalles'), lapiz), App.Nav.relacionado(a.id));
       return caja;
     }
@@ -388,9 +388,9 @@
           App.retratoImg(a, 'retrato', 120),
           h('div.der-tit', h('h2', a.nombre), sub),
           h('div.der-acciones.agente-herr',
-            h('button.btn.fantasma.icono.agente-lapiz-btn', { title: 'Perfil, apariencia y permisos de ' + a.nombre, 'aria-pressed': String(esFicha(lado)),
+            h('button.btn.fantasma.icono.agente-lapiz-btn.solo-compu', { title: 'Perfil, apariencia y permisos de ' + a.nombre, 'aria-pressed': String(esFicha(lado)),
               onclick: function () { verLado(esFicha(lado) ? 'detalles' : 'perfil'); } }, App.icono('lapiz')),
-            h('button.btn.fantasma.icono', { title: 'Ver dónde está ' + a.nombre + ' en la oficina', onclick: function () {
+            h('button.btn.fantasma.icono.solo-compu', { title: 'Ver dónde está ' + a.nombre + ' en la oficina', onclick: function () {
               if (App.Oficina.marcar) App.Oficina.marcar(a.id); else if (App.Oficina.enfocarAgente) App.Oficina.enfocarAgente(a.id); } }, App.icono('pin')),
             /* cerrar no va acá: queda arriba a la derecha del todo, en la cabecera de la columna del costado */)),
         h('div.charla-barra', h('b.charla-tit', App.Nav.tituloCharla ? App.Nav.tituloCharla(a.id) : ''), chipContexto(a),
@@ -491,7 +491,7 @@
       g.empezar().then(function () { redactar.replaceWith(franja.el); }).catch(function (e) { App.aviso(e.message, true); });
     }
     App.add(pie, adj.lista, adj.error, adj.input, redactar,
-      h('div.pie-charla', selector, h('div.ayuda', 'Enter para enviar (con ' + a.nombre + ' trabajando, queda en cola) · Mayús+Enter para otra línea · arrastrá o pegá archivos')));
+      h('div.pie-charla.solo-compu', selector, h('div.ayuda', 'Enter para enviar (con ' + a.nombre + ' trabajando, queda en cola) · Mayús+Enter para otra línea · arrastrá o pegá archivos')));
 
     function render() {
       App.vaciar(lista); App.vaciar(sug);
@@ -1141,7 +1141,7 @@
     }
 
     cargar();
-    App.add(pie, App.acciones(null, h('button.btn.primario', { onclick: function () { hojaTarea(a, null, cargar); } }, 'Nueva tarea')));
+    App.add(pie, App.acciones(null, h('button.btn.primario.solo-compu', { onclick: function () { hojaTarea(a, null, cargar); } }, 'Nueva tarea')));
   }
 
   /* charla nueva con el agente: sesión nueva y vacía (la anterior queda en la lista de charlas) */

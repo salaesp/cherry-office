@@ -1378,3 +1378,24 @@ textarea.campo.skill-contenido { font-family: ui-monospace, SFMono-Regular, Menl
 .cel-pasos ol { margin: 6px 0 0; padding-left: 18px; }
 .cel-pasos li { margin-bottom: 4px; }
 .cel-pasos a { color: var(--texto); }
+
+/* ---------- modo celular (ui/movil.js, docs/plan-celular.md fase 2) ----------
+   La misma app con menos cosas: sin la oficina pixel y sin lo que es de la compu. */
+.modo-movil .solo-compu, .modo-movil .yo-grupo { display: none !important; }
+.modo-movil .vista > .lienzo, .modo-movil .vista > .marca, .modo-movil .vista > .pista,
+.modo-movil .vista > .carga-oficina, .modo-movil .vista > .aviso-reunion { display: none !important; }
+.modo-movil .vista { background: var(--fondo); }
+/* la Bandeja es Hoy: no hay lista a la que volver */
+.modo-movil .app[data-seccion="bandeja"] .derecho[data-modo="parte"] .cerrar-panel { display: none; }
+@media (max-width: 720px) {
+  .modo-movil .riel { justify-content: space-between; padding-left: 8px; padding-right: 8px; }
+  .modo-movil .riel-item { flex: 1; min-width: 0; }
+}
+/* avisos e instalación en el celular (ui/push.js) */
+.push-tarjeta { margin: 12px 14px 4px; padding: 12px 14px; border-radius: var(--radio); background: var(--panel); border: 1px solid var(--linea); box-shadow: var(--sombra); }
+.push-tarjeta > div > svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--suave); }
+.push-tarjeta p { color: var(--suave); margin: 2px 0 0; }
+.push-tarjeta .acciones { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+.push-instalar p { color: var(--suave); margin: 2px 0 6px; }
+.push-instalar ol { margin: 0; padding-left: 18px; color: var(--suave); }
+.push-instalar li { margin-bottom: 3px; }

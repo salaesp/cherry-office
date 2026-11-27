@@ -15,9 +15,15 @@ App.Actividad = (function () {
     }).catch(function () { errores++; }).then(function () {
       var hay = Object.keys(datos.agentes || {}).length > 0 || Object.keys(App.E.ocupados || {}).length > 0;
       if (hay) pintarLateral();   // el «cuánto lleva» avanza aunque no cambie nada más
+      /* con la app en segundo plano (otra pestaña, el celular bloqueado) no se pregunta: al volver se pide enseguida */
+      if (document.hidden) { timer = null; dormida = true; return; }
       timer = setTimeout(ciclo, errores ? 5000 : hay ? 1000 : 4000);
     });
   }
+  var dormida = false;
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && dormida) { dormida = false; ciclo(); }
+  });
 
   function aplicar(r) {
     datos = r;
