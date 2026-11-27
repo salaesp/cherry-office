@@ -86,7 +86,7 @@
         recargando = false;
         if (!vivo()) return;
         var st = rs[0];
-        if (App.Oficina3D && App.Oficina3D.bibliotecario) App.Oficina3D.bibliotecario(st);   // el de la oficina pixel se entera al instante
+        if (App.Oficina && App.Oficina.bibliotecario) App.Oficina.bibliotecario(st);   // el de la oficina pixel se entera al instante
         pintarCab(st);
         pintarPropuesta(rs[1] && rs[1].propuesta);
         pintarChoques(rs[2].choques || []);

@@ -18,7 +18,7 @@ export function archivo(r: Raices, ruta: string): string | undefined {
   let rel = ruta === '/' ? 'index.html' : ruta.slice(1)
   if (!ruta.startsWith('/') || rel.includes('\0') || rel.includes('\\') || rel.split('/').includes('..')) return undefined
   let base: string
-  if (estaticos.has(rel) || rel.startsWith('ui/') || rel.startsWith('ldraw/')) base = r.ui
+  if (estaticos.has(rel) || rel.startsWith('ui/')) base = r.ui
   else if (rel.startsWith('vendor/')) {
     base = r.vendor
     rel = rel.slice('vendor/'.length)

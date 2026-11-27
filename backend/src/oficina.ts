@@ -16,7 +16,7 @@ import { decodificarTarea, type TareaProgramada } from './tareas.js'
 import { Slug, Validar, largo, plegar, prefijo } from './validar.js'
 
 export type Avatar = Partial<Record<(typeof clavesAvatar)[number], string>>
-/** Las claves `px*` son de la oficina pixel (peinado, prenda de arriba, de abajo y accesorio); los colores se comparten con la maqueta LEGO. */
+/** Las claves `px*` son de la oficina pixel (peinado, prenda de arriba, de abajo y accesorio); las demás vienen de la maqueta LEGO de antes y se conservan para leer avatares guardados. */
 export const clavesAvatar = ['semilla', 'pelo', 'colorPelo', 'cara', 'torso', 'colorTorso', 'colorPiernas', 'colorPiel',
   'colorBrazos', 'colorAccesorio', 'piernas', 'sombrero', 'cuello', 'pxPelo', 'pxArriba', 'pxAbajo', 'pxAccesorio'] as const
 

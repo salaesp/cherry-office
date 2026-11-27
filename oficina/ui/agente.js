@@ -170,10 +170,10 @@
     actual = id; pestana = pest || (mismo ? pestana : 'chat');
     /* en la compu la ficha va al costado de la charla */
     if (esCompu() && pestana !== 'chat') { lado = pestana; pestana = 'chat'; }
-    App.Oficina3D.elegir(id);
+    App.Oficina.elegir(id);
     App.abrirDerecho('agente');   // primero: así ya está en su sección al pintar
     pintar();
-    if (esCompu() && App.Oficina3D.enfocarAgente) App.Oficina3D.enfocarAgente(id);
+    if (esCompu() && App.Oficina.enfocarAgente) App.Oficina.enfocarAgente(id);
     if (App.Avisos) App.Avisos.vistoAgente(id);
     App.marcarEstados();
   }
@@ -346,7 +346,7 @@
             h('button.btn.fantasma.icono.agente-lapiz-btn', { title: 'Perfil, apariencia y permisos de ' + a.nombre, 'aria-pressed': String(lado === 'perfil' || lado === 'permisos'),
               onclick: function () { verLado(lado === 'perfil' || lado === 'permisos' ? 'detalles' : 'perfil'); } }, App.icono('lapiz')),
             h('button.btn.fantasma.icono', { title: 'Ver dónde está ' + a.nombre + ' en la oficina', onclick: function () {
-              if (App.Oficina3D.marcar) App.Oficina3D.marcar(a.id); else if (App.Oficina3D.enfocarAgente) App.Oficina3D.enfocarAgente(a.id); } }, App.icono('pin')),
+              if (App.Oficina.marcar) App.Oficina.marcar(a.id); else if (App.Oficina.enfocarAgente) App.Oficina.enfocarAgente(a.id); } }, App.icono('pin')),
             /* cerrar no va acá: queda arriba a la derecha del todo, en la cabecera de la columna del costado */)),
         h('div.charla-barra', h('b.charla-tit', App.Nav.tituloCharla ? App.Nav.tituloCharla(a.id) : ''), chipContexto(a),
           h('button.btn.chico.fantasma.sacar-tareas', { title: 'Convertir esta charla en tareas (para ' + a.nombre + ' o para otros)', onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), 'Sacar tareas')),
@@ -523,7 +523,7 @@
 
   function ocupado(id, si) {
     if (si) { enCurso[id] = true; App.E.ocupados[id] = true; } else { delete enCurso[id]; delete App.E.ocupados[id]; }
-    App.Oficina3D.ocupado(id, si);
+    App.Oficina.ocupado(id, si);
     App.marcarEstados();
   }
 
@@ -1158,7 +1158,7 @@
   }
 
   function cerrar() { if (App.modoDerecho() === 'agente') App.cerrarDerecho(); else alCerrar(); }
-  function alCerrar() { actual = null; App.Oficina3D.elegir(null); App.marcarEstados(); }
+  function alCerrar() { actual = null; App.Oficina.elegir(null); App.marcarEstados(); }
 
   /* abre la hoja de «Nueva tarea» (de un agente, o sin agente: arriba se elige) con datos precargados (desde un pendiente de reunión) */
   function nuevaTarea(id, pre, alGuardar) {
@@ -1176,7 +1176,7 @@
     /* abre una conversación concreta del agente (p. ej. la de una entrega) en su pestaña de chat */
     abrirSesion: function (id, sid) {
       var a = App.agente(id); if (!a) return;
-      actual = id; sesionFija = sid; pestana = 'chat'; App.Oficina3D.elegir(id); App.abrirDerecho('agente'); abrirSesion(a, sid); App.marcarEstados();
+      actual = id; sesionFija = sid; pestana = 'chat'; App.Oficina.elegir(id); App.abrirDerecho('agente'); abrirSesion(a, sid); App.marcarEstados();
     },
     nueva: nueva,
     sesion: function (id) { return sesiones[id] || null; },

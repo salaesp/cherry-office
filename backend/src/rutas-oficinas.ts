@@ -1,6 +1,6 @@
 // Rutas del núcleo para oficinas (Router.despachar de Swift): estado, oficinas, oficina, perfil y la lista de agentes
 // (los departamentos viven en rutas-departamentos.ts). Contratar/editar/despedir agentes, chat e historial se suman al portar sus módulos.
-import { clavesModelo, esConectoresAgentes, esEstiloOficina, esMemoriaIA, esModoPermisos, modelosValidos, type ClaveModelo, type Config, type PreferenciasIA } from './config.js'
+import { clavesModelo, esConectoresAgentes, esMemoriaIA, esModoPermisos, modelosValidos, type ClaveModelo, type Config, type PreferenciasIA } from './config.js'
 import { ErrorAPI } from './errores.js'
 import { esObjeto, objeto, objetoOpcional, type Obj } from './json.js'
 import { ValidarAgenteExtra, agenteJSON, departamentoJSON, oficinaJSON } from './oficina.js'
@@ -71,7 +71,7 @@ export function rutasOficinas({ config, oficinas, claude, alAbrir = [], ocupada 
       agentes: (act?.oficina.agentes.map((x) => x.id) ?? []).sort(), auth: a,
       claudePath: bin ?? null, oficina: act ? act.resumen : null,
       perfil: perfilJSON(oficinas.perfilActual()), modo_permisos: config.modoPermisos ?? null,
-      conectores_agentes: config.conectoresAgentes ?? 'por_agente', estilo_oficina: config.estiloOficina ?? 'pixel',
+      conectores_agentes: config.conectoresAgentes ?? 'por_agente',
       modelos: config.modelosEfectivos, ia: config.iaEfectiva,
     }
   }
@@ -109,7 +109,7 @@ export function rutasOficinas({ config, oficinas, claude, alAbrir = [], ocupada 
       return no405
     }
     if (seccion === 'preferencias' && n === 2) {
-      const prefs = () => ({ modo_permisos: config.modoPermisos ?? null, conectores_agentes: config.conectoresAgentes ?? 'por_agente', estilo_oficina: config.estiloOficina ?? 'pixel', modelos: config.modelosEfectivos, ia: config.iaEfectiva })
+      const prefs = () => ({ modo_permisos: config.modoPermisos ?? null, conectores_agentes: config.conectoresAgentes ?? 'por_agente', modelos: config.modelosEfectivos, ia: config.iaEfectiva })
       if (method === 'GET') return [200, prefs()]
       if (method === 'PUT') {
         const d = objeto(body)
@@ -117,16 +117,13 @@ export function rutasOficinas({ config, oficinas, claude, alAbrir = [], ocupada 
         const hayConectores = d.conectores_agentes !== undefined
         const hayModelos = d.modelos !== undefined
         const hayIA = d.ia !== undefined
-        const hayEstilo = d.estilo_oficina !== undefined
-        if (!hayModo && !hayConectores && !hayModelos && !hayIA && !hayEstilo) throw new ErrorAPI(400, 'Falta «modo_permisos», «conectores_agentes», «estilo_oficina», «modelos» o «ia».')
+        if (!hayModo && !hayConectores && !hayModelos && !hayIA) throw new ErrorAPI(400, 'Falta «modo_permisos», «conectores_agentes», «modelos» o «ia».')
         const modelos = hayModelos ? modelosPedidos(d.modelos) : undefined
         const ia = hayIA ? iaPedida(d.ia) : undefined
         if (hayModo && !esModoPermisos(d.modo_permisos)) throw new ErrorAPI(400, '«modo_permisos» tiene que ser "auto" o "preguntar".')
         if (hayConectores && !esConectoresAgentes(d.conectores_agentes)) throw new ErrorAPI(400, '«conectores_agentes» tiene que ser "todos" o "por_agente".')
-        if (hayEstilo && !esEstiloOficina(d.estilo_oficina)) throw new ErrorAPI(400, '«estilo_oficina» tiene que ser "pixel" o "lego".')
         if (esModoPermisos(d.modo_permisos)) oficinas.guardarModoPermisos(d.modo_permisos)
         if (esConectoresAgentes(d.conectores_agentes)) oficinas.guardarConectoresAgentes(d.conectores_agentes)
-        if (esEstiloOficina(d.estilo_oficina)) oficinas.guardarEstiloOficina(d.estilo_oficina)
         if (modelos) oficinas.guardarModelos(modelos)
         if (ia) oficinas.guardarIA(ia)
         return [200, prefs()]

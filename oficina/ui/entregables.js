@@ -1,7 +1,7 @@
 /* Entregables (docs/plan-entregables.md, E2): lo que los agentes terminaron y te falta revisar.
    Panel derecho con la lista (filtro «sin revisar» por defecto, por agente y por origen) y el detalle de cada entrega
    (texto, archivos, «Listo», «Pedir cambios», «Abrir en el chat»). El contador llega con /api/actividad y se reparte a la
-   barra lateral, al muro 3D, al Dock (junto con los avisos) y a la tecla N. Abrir una entrega NO la marca revisada. */
+   barra lateral, al muro de la oficina, al Dock (junto con los avisos) y a la tecla N. Abrir una entrega NO la marca revisada. */
 window.App = window.App || {};
 App.Entregables = (function () {
   'use strict';
@@ -48,7 +48,7 @@ App.Entregables = (function () {
   function pintarContador() {
     var b = App.dom && App.dom.navEnt;
     if (b) { b.textContent = sinRevisar; b.classList.toggle('oculto', !sinRevisar); }
-    if (App.Oficina3D && App.Oficina3D.muro) App.Oficina3D.muro(ultimas, sinRevisar);
+    if (App.Oficina && App.Oficina.muro) App.Oficina.muro(ultimas, sinRevisar);
     if (App.Avisos && App.Avisos.insignia) App.Avisos.insignia();
     if (App.Yo && App.Yo.refrescar) App.Yo.refrescar();
     if (App.Nav && App.Nav.seccion() === 'bandeja') App.Nav.pintarLista();
@@ -538,7 +538,7 @@ App.Entregables = (function () {
     api().get('/api/entregas', { estado: 'sin_revisar', limite: 1 }).then(function (r) {
       var e = (r.entregas || [])[0]; if (e) abrir(e.id);
     }).catch(App.fallo);
-    if (App.Oficina3D && App.Oficina3D.enfocarLugar) App.Oficina3D.enfocarLugar('entregables');
+    if (App.Oficina && App.Oficina.enfocarLugar) App.Oficina.enfocarLugar('entregables');
     return true;
   }
 
