@@ -86,6 +86,10 @@ export type ChatWA = {
   elegidoDesde?: number
   /** Solo en un grupo elegido: las únicas personas (número o @lid) cuyos mensajes se guardan, más los propios. Sin esto, todas. */
   solo?: string[]
+  /** Se eligió solo porque está prendido «leer todos los chats individuales» (la persona no lo eligió a mano). */
+  auto?: boolean
+  /** La persona lo sacó estando prendido «leer todos»: no se vuelve a elegir solo. */
+  ignorado?: boolean
 }
 
 /** `fila`: orden de llegada (rowid): el cursor de la secretaría, que no se confunde con mensajes del mismo segundo ni con
@@ -153,6 +157,9 @@ export class WhatsAppStore {
     // filtro de personas de un grupo (JSON con la lista de ids)
     const colsChats = this.db.query("SELECT name FROM pragma_table_info('wa_chats')").map((f) => txt(f.name))
     if (!colsChats.includes('solo')) this.db.exec('ALTER TABLE wa_chats ADD COLUMN solo TEXT')
+    // «leer todos los chats individuales»: elegido solo (auto) o sacado a mano (ignorado)
+    if (!colsChats.includes('auto')) this.db.exec('ALTER TABLE wa_chats ADD COLUMN auto INTEGER NOT NULL DEFAULT 0')
+    if (!colsChats.includes('ignorado')) this.db.exec('ALTER TABLE wa_chats ADD COLUMN ignorado INTEGER NOT NULL DEFAULT 0')
   }
 
   // estado
@@ -176,6 +183,8 @@ export class WhatsAppStore {
     const d = optNum(f.elegido_desde); if (d) c.elegidoDesde = d
     const so = optTxt(f.solo)
     if (so) { try { const l = JSON.parse(so); if (Array.isArray(l)) c.solo = l.filter((x): x is string => typeof x === 'string') } catch {} }
+    if (num(f.auto ?? 0) === 1) c.auto = true
+    if (num(f.ignorado ?? 0) === 1) c.ignorado = true
     return c
   }
 
@@ -221,9 +230,11 @@ export class WhatsAppStore {
       this.anotarChats([{ jid: pn, grupo: false, agenda: fila.agenda, pista: fila.pista, ultimo: fila.ultimo }])
       if (fila.elegido) {
         const destino = this.chat(pn)
-        if (destino && !destino.elegido) this.db.run('UPDATE wa_chats SET elegido=1, nombre=COALESCE(nombre, ?), nota=COALESCE(nota, ?), elegido_desde=? WHERE jid=?', [fila.nombre ?? null, fila.nota ?? null, fila.elegidoDesde ?? Date.now() / 1000, pn])
+        if (destino && !destino.elegido) this.db.run('UPDATE wa_chats SET elegido=1, nombre=COALESCE(nombre, ?), nota=COALESCE(nota, ?), elegido_desde=?, auto=?, ignorado=0 WHERE jid=?', [fila.nombre ?? null, fila.nota ?? null, fila.elegidoDesde ?? Date.now() / 1000, fila.auto ? 1 : 0, pn])
+        else if (destino?.auto && !fila.auto) this.db.run('UPDATE wa_chats SET auto=0, nombre=COALESCE(nombre, ?), nota=COALESCE(nota, ?) WHERE jid=?', [fila.nombre ?? null, fila.nota ?? null, pn])
         this.db.run('UPDATE OR IGNORE wa_mensajes SET chat=? WHERE chat=?', [pn, lid])
       }
+      if (fila.ignorado) this.db.run('UPDATE wa_chats SET ignorado=1 WHERE jid=? AND elegido=0', [pn])
       this.db.run('DELETE FROM wa_mensajes WHERE chat=?', [lid])
       this.db.run('DELETE FROM wa_chats WHERE jid=?', [lid])
     }
@@ -233,14 +244,45 @@ export class WhatsAppStore {
   elegir(jid: string, nombre: string, nota: string | undefined) {
     const ahora = Date.now() / 1000
     this.db.run(`INSERT INTO wa_chats(jid, nombre, nota, elegido, grupo, elegido_desde) VALUES (?, ?, ?, 1, ?, ?)
-      ON CONFLICT(jid) DO UPDATE SET nombre=excluded.nombre, nota=excluded.nota, elegido=1,
+      ON CONFLICT(jid) DO UPDATE SET nombre=excluded.nombre, nota=excluded.nota, elegido=1, auto=0, ignorado=0,
         elegido_desde=CASE WHEN elegido=1 THEN elegido_desde ELSE excluded.elegido_desde END`,
     [jid, nombre, nota ?? null, esGrupo(jid) ? 1 : 0, ahora])
   }
 
+  /** Lo elige solo («leer todos los chats individuales»): sin nombre propio (se ve el de la agenda o el número). false si
+   *  no corresponde (un grupo, uno que la persona sacó o uno ya elegido). */
+  elegirAuto(jid: string): boolean {
+    if (esGrupo(jid)) return false
+    const c = this.chat(jid)
+    if (c?.elegido || c?.ignorado) return false
+    this.db.run(`INSERT INTO wa_chats(jid, elegido, grupo, elegido_desde, auto) VALUES (?, 1, 0, ?, 1)
+      ON CONFLICT(jid) DO UPDATE SET elegido=1, auto=1, elegido_desde=excluded.elegido_desde`, [jid, Date.now() / 1000])
+    return true
+  }
+
+  /** Los chats que la persona sacó estando prendido «leer todos», con sus @lid (para que la captura no los lea). */
+  ignorados(): string[] {
+    const out: string[] = []
+    for (const f of this.db.query('SELECT jid FROM wa_chats WHERE ignorado=1')) {
+      const j = txt(f.jid)
+      out.push(j, ...(esNumero(j) ? this.lidsDe(j) : []))
+    }
+    return out
+  }
+
+  /** Apaga «leer todos»: deja de leer los que se eligieron solos (borra sus mensajes) y olvida los sacados. Devuelve los
+   *  archivos de audios e imágenes que hay que borrar. */
+  quitarAutos(): string[] {
+    const archivos: string[] = []
+    for (const f of this.db.query('SELECT jid FROM wa_chats WHERE elegido=1 AND auto=1')) archivos.push(...this.quitar(txt(f.jid)))
+    this.db.run('UPDATE wa_chats SET ignorado=0')
+    return archivos
+  }
+
+  /** Editarlo lo vuelve propio: deja de ser «elegido solo» y sobrevive a apagar «leer todos». */
   editar(jid: string, cambios: { nombre?: string; nota?: string | null }) {
-    if (cambios.nombre !== undefined) this.db.run('UPDATE wa_chats SET nombre=? WHERE jid=?', [cambios.nombre, jid])
-    if (cambios.nota !== undefined) this.db.run('UPDATE wa_chats SET nota=? WHERE jid=?', [cambios.nota, jid])
+    if (cambios.nombre !== undefined) this.db.run('UPDATE wa_chats SET nombre=?, auto=0 WHERE jid=?', [cambios.nombre, jid])
+    if (cambios.nota !== undefined) this.db.run('UPDATE wa_chats SET nota=?, auto=0 WHERE jid=?', [cambios.nota, jid])
   }
 
   // integrantes de los grupos y filtro de personas
@@ -290,10 +332,11 @@ export class WhatsAppStore {
     return archivos
   }
 
-  /** Deja de leerlo y borra sus mensajes. Devuelve los archivos de audios e imágenes que hay que borrar. */
-  quitar(jid: string): string[] {
+  /** Deja de leerlo y borra sus mensajes. Devuelve los archivos de audios e imágenes que hay que borrar. `ignorar`: con «leer
+   *  todos» prendido, que no se vuelva a elegir solo. */
+  quitar(jid: string, ignorar = false): string[] {
     const archivos = this.archivosDe('chat=?', [jid])
-    this.db.run('UPDATE wa_chats SET elegido=0, nombre=NULL, nota=NULL, elegido_desde=NULL, solo=NULL WHERE jid=?', [jid])
+    this.db.run('UPDATE wa_chats SET elegido=0, nombre=NULL, nota=NULL, elegido_desde=NULL, solo=NULL, auto=0, ignorado=? WHERE jid=?', [ignorar ? 1 : 0, jid])
     this.db.run('DELETE FROM wa_mensajes WHERE chat=?', [jid])
     return archivos
   }
@@ -491,6 +534,20 @@ export class ServicioWhatsApp {
 
   // MARK: transcripción de notas de voz (S4)
 
+  // MARK: leer todos los chats individuales
+
+  /** La persona prendió «leer todos los chats individuales» (para un negocio que no tiene agendados a sus clientes). */
+  get leerTodos() { return this.store.estado('leerTodos') === '1' }
+
+  /** Prende o apaga «leer todos». Al apagar se dejan de leer los chats que se eligieron solos y se borran sus mensajes
+   *  (los que la persona editó o eligió a mano se quedan). */
+  ponerLeerTodos(si: boolean) {
+    if (si === this.leerTodos) return
+    this.store.ponerEstado('leerTodos', si ? '1' : undefined)
+    if (!si) this.borrarArchivos(this.store.quitarAutos())
+    this.enviarElegidos()
+  }
+
   /** La persona activó la transcripción en Ajustes › WhatsApp. */
   get transcribir() { return this.store.estado('transcribir') === '1' }
   transcriptor: { estado: 'apagado' | 'cargando' | 'listo' | 'trabajando' | 'sin_motor'; progreso?: number | null; error?: string } = { estado: 'apagado' }
@@ -677,7 +734,7 @@ export class ServicioWhatsApp {
         if (Array.isArray(m.chats)) this.store.anotarChats(m.chats.filter((c) => typeof c?.jid === 'string'))
         break
       case 'alias':
-        if (this.store.anotarAlias(m.pn, m.lid) && this.store.chat(m.pn)?.elegido) this.enviarElegidos()
+        if (this.store.anotarAlias(m.pn, m.lid)) { const c = this.store.chat(m.pn); if (c?.elegido || c?.ignorado) this.enviarElegidos() }
         break
       case 'telefono':
         if (typeof m.ts === 'number' && m.ts > (this.telefonoVisto ?? 0) && m.ts <= Date.now() / 1000 + 60) this.store.ponerEstado('telefonoVisto', String(Math.floor(m.ts)))
@@ -686,7 +743,7 @@ export class ServicioWhatsApp {
         if (esGrupo(m.grupo) && Array.isArray(m.miembros)) this.store.anotarMiembros(m.grupo, m.miembros, m.modo)
         break
       case 'mensaje':
-        if (m.m && typeof m.m.chat === 'string' && this.leeA(m.m) && this.store.guardar(m.m, { transcribir: this.transcribir })) this.transcribirPendientes()
+        if (m.m && typeof m.m.chat === 'string') this.alMensajeWA(m.m)
         break
       case 'cerrada':
         this.desvinculando?.()
@@ -726,6 +783,15 @@ export class ServicioWhatsApp {
     this.reintento.unref?.()
   }
 
+  private alMensajeWA(m: MensajeWA) {
+    // con «leer todos», el primer mensaje de alguien de un chat individual lo elige solo
+    if (this.leerTodos && !m.propio && !esGrupo(m.chat) && !m.editado && !m.borrado) {
+      if (esLid(m.chat)) { const pn = this.store.numeroDeLid(m.chat); if (pn) m = { ...m, chat: pn, de: m.de === m.chat ? pn : m.de } }
+      if (this.store.elegirAuto(m.chat)) this.enviarElegidos()
+    }
+    if (this.leeA(m) && this.store.guardar(m, { transcribir: this.transcribir })) this.transcribirPendientes()
+  }
+
   /** Segunda barrera del filtro de personas de un grupo (la primera es la captura): un mensaje que llegó con la lista vieja no se guarda. */
   private leeA(m: MensajeWA): boolean {
     if (m.propio || !esGrupo(m.chat)) return true
@@ -739,7 +805,7 @@ export class ServicioWhatsApp {
       jid: c.jid, lids: esNumero(c.jid) ? this.store.lidsDe(c.jid) : [],
       ...(c.grupo && c.solo ? { solo: [...this.store.equivalentes(c.solo)] } : {}),
     }))
-    try { this.proceso?.send({ tipo: 'elegidos', chats }) } catch {}
+    try { this.proceso?.send({ tipo: 'elegidos', chats, ...(this.leerTodos ? { todos: { ignorar: this.store.ignorados() } } : {}) }) } catch {}
   }
 
   /** Para la captura sin cerrar la sesión (al salir de la app). */
@@ -807,6 +873,7 @@ export function chatJSON(c: ChatWA, miembros?: Obj[]): Obj {
   if (c.ultimo) o.ultimo = c.ultimo
   if (c.elegidoDesde) o.elegidoDesde = c.elegidoDesde
   if (c.solo) o.solo = c.solo
+  if (c.auto) o.auto = true
   if (miembros) o.miembros = miembros
   return o
 }
@@ -892,6 +959,7 @@ export class WhatsAppRouter implements SubRouter {
       retencionDias: ServicioWhatsApp.retencionDias,
       telefonoVisto: wa.telefonoVisto ?? null,
       transcribir: wa.transcribir,
+      leerTodos: wa.leerTodos,
       modelo: wa.modelo,
       idioma: wa.idioma,
       modelos: Object.entries(modelosTranscripcion).map(([id, m]) => ({ id, nombre: m.nombre, mb: m.mb })),
@@ -928,9 +996,11 @@ export class WhatsAppRouter implements SubRouter {
       if (method !== 'PUT') return no405
       const b = objeto(body)
       if (b.transcribir !== undefined && typeof b.transcribir !== 'boolean') return [400, { error: '«transcribir» tiene que ser sí o no.' }]
+      if (b.leerTodos !== undefined && typeof b.leerTodos !== 'boolean') return [400, { error: '«leerTodos» tiene que ser sí o no.' }]
       if (b.modelo !== undefined && !esModeloTr(b.modelo)) return [400, { error: `«modelo» tiene que ser uno de: ${Object.keys(modelosTranscripcion).join(', ')}.` }]
       if (b.idioma !== undefined && !esIdiomaTr(b.idioma)) return [400, { error: `«idioma» tiene que ser uno de: ${Object.keys(idiomasTranscripcion).join(', ')}.` }]
-      if (b.transcribir === undefined && b.modelo === undefined && b.idioma === undefined) return [400, { error: 'Decime qué cambiar: «transcribir», «modelo» o «idioma».' }]
+      if (b.transcribir === undefined && b.modelo === undefined && b.idioma === undefined && b.leerTodos === undefined) return [400, { error: 'Decime qué cambiar: «transcribir», «modelo», «idioma» o «leerTodos».' }]
+      if (b.leerTodos !== undefined) wa.ponerLeerTodos(b.leerTodos)
       wa.ponerModeloIdioma(b.modelo as ModeloTr | undefined, b.idioma as IdiomaTr | undefined)
       if (b.transcribir !== undefined) wa.ponerTranscribir(b.transcribir)
       return [200, this.estadoJSON()]
@@ -956,7 +1026,8 @@ export class WhatsAppRouter implements SubRouter {
       if (!jid || !c) return [404, { error: 'No encontré ese chat.' }]
       const b = objeto(body)
       if (b.elegido === false) {
-        wa.borrarArchivos(wa.store.quitar(jid))
+        // con «leer todos» prendido, un chat individual que se saca no se vuelve a elegir solo
+        wa.borrarArchivos(wa.store.quitar(jid, wa.leerTodos && !c.grupo))
         wa.enviarElegidos()
         return [200, { chat: chatJSON(wa.store.chat(jid)!) }]
       }
@@ -1173,7 +1244,7 @@ export function herramientasWhatsApp(s: Servicios, _token: string, identidad: Id
   if (!ag) return undefined
   const deSecretaria = WhatsAppAgente.chatsSecretaria(o, ag)
   if (!WhatsAppAgente.puede(ag) && deSecretaria === undefined) return undefined
-  return new HerramientasWhatsApp(wa, o.duenio === '' ? 'Vos (la persona)' : o.duenio, WhatsAppAgente.puede(ag) ? undefined : deSecretaria)
+  return new HerramientasWhatsApp(wa, o.duenio === '' ? 'Vos (la persona)' : o.duenio, WhatsAppAgente.puede(ag) || deSecretaria === 'todos' ? undefined : deSecretaria)
 }
 
 // MARK: - instalación

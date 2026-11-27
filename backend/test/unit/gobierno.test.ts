@@ -189,8 +189,8 @@ describe('Acciones (en proceso)', () => {
     expect(HerramientasMCPAgente.lista(act.oficina, nico)).not.toContain('mcp__hq__proponer_accion')
     const mcp = mcpDe(s)!
     const id = (a: string) => ({ oficina: carpeta, agente: a, sid: U.a, perfil: 'agente' })
-    expect(nombres(mcp.consultas.herramientas('t', id('marce')))).toEqual(['colegas', 'consultar', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'proponer_accion', 'pedir', 'quedo_esperando', 'cancelar_espera'])
-    expect(nombres(mcp.consultas.herramientas('t', id('nico')))).toEqual(['colegas', 'consultar', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'pedir', 'quedo_esperando', 'cancelar_espera'])
+    expect(nombres(mcp.consultas.herramientas('t', id('marce')))).toEqual(['colegas', 'consultar', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'proponer_accion', 'pedir', 'quedo_esperando', 'cancelar_espera', 'proponer_skill'])
+    expect(nombres(mcp.consultas.herramientas('t', id('nico')))).toEqual(['colegas', 'consultar', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'pedir', 'quedo_esperando', 'cancelar_espera', 'proponer_skill'])
     // y sin asignación nico no puede proponer aunque llame por nombre
     expect(await mcp.consultas.herramientas('t', id('nico')).llamar('proponer_accion', { herramienta: crearCal, resumen: 'x' })).toBeUndefined()
   })

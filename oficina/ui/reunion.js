@@ -194,7 +194,7 @@
   function sincronizar() {
     var r = E.reunion, pill = App.dom && App.dom.avisoReu;
     if (activa(r)) {
-      App.Oficina3D.reunion(r.agentes, r.estado === 'en_curso' ? r.hablando : null);
+      App.Oficina.reunion(r.agentes, r.estado === 'en_curso' ? r.hablando : null);
       App.dom.navReu.classList.remove('oculto');
       App.dom.navReu.textContent = r.estado === 'en_curso' ? 'En curso' : 'Esperando';
       if (pill) {
@@ -204,7 +204,7 @@
         pill.classList.remove('oculto');
       }
     } else {
-      App.Oficina3D.finReunion();
+      App.Oficina.finReunion();
       if (App.dom) { App.dom.navReu.classList.add('oculto'); if (pill) pill.classList.add('oculto'); }
     }
     App.marcarEstados();

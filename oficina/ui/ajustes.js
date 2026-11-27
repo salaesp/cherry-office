@@ -270,28 +270,7 @@ App.Ajustes = (function () {
       visible: function () { return !!(App.Permisos && (App.Permisos.pintarModo || App.Permisos.abrirModo)); }, pintar: permisos },
     { id: 'ia', grupo: 'app', texto: 'Modelos y consumo', icono: 'medidor', pintar: iaAjustes },
     { id: 'whatsapp', grupo: 'app', texto: 'WhatsApp', icono: 'charla', visible: function () { return !!App.WhatsApp; }, pintar: function (c) { App.WhatsApp.pintar(c); } },
-    { id: 'apariencia', grupo: 'app', texto: 'Apariencia', icono: 'capas', nota: function () { return App.estiloOficina === 'lego' ? 'Maqueta LEGO' : 'Pixel'; }, pintar: apariencia },
   ];
-
-  /* `estilo_oficina` (toda la app, PUT /api/preferencias): cómo se dibuja la oficina. Cambiarlo recarga la app. */
-  var ESTILOS = [
-    { valor: 'pixel', titulo: 'Pixel', sub: 'La oficina en pixel art, con salas, ventanales que siguen la hora y agentes que caminan.' },
-    { valor: 'lego', titulo: 'Maqueta LEGO', sub: 'La maqueta 3D de antes. Queda como opción, pero no recibe novedades.' },
-  ];
-  function apariencia(crear) {
-    var hj = crear({ titulo: 'Apariencia' }), err = h('div.error-txt');
-    var el = App.elegir({ forma: 'lista', etiqueta: 'Estilo de la oficina', opciones: ESTILOS, valor: App.estiloOficina,
-      alCambiar: function (v) {
-        if (v === App.estiloOficina) return;
-        err.textContent = '';
-        api().put('/api/preferencias', { estilo_oficina: v }).then(function (r) {
-          if (App.E && App.E.estado) App.E.estado.estilo_oficina = r.estilo_oficina;
-          location.reload();
-        }).catch(function (e) { err.textContent = e.message; el.poner(App.estiloOficina); });
-      } });
-    hj.cuerpo.appendChild(App.ajuste('Estilo de la oficina', 'Vale para todas tus oficinas. Al cambiarlo, la app se vuelve a abrir.', el));
-    hj.cuerpo.appendChild(err);
-  }
 
   /* Sección «Modelos y consumo» (toda la app, PUT /api/preferencias): qué modelo usa cada proceso que no es un agente y
      cuánto gasta la IA. El modelo y el esfuerzo de cada agente se eligen en su ficha. Se guarda al elegir. */

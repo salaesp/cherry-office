@@ -25,8 +25,6 @@ export type ModoPermisos = 'auto' | 'preguntar'
 export const esModoPermisos = (v: unknown): v is ModoPermisos => v === 'auto' || v === 'preguntar'
 export type ConectoresAgentes = 'todos' | 'por_agente'
 export const esConectoresAgentes = (v: unknown): v is ConectoresAgentes => v === 'todos' || v === 'por_agente'
-export type EstiloOficina = 'pixel' | 'lego'
-export const esEstiloOficina = (v: unknown): v is EstiloOficina => v === 'pixel' || v === 'lego'
 
 /** Modelos de los procesos que no son un agente de la oficina (clave `modelos` de config.json, toda la app).
  *  `creador`: el Creador de la recepción; `internos`: borradores de agente, fichas e imágenes de la biblioteca y síntesis
@@ -76,8 +74,6 @@ export class Config {
    *  todos los conectores conectados y lo que actúa (enviar, publicar...) se pide como cualquier permiso; `por_agente` = solo
    *  los asignados a cada agente (Ajustes › Conectores). undefined se comporta como `por_agente`. */
   conectoresAgentes?: ConectoresAgentes
-  /** Cómo se dibuja la oficina (clave `estilo_oficina`, toda la app): `pixel` (por defecto) o `lego` (la maqueta 3D). */
-  estiloOficina?: EstiloOficina
   /** Solo lo que la persona cambió; lo demás sale de `modelosPorDefecto` (ver `modelo()`). */
   modelos: Partial<Record<ClaveModelo, string>> = {}
   /** Solo lo que la persona cambió; lo demás sale de `iaPorDefecto`. */
@@ -167,7 +163,6 @@ export class Config {
     if (lista(o.oficina_dirs_extra)) this.oficinaDirsExtra = o.oficina_dirs_extra.map((d) => Config.ruta(d, home))
     if (esModoPermisos(o.modo_permisos)) this.modoPermisos = o.modo_permisos
     if (esConectoresAgentes(o.conectores_agentes)) this.conectoresAgentes = o.conectores_agentes
-    if (esEstiloOficina(o.estilo_oficina)) this.estiloOficina = o.estilo_oficina
     if (esObjeto(o.modelos)) {
       for (const k of clavesModelo) {
         const v = o.modelos[k]

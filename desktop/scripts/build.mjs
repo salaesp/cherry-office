@@ -1,5 +1,5 @@
 // Compila la carcasa: main (con el backend TS adentro) y preload a CommonJS, con esbuild.
-// `--recursos` además arma build/recursos/oficina (el front filtrado, con vendor/: three.js y Poppins), que
+// `--recursos` además arma build/recursos/oficina (el front filtrado, con vendor/: Poppins), que
 // electron-builder copia como recurso de la app.
 import { build } from 'esbuild'
 import fs from 'node:fs'
@@ -68,7 +68,7 @@ if (process.argv.includes('--recursos')) {
   const fuera = (rel) => {
     const base = path.basename(rel)
     if (['server.py', 'lanzar.py', '.datos', '.sesiones.json', 'Agentes imagenes', '__pycache__', '.DS_Store', 'README.md',
-      'lego_man.json', 'personajes', '_labvendor', '_ldraw'].includes(base)) return true
+      'personajes', '_labvendor'].includes(base)) return true
     if (base.endsWith('.command') || base.startsWith('config') || base.startsWith('_lab') || base.startsWith('_cara')) return true
     if (['_fig.html', '_figuras_demo.html'].includes(base)) return true
     if (rel === 'js' || (rel.startsWith('ui/') && base.startsWith('_'))) return true
@@ -84,8 +84,7 @@ if (process.argv.includes('--recursos')) {
     } else fs.copyFileSync(o, path.join(dest, rel))
   }
   copiar('')
-  const deben = ['index.html', 'ui/base.js', 'ui/app.js', 'ldraw/catalogo.json', 'ldraw/minifigs.mpd', 'ldraw/LICENSE-LDraw.txt',
-    'vendor/three.min.js', 'vendor/LDrawLoader.js', 'vendor/LICENSE-three.txt', 'vendor/LICENSE-Poppins-OFL.txt']
+  const deben = ['index.html', 'ui/base.js', 'ui/app.js', 'ui/pixel/oficina-pixel.js', 'vendor/poppins.css', 'vendor/LICENSE-Poppins-OFL.txt']
   for (const f of deben) if (!fs.existsSync(path.join(dest, f))) throw new Error(`Falta en los recursos: oficina/${f}`)
   console.log(`recursos: ${dest}`)
 }

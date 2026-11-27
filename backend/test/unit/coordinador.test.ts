@@ -5,7 +5,7 @@ import { HerramientasCoordinador, herramientasCoordinador, maxRespuesta, respues
 import { mcpDe } from '../../src/consultas.js'
 import { corridasDe } from '../../src/parte.js'
 import type { MCPHerramientas } from '../../src/mcp-protocolo.js'
-import { Coordinador, Dependencias, HerramientasMCPAgente, Seguimiento, contexto, herramientasMCP } from '../../src/permisos.js'
+import { Coordinador, Dependencias, HerramientasMCPAgente, Seguimiento, contexto, herramientaProponerSkill, herramientasMCP } from '../../src/permisos.js'
 import { OficinaStore, type AgenteDef, type Oficina } from '../../src/oficina.js'
 import { Sandbox, U, esperar } from '../support/sandbox.js'
 import { arrancar, oficina } from '../support/en-proceso.js'
@@ -37,17 +37,17 @@ describe('Coordinador', () => {
     expect(Coordinador.perfil(o, coordi)).toBe('coordinador')
     expect(Coordinador.herramientasMCP(o, marce)).toEqual([])
     expect(Coordinador.herramientasMCP(o, coordi)).toEqual(['mcp__hq__estado_oficina', 'mcp__hq__entregas', 'mcp__hq__corridas', 'mcp__hq__bloqueos', 'mcp__hq__encargar'])
-    expect(HerramientasMCPAgente.lista(o, coordi)).toEqual([...herramientasMCP, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, coordi), ...Seguimiento.herramientasMCP(o, coordi)])
-    expect(HerramientasMCPAgente.lista(o, marce)).toEqual([...herramientasMCP, ...Dependencias.herramientasMCP(), ...Seguimiento.herramientasMCP(o, marce)])
+    expect(HerramientasMCPAgente.lista(o, coordi)).toEqual([...herramientasMCP, ...Dependencias.herramientasMCP(), ...Coordinador.herramientasMCP(o, coordi), ...Seguimiento.herramientasMCP(o, coordi), herramientaProponerSkill])
+    expect(HerramientasMCPAgente.lista(o, marce)).toEqual([...herramientasMCP, ...Dependencias.herramientasMCP(), ...Seguimiento.herramientasMCP(o, marce), herramientaProponerSkill])
   })
 
   test('el perfil agente no ve las herramientas del coordinador, ni siquiera llamándolas por nombre', async () => {
     const { tools, s, carpeta } = await preparar()
     const h = tools('marce', 'agente')
-    expect(nombres(h)).toEqual(['colegas', 'consultar', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'pedir', 'quedo_esperando', 'cancelar_espera'])
+    expect(nombres(h)).toEqual(['colegas', 'consultar', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'pedir', 'quedo_esperando', 'cancelar_espera', 'proponer_skill'])
     for (const n of Coordinador.nombresMCP) expect(await h.llamar(n, {})).toBeUndefined()
     const c = tools('coordi', 'coordinador')
-    expect(nombres(c)).toEqual(['colegas', 'consultar', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'estado_oficina', 'entregas', 'corridas', 'bloqueos', 'encargar', 'pedir', 'quedo_esperando', 'cancelar_espera'])
+    expect(nombres(c)).toEqual(['colegas', 'consultar', 'quien_sabe', 'buscar', 'marcar_obsoleto', 'anotar', 'seguimiento', 'seguimientos', 'seguimiento_leer', 'ficha_anotar', 'ficha_leer', 'estado_oficina', 'entregas', 'corridas', 'bloqueos', 'encargar', 'pedir', 'quedo_esperando', 'cancelar_espera', 'proponer_skill'])
     expect(herramientasCoordinador(s, 't', { oficina: carpeta, agente: 'marce', sid: U.a, perfil: 'agente' })).toBeUndefined()
   })
 

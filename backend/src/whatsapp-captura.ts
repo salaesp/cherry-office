@@ -1,7 +1,8 @@
 // Captura de WhatsApp (docs/plan-secretaria.md, «Fuente WhatsApp»): proceso hijo que lanza y supervisa `whatsapp.ts`.
 // Mantiene la sesión de dispositivo vinculado con Baileys, filtra por los chats elegidos y le pasa al backend, por IPC,
 // solo los mensajes de esos chats y los metadatos de los demás para la lista (nunca su texto). En un grupo con filtro de
-// personas, los mensajes de quienes quedaron afuera tampoco salen de este proceso (`FiltroElegidos`).
+// personas, los mensajes de quienes quedaron afuera tampoco salen de este proceso (`FiltroElegidos`). Con «leer todos los
+// chats individuales» prendido, también salen los de cualquier chat individual desde que la otra persona escribe.
 //
 // SOLO LECTURA: este archivo nunca llama a sendMessage, readMessages, sendPresenceUpdate ni chatModify. No manda
 // mensajes, no marca leído y no aparece «en línea». Si algún día hace falta mandar algo, no va acá.
@@ -311,7 +312,7 @@ let elegidosNumeros: string[] = []
 
 process.on('message', (msg: ACaptura) => {
   if (msg?.tipo === 'elegidos') {
-    elegidos = new FiltroElegidos(msg.chats)
+    elegidos = new FiltroElegidos(msg.chats, msg.todos)
     elegidosNumeros = msg.chats.map((c) => c.jid).filter((j) => j.endsWith('@s.whatsapp.net'))
     if (sock?.user) void resolverLids(sock)
   } else if (msg?.tipo === 'cerrar_sesion') {

@@ -1,6 +1,6 @@
-/* Apariencia pixel de los agentes: traducción desde el avatar LEGO, retratos y editor.
+/* Apariencia de los agentes: retratos, editor y traducción desde el avatar LEGO de antes (datos guardados).
    El avatar se guarda en las mismas claves de siempre: los colores (colorPiel, colorPelo, colorTorso, colorPiernas,
-   colorAccesorio) son compartidos con la maqueta LEGO; peinado, prendas y accesorio pixel van en pxPelo, pxArriba,
+   colorAccesorio) vienen de la época de la maqueta LEGO; peinado, prendas y accesorio pixel van en pxPelo, pxArriba,
    pxAbajo y pxAccesorio. Si faltan, salen del avatar LEGO (pelo, torso, piernas, sombrero) o de la semilla. */
 window.App = window.App || {};
 App.Pixel = (function () {

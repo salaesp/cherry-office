@@ -266,12 +266,12 @@
   var VERBOS = {
     Read: 'Leyó', Write: 'Escribió', Edit: 'Editó', MultiEdit: 'Editó', NotebookEdit: 'Editó', Glob: 'Buscó archivos',
     Grep: 'Buscó', Bash: 'Ejecutó un comando', WebFetch: 'Abrió', WebSearch: 'Buscó en la web', Task: 'Delegó una tarea',
-    Agent: 'Delegó una tarea', TodoWrite: 'Actualizó su lista', Skill: 'Usó una habilidad', LS: 'Miró la carpeta'
+    Agent: 'Delegó una tarea', TodoWrite: 'Actualizó su lista', Skill: 'Usó la skill', LS: 'Miró la carpeta'
   };
   var GERUNDIOS = {
     Read: 'Leyendo', Write: 'Escribiendo', Edit: 'Editando', MultiEdit: 'Editando', NotebookEdit: 'Editando', Glob: 'Buscando archivos',
     Grep: 'Buscando', Bash: 'Ejecutando un comando', WebFetch: 'Abriendo', WebSearch: 'Buscando en la web', Task: 'Delegando una tarea',
-    Agent: 'Delegando una tarea', LS: 'Mirando la carpeta'
+    Agent: 'Delegando una tarea', LS: 'Mirando la carpeta', Skill: 'Usando la skill'
   };
   function verbo(nombre) {
     if (VERBOS[nombre]) return VERBOS[nombre];

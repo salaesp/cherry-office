@@ -1,4 +1,4 @@
-/* «Te necesita»: avisos que llegan con /api/actividad. Faro sobre el agente en 3D, banner abajo al centro,
+/* «Te necesita»: avisos que llegan con /api/actividad. Faro sobre el agente en la oficina, banner abajo al centro,
    tecla N para ir al siguiente, insignia del Dock (app nativa). Los de tipo reunión y propuestas se calculan en el
    servidor y desaparecen solos al resolverse (la reunión, también al abrirla); los demás se marcan como vistos al abrirlos. */
 window.App = window.App || {};
@@ -13,6 +13,7 @@ App.Avisos = (function () {
   function titulo(a) {
     if (a.tipo === 'reunion') return 'Reunión esperándote';
     if (a.tipo === 'propuestas') return 'Propuesta de cambio en un documento';
+    if (a.tipo === 'skill') return (nombre(a) || 'Un agente') + ' propone una skill';
     if (a.tipo === 'pendiente') return 'Pendientes para vos';
     if (a.tipo === 'flujo') return 'Te toca en un flujo';
     if (a.tipo === 'espera') {
@@ -43,7 +44,7 @@ App.Avisos = (function () {
     if (indice >= lista.length) indice = 0;
     var faros = {};
     lista.forEach(function (a) { if (a.agente) faros[a.agente] = a.tipo; });
-    if (App.Oficina3D && App.Oficina3D.faros) App.Oficina3D.faros(faros);
+    if (App.Oficina && App.Oficina.faros) App.Oficina.faros(faros);
     insignia();
     marcarLateral(faros);
     pintarBanner();
@@ -93,14 +94,15 @@ App.Avisos = (function () {
     if (!a) {  // desde una notificación: puede no estar en la lista todavía
       return App.api.get('/api/avisos').then(function (r) { lista = r.avisos || []; var b = lista.filter(function (x) { return x.id === id; })[0]; if (b) abrir(id); });
     }
-    if (a.tipo === 'reunion') { if (a.ref && App.Reunion.ver) App.Reunion.ver(a.ref); else App.Reunion.abrir(); if (App.Oficina3D.enfocarLugar) App.Oficina3D.enfocarLugar('reunion'); return; }
+    if (a.tipo === 'reunion') { if (a.ref && App.Reunion.ver) App.Reunion.ver(a.ref); else App.Reunion.abrir(); if (App.Oficina.enfocarLugar) App.Oficina.enfocarLugar('reunion'); return; }
     if (a.tipo === 'propuestas') { App.Biblioteca.abrir(); return; }
+    if (a.tipo === 'skill') { if (App.SkillsPropias) App.SkillsPropias.revisar(a.agente, a.ref); return; }
     if (a.tipo === 'flujo') { visto({ id: a.id }); if (App.Flujos && App.Flujos.verCorrida) App.Flujos.verCorrida(a.ref); return; }
     if (a.tipo === 'espera') { visto({ id: a.id }); if (App.Parte && App.Parte.abrirEspera) App.Parte.abrirEspera(a.ref); return; }
     if (a.tipo === 'pendiente') { visto({ id: a.id }); if (App.Reunion.ver && a.ref) App.Reunion.ver(a.ref); else App.Reunion.abrir(); return; }
     if (a.agente && App.agente(a.agente)) {
       App.Agente.abrir(a.agente, 'chat');
-      if (App.Oficina3D.enfocarAgente) App.Oficina3D.enfocarAgente(a.agente);
+      if (App.Oficina.enfocarAgente) App.Oficina.enfocarAgente(a.agente);
       visto({ agente: a.agente });
     } else visto({ id: a.id });
   }
@@ -112,8 +114,8 @@ App.Avisos = (function () {
     }
     indice = (indice + 1) % lista.length;
     var a = lista[indice];
-    if (a.agente && App.Oficina3D.enfocarAgente) App.Oficina3D.enfocarAgente(a.agente);
-    else if (a.tipo === 'reunion' && App.Oficina3D.enfocarLugar) App.Oficina3D.enfocarLugar('reunion');
+    if (a.agente && App.Oficina.enfocarAgente) App.Oficina.enfocarAgente(a.agente);
+    else if (a.tipo === 'reunion' && App.Oficina.enfocarLugar) App.Oficina.enfocarLugar('reunion');
     pintarBanner();
   }
 

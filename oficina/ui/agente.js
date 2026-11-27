@@ -59,6 +59,13 @@
     setTimeout(paso, 300);
   }
 
+  /* «Convertir en skill»: guarda lo que sirve de esta charla como skill propia del agente (skills-propias.js) */
+  function botonSkill(a, fantasma) {
+    if (!App.SkillsPropias) return null;
+    return h('button.btn.chico.convertir-skill' + (fantasma ? '.fantasma' : ''), { title: 'Guardar lo que sirve de esta charla como skill de ' + a.nombre + ', para la próxima vez',
+      onclick: function () { App.SkillsPropias.desdeCharla(a, sesiones[a.id]); } }, App.icono('libro'), 'Convertir en skill');
+  }
+
   /* ---- enviar, cola y «Detener» ---- */
   function repintar(id) { if (repintarChat && repintarChat.id === id && actual === id && pestana === 'chat') repintarChat.fn(); }
 
@@ -170,10 +177,10 @@
     actual = id; pestana = pest || (mismo ? pestana : 'chat');
     /* en la compu la ficha va al costado de la charla */
     if (esCompu() && pestana !== 'chat') { lado = pestana; pestana = 'chat'; }
-    App.Oficina3D.elegir(id);
+    App.Oficina.elegir(id);
     App.abrirDerecho('agente');   // primero: así ya está en su sección al pintar
     pintar();
-    if (esCompu() && App.Oficina3D.enfocarAgente) App.Oficina3D.enfocarAgente(id);
+    if (esCompu() && App.Oficina.enfocarAgente) App.Oficina.enfocarAgente(id);
     if (App.Avisos) App.Avisos.vistoAgente(id);
     App.marcarEstados();
   }
@@ -346,10 +353,10 @@
             h('button.btn.fantasma.icono.agente-lapiz-btn', { title: 'Perfil, apariencia y permisos de ' + a.nombre, 'aria-pressed': String(lado === 'perfil' || lado === 'permisos'),
               onclick: function () { verLado(lado === 'perfil' || lado === 'permisos' ? 'detalles' : 'perfil'); } }, App.icono('lapiz')),
             h('button.btn.fantasma.icono', { title: 'Ver dónde está ' + a.nombre + ' en la oficina', onclick: function () {
-              if (App.Oficina3D.marcar) App.Oficina3D.marcar(a.id); else if (App.Oficina3D.enfocarAgente) App.Oficina3D.enfocarAgente(a.id); } }, App.icono('pin')),
+              if (App.Oficina.marcar) App.Oficina.marcar(a.id); else if (App.Oficina.enfocarAgente) App.Oficina.enfocarAgente(a.id); } }, App.icono('pin')),
             /* cerrar no va acá: queda arriba a la derecha del todo, en la cabecera de la columna del costado */)),
         h('div.charla-barra', h('b.charla-tit', App.Nav.tituloCharla ? App.Nav.tituloCharla(a.id) : ''), chipContexto(a),
-          h('button.btn.chico.fantasma.sacar-tareas', { title: 'Convertir esta charla en tareas (para ' + a.nombre + ' o para otros)', onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), 'Sacar tareas')),
+          h('button.btn.chico.fantasma.sacar-tareas', { title: 'Convertir esta charla en tareas (para ' + a.nombre + ' o para otros)', onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), 'Sacar tareas'), botonSkill(a, true)),
         cuerpo, pie);
       der.classList.add('con-relacionado');
       ponerColumnas(a);
@@ -368,7 +375,7 @@
             App.retratoImg(a, 'retrato', 120),
             h('span.der-tit', h('span.agente-nombre', h('h2', a.nombre), App.icono('flecha')), sub, pista)),
           h('div.der-acciones', chipContexto(a),
-            h('button.btn.chico.sacar-tareas', { title: 'Convertir esta charla en tareas (para ' + a.nombre + ' o para otros)', onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), 'Sacar tareas')),
+            h('button.btn.chico.sacar-tareas', { title: 'Convertir esta charla en tareas (para ' + a.nombre + ' o para otros)', onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), 'Sacar tareas'), botonSkill(a)),
           cerrarBtn),
         filaCuentas(a),
         cuerpo, pie);
@@ -380,7 +387,7 @@
           h('div.der-tit', h('h2', a.nombre), sub),
           /* con texto: un ícono solo no dice qué hace. La charla actual no se pierde: queda en la lista de Charlas */
           h('div.der-acciones', chipContexto(a),
-            h('button.btn.chico.sacar-tareas', { title: 'Convertir esta charla en tareas (para ' + a.nombre + ' o para otros)', onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), 'Sacar tareas'),
+            h('button.btn.chico.sacar-tareas', { title: 'Convertir esta charla en tareas (para ' + a.nombre + ' o para otros)', onclick: function () { App.ChatTareas.abrir(a, sesiones[a.id]); } }, App.icono('reloj'), 'Sacar tareas'), botonSkill(a),
             h('button.btn.chico', { title: 'Empezar de cero con ' + a.nombre + '. Esta charla queda guardada en Charlas.', onclick: function () { nueva(a.id); } }, App.icono('mas'), 'Nueva charla')),
           cerrarBtn),
         cuerpo, pie);
@@ -478,8 +485,8 @@
       parar.disabled = !!cancelando[a.id];
       parar.title = cancelando[a.id] ? 'Deteniendo…' : 'Detener lo que está haciendo ' + a.nombre;
       /* «Sacar tareas»: solo con una charla que tenga algo tuyo y sin respuesta en curso */
-      var sacar = App.dom.derecho.querySelector('.sacar-tareas');
-      if (sacar) sacar.disabled = !!enCurso[a.id] || !sesiones[a.id] || !msgs.some(function (m) { return m.r === 'u'; });
+      var sinCharla = !!enCurso[a.id] || !sesiones[a.id] || !msgs.some(function (m) { return m.r === 'u'; });
+      App.dom.derecho.querySelectorAll('.sacar-tareas, .convertir-skill').forEach(function (b) { b.disabled = sinCharla; });
     }
 
     var leyendo = false;
@@ -523,7 +530,7 @@
 
   function ocupado(id, si) {
     if (si) { enCurso[id] = true; App.E.ocupados[id] = true; } else { delete enCurso[id]; delete App.E.ocupados[id]; }
-    App.Oficina3D.ocupado(id, si);
+    App.Oficina.ocupado(id, si);
     App.marcarEstados();
   }
 
@@ -793,7 +800,7 @@
     App.add(cont, resumen, zonaReglas,
       App.ajuste('Hace solo', 'Lo que resuelve sin consultarte.', chipsSolo),
       App.ajuste('Te consulta antes', 'Mail, publicar o gastar siempre quedan como propuesta, aunque no figure acá.', chipsProponer),
-      zonaHab, zonaConectores);
+      App.SkillsPropias ? App.SkillsPropias.seccion(ag()) : null, zonaHab, zonaConectores);
     pintarReglas(); pintarConectores(); cargarHabilitados();
     if (!global) cargarCatalogo();
     api.get('/api/biblioteca/entregables', { agente: id }).then(function (r) {
@@ -1219,7 +1226,7 @@
   }
 
   function cerrar() { if (App.modoDerecho() === 'agente') App.cerrarDerecho(); else alCerrar(); }
-  function alCerrar() { actual = null; App.Oficina3D.elegir(null); App.marcarEstados(); }
+  function alCerrar() { actual = null; App.Oficina.elegir(null); App.marcarEstados(); }
 
   /* abre la hoja de «Nueva tarea» (de un agente, o sin agente: arriba se elige) con datos precargados (desde un pendiente de reunión) */
   function nuevaTarea(id, pre, alGuardar) {
@@ -1237,7 +1244,7 @@
     /* abre una conversación concreta del agente (p. ej. la de una entrega) en su pestaña de chat */
     abrirSesion: function (id, sid) {
       var a = App.agente(id); if (!a) return;
-      actual = id; sesionFija = sid; pestana = 'chat'; App.Oficina3D.elegir(id); App.abrirDerecho('agente'); abrirSesion(a, sid); App.marcarEstados();
+      actual = id; sesionFija = sid; pestana = 'chat'; App.Oficina.elegir(id); App.abrirDerecho('agente'); abrirSesion(a, sid); App.marcarEstados();
     },
     nueva: nueva,
     sesion: function (id) { return sesiones[id] || null; },

@@ -118,8 +118,8 @@ select.campo { padding-right: 26px; }
 
 .vista { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
 .lienzo { position: absolute; inset: 0; }
-.lienzo3d { position: absolute; inset: 0; display: block; touch-action: none; }
-.capa3d { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.lienzo-oficina { position: absolute; inset: 0; display: block; touch-action: none; }
+.capa-oficina { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .herramientas { position: absolute; top: 14px; right: 14px; display: flex; gap: 8px; z-index: 5; }
 .herramientas .btn { box-shadow: var(--sombra); }
 /* medidor de uso de Claude (uso.js): chip en la barra y popover */
@@ -169,7 +169,7 @@ select.campo { padding-right: 26px; }
 .pista { position: absolute; left: 14px; bottom: 12px; font-size: 11px; color: var(--tenue); z-index: 5; pointer-events: none; }
 .aviso-reunion { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 9px; height: 34px; padding: 0 6px 0 14px;
   background: var(--panel); border: 1px solid var(--linea); border-radius: 17px; box-shadow: var(--sombra); font-weight: 500; }
-.carga3d { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--suave); z-index: 4; }
+.carga-oficina { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--suave); z-index: 4; }
 
 /* etiquetas sobre la maqueta: .etq es un ancla de tamaño 0 que se mueve con transform; .etq-in es lo visible */
 .etq { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; will-change: transform; }
@@ -376,17 +376,6 @@ body.arrastrando-hoja iframe { pointer-events: none; }   /* que un artefacto o u
 .editor-avatar .grande { width: 236px; height: 236px; border-radius: 14px; background: var(--fondo); border: 1px solid var(--linea); object-fit: cover; }
 .editor-avatar canvas.grande { object-fit: contain; image-rendering: pixelated; image-rendering: crisp-edges; }
 .lienzo-pixel { image-rendering: pixelated; image-rendering: crisp-edges; }
-.galeria-cab { display: flex; align-items: center; gap: 10px; width: 100%; padding: 4px 10px 4px 4px; border-radius: var(--radio-chico); border: 1px solid var(--linea-fuerte); background: var(--panel); cursor: pointer; text-align: left; color: inherit; }
-.galeria-cab img { width: 44px; height: 44px; border-radius: 6px; background: var(--fondo); flex: none; }
-.galeria-nombre { flex: 1; min-width: 0; }
-.galeria-flecha { color: var(--suave); font-size: 11px; }
-.galeria-grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; margin-top: 8px; max-height: min(400px, 55vh); overflow-y: auto; padding: 2px; }
-.galeria-grilla button { padding: 0; border: 1px solid var(--linea); border-radius: 8px; background: var(--fondo); cursor: pointer; overflow: hidden; display: block; align-self: start; }
-/* la proporción va en la imagen y no en el botón: con aspect-ratio en el ítem de grilla, WebKit dejaba las filas
-   más bajas que los botones y se encimaban */
-.galeria-grilla button img { width: 100%; height: auto; aspect-ratio: 1; display: block; }
-.galeria-grilla button.sel { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--texto); }
-.galeria-grilla button:hover { border-color: var(--linea-fuerte); }
 .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .pasos { display: flex; gap: 6px; align-items: center; color: var(--tenue); font-size: 12px; }
 .pasos b { color: var(--texto); font-weight: 600; }
@@ -913,7 +902,7 @@ button.adjunto:hover { background: var(--panel-2); }
 
 /* secciones: el panel es la pantalla (la maqueta queda armada, oculta) */
 .app.en-seccion .lienzo { visibility: hidden; }
-.app.en-seccion .carga3d, .app.en-seccion .herramientas, .app.en-seccion .pista, .app.en-seccion .vista > .marca, .app.en-seccion .aviso-reunion { display: none; }
+.app.en-seccion .carga-oficina, .app.en-seccion .herramientas, .app.en-seccion .pista, .app.en-seccion .vista > .marca, .app.en-seccion .aviso-reunion { display: none; }
 .app.en-seccion .derecho { width: 100%; transform: none; visibility: visible; box-shadow: none; border-left: 0; transition: none; }
 /* Dos formatos de pantalla: «lectura» (todo en una columna de --ancho-lectura: cabecera, cuerpo y pie alineados) y
    «trabajo» (todo el ancho, con columnas propias: biblioteca, conocimiento y el Creador). */
@@ -1275,3 +1264,9 @@ button.adjunto:hover { background: var(--panel-2); }
     .hoja-doc .hoja-cuerpo { padding: 14px 16px 20px; }
   }
 }
+
+/* Skills propias (skills-propias.js) */
+.skill-aviso { background: var(--panel-2); border: 1px solid var(--linea); border-radius: var(--radio-chico); padding: 10px 12px; margin-bottom: 14px; font-size: 13px; line-height: 1.45; }
+.skill-aviso b { display: block; margin-bottom: 2px; }
+.skill-aviso .ayuda { margin-top: 4px; }
+textarea.campo.skill-contenido { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; min-height: 260px; }

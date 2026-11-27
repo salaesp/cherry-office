@@ -1,5 +1,5 @@
 /* Flujos (docs/plan-creador-flujos.md §7 y §12): tablero de corridas, detalle de una corrida (línea de pasos), hoja «Nueva corrida»
-   y editor de las definiciones. Panel derecho en modo «flujos». También anima la pieza en el 3D cuando una corrida cambia de paso
+   y editor de las definiciones. Panel derecho en modo «flujos». También anima la pieza en la oficina cuando una corrida cambia de paso
    y cuenta en la barra lateral las corridas que esperan a la persona o están trabadas (llegan con /api/actividad). */
 window.App = window.App || {};
 App.Flujos = (function () {
@@ -747,7 +747,7 @@ App.Flujos = (function () {
     cargar(idInicial);
   }
 
-  /* ---------------- actividad: insignia, lista viva y pieza en el 3D ---------------- */
+  /* ---------------- actividad: insignia, lista viva y pieza en la oficina ---------------- */
   function alActividad(r) {
     pintarVivos();
     var cs = r.corridas || [];
@@ -755,7 +755,7 @@ App.Flujos = (function () {
     cs.forEach(function (c) { nuevo[c.id] = { paso: c.paso, quien: c.quien, estado: c.estado }; });
 
     /* la pieza viaja cuando una corrida cambia de paso (o aparece una nueva, que sale de la recepción) */
-    if (conocidas !== null && App.Oficina3D && App.Oficina3D.pieza) {
+    if (conocidas !== null && App.Oficina && App.Oficina.pieza) {
       cs.forEach(function (c) {
         var antes = conocidas[c.id];
         if (antes && antes.paso === c.paso) return;
@@ -763,7 +763,7 @@ App.Flujos = (function () {
         var prev = antes ? (antes.quien || c.anterior) : null;
         var desde = prev && prev !== 'persona' ? prev : null;
         var hacia = c.quien && c.quien !== 'persona' ? c.quien : null;
-        try { App.Oficina3D.pieza(desde, hacia); } catch (e) { /* la animación nunca rompe nada */ }
+        try { App.Oficina.pieza(desde, hacia); } catch (e) { /* la animación nunca rompe nada */ }
       });
     }
     conocidas = nuevo;

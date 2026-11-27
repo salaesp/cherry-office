@@ -174,14 +174,16 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
     var p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.setAttribute('d', ICONOS[n] || ''); s.appendChild(p);
     return s;
   };
-  /* logo: un ladrillo 2x2 visto en perspectiva, en gris oscuro */
+  /* logo: un edificio pixel con ventanas encendidas (16×16, sin suavizado) */
   App.logo = function () {
     var s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    s.setAttribute('viewBox', '0 0 32 32'); s.setAttribute('class', 'logo');
-    s.innerHTML = '<rect x="2" y="9" width="28" height="19" rx="3" fill="#c4372f"/><rect x="2" y="9" width="28" height="5" rx="2" fill="#d6463d"/>' +
-      '<ellipse cx="10" cy="9" rx="4.5" ry="2" fill="#e05a50"/><rect x="5.5" y="5" width="9" height="4" fill="#d6463d"/><ellipse cx="10" cy="5" rx="4.5" ry="2" fill="#ea6c62"/>' +
-      '<ellipse cx="22" cy="9" rx="4.5" ry="2" fill="#e05a50"/><rect x="17.5" y="5" width="9" height="4" fill="#d6463d"/><ellipse cx="22" cy="5" rx="4.5" ry="2" fill="#ea6c62"/>';
-    return s;
+    s.setAttribute('viewBox', '0 0 16 16'); s.setAttribute('class', 'logo'); s.setAttribute('shape-rendering', 'crispEdges');
+    var r = function (x, y, w, h, c) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="' + c + '"/>'; }, v = '';
+    v += r(2, 2, 9, 13, '#2a1f2e') + r(3, 3, 7, 12, '#e8a33d') + r(3, 3, 7, 1, '#f5c86a') + r(9, 3, 1, 12, '#c4822a');
+    v += r(10, 6, 4, 9, '#2a1f2e') + r(11, 7, 2, 8, '#5d7da6') + r(11, 7, 2, 1, '#8eaed2');
+    [[4, 5], [7, 5], [4, 8], [7, 8], [4, 11]].forEach(function (p) { v += r(p[0], p[1], 2, 2, '#fff3c4'); });
+    v += r(7, 12, 2, 3, '#2a1f2e') + r(11, 9, 2, 1, '#fff3c4') + r(11, 12, 2, 1, '#fff3c4') + r(1, 15, 14, 1, '#2a1f2e');
+    s.innerHTML = v; return s;
   };
 
   /* ---------------- avisos ---------------- */
@@ -1121,7 +1123,7 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
   /* imagen de retrato con carga diferida */
   App.retratoImg = function (agente, clase, tam) {
     var img = h('img.' + (clase || 'retrato'), { alt: '' });
-    App.Piezas.retrato(agente.avatar, agente.id, tam || 96).then(function (u) { img.src = u; }).catch(function () {});
+    App.Pixel.retrato(agente.avatar, agente.id, tam || 96).then(function (u) { img.src = u; }).catch(function () {});
     return img;
   };
 

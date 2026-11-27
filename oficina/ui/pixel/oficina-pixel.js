@@ -1,8 +1,8 @@
-/* Oficina en pixel art isométrico: misma interfaz que App.Oficina3D (iniciar, construir, actividad, faros, reunion,
-   pieza, muro, enfocar…), así el resto de la app no se entera de qué estilo se dibuja.
+/* La oficina en pixel art isométrico (App.Oficina: iniciar, construir, actividad, faros, reunion, pieza, muro,
+   enfocar…); el resto de la app la maneja solo por esta interfaz.
    Usa N (pixel/nucleo.js), M (pixel/muebles.js), drawChar (pixel/personajes.js) y App.Pixel (pixel/avatar.js). */
 window.App = window.App || {};
-App.OficinaPixel = (function () {
+App.Oficina = (function () {
   'use strict';
   if (!window.N || !window.M || !window.drawChar) return null;
   var R = Math.round, S = N.S, WH = 46, WHI = 13, WT = .2, PROF = 6, PAS = 1.6, LAT = 1.4;
@@ -599,7 +599,7 @@ App.OficinaPixel = (function () {
     ctx.putImageData(img, 0, 0); pisos[key] = cv; return cv;
   }
 
-  /* ---------- etiquetas (las mismas clases que la maqueta 3D) ---------- */
+  /* ---------- etiquetas ---------- */
   function etiqueta(tipo, texto, color) {
     var el = document.createElement('div'); el.className = 'etq etq-' + tipo;
     var d = document.createElement('div'); d.className = 'etq-in'; el.appendChild(d);
@@ -851,8 +851,8 @@ App.OficinaPixel = (function () {
   /* ---------- interfaz pública ---------- */
   function iniciar(contenedor) {
     cont = contenedor;
-    vista = document.createElement('canvas'); vista.className = 'lienzo3d lienzo-pixel'; vista.style.width = '100%'; vista.style.height = '100%';
-    capa = document.createElement('div'); capa.className = 'capa3d';
+    vista = document.createElement('canvas'); vista.className = 'lienzo-oficina lienzo-pixel'; vista.style.width = '100%'; vista.style.height = '100%';
+    capa = document.createElement('div'); capa.className = 'capa-oficina';
     cont.appendChild(vista); cont.appendChild(capa);
     vc = vista.getContext('2d');
     mundo = document.createElement('canvas'); g = mundo.getContext('2d'); N.g = g;
