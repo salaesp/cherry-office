@@ -3,7 +3,9 @@
 //   cd backend && npm run dev            → http://localhost:8765
 //
 // Variables: PORT (8765), HQ_HOME (carpeta personal alternativa; tests), HQ_DATA_DIR, HQ_OFICINAS_DIR, CLAUDE_BIN,
-// HQ_CONFIG y las demás de Config. HQ_UI_DIR apunta a otra carpeta `oficina/` (por defecto la del repo).
+// HQ_CONFIG y las demás de Config. HQ_UI_DIR apunta a otra carpeta `oficina/` (por defecto la del repo). HQ_HOSTS: nombres
+// extra por los que se entra, separados por comas (p. ej. `alfred.tu-red.ts.net` detrás de `tailscale serve`, que da https y
+// así el navegador deja usar el micrófono); por defecto solo localhost.
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -28,7 +30,8 @@ try {
   process.exit(1)
 }
 
-const servidor = new ServidorDev({ router: backend.router, raizUI: ui, raizVendor: vendor, puerto })
+const hostsExtra = (env.HQ_HOSTS ?? '').split(',').map((x) => x.trim()).filter((x) => x !== '')
+const servidor = new ServidorDev({ router: backend.router, raizUI: ui, raizVendor: vendor, puerto, hostsExtra })
 try {
   await servidor.arrancar()
 } catch (e) {
