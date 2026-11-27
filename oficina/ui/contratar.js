@@ -300,10 +300,11 @@
     var rol = h('input.campo', { value: d.rol || '', maxlength: 160, placeholder: 'Ej.: Analista de ventas' });
     var dep = App.elegir({ etiqueta: 'Departamento', valor: d.departamento || (deptos[0] && deptos[0].id),
       opciones: deptos.map(function (x) { return { valor: x.id, titulo: x.nombre, color: x.color }; }) });
-    var modelo = App.elegir({ etiqueta: 'Modelo', forma: 'lista', valor: d.modelo || 'sonnet',
-      opciones: App.MODELOS.map(function (m) { return { valor: m.valor, titulo: m.titulo, sub: m.sub }; }) });
-    var esfuerzo = App.elegir({ etiqueta: 'Esfuerzo', forma: 'lista', valor: d.esfuerzo || '',
-      opciones: App.ESFUERZOS.map(function (m) { return { valor: m.valor, titulo: m.titulo, sub: m.sub }; }) });
+    /* mismos deslizadores que en el selector de cada charla */
+    var modelo = App.elegir({ etiqueta: 'Modelo', forma: 'deslizador', valor: d.modelo || 'sonnet',
+      opciones: App.modeloOpciones() });
+    var esfuerzo = App.elegir({ etiqueta: 'Esfuerzo', forma: 'deslizador', valor: d.esfuerzo || '',
+      opciones: App.ESFUERZOS.map(function (m) { return { valor: m.valor, titulo: m.valor ? m.titulo : 'El de Claude Code', sub: m.sub, aparte: m.valor === '' }; }) });
     var desc = h('input.campo', { value: d.description || '', maxlength: 1000, placeholder: 'En una línea, para qué sirve' });
     var prompt = h('textarea.campo', { rows: 9, maxlength: 20000 }); prompt.value = d.prompt || '';
     var sabeItems = temas((d.sabeDe || []).join(', '));
