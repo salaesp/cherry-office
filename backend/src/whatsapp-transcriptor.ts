@@ -103,16 +103,50 @@ async function decodificar(datos: Buffer): Promise<Float32Array> {
   }
 }
 
+/** WAV PCM de 16 bits (los recados, que la interfaz graba y convierte) a 16 kHz mono. */
+function decodificarWav(b: Buffer): Float32Array {
+  if (b.length < 44 || b.toString('ascii', 0, 4) !== 'RIFF' || b.toString('ascii', 8, 12) !== 'WAVE') throw new Error('no es un WAV')
+  let i = 12, canales = 0, frecuencia = 0, bits = 0, formato = 0
+  while (i + 8 <= b.length) {
+    const id = b.toString('ascii', i, i + 4), n = b.readUInt32LE(i + 4)
+    if (id === 'fmt ' && i + 24 <= b.length) { formato = b.readUInt16LE(i + 8); canales = b.readUInt16LE(i + 10); frecuencia = b.readUInt32LE(i + 12); bits = b.readUInt16LE(i + 22) }
+    else if (id === 'data') {
+      if (formato !== 1 || bits !== 16 || canales < 1 || frecuencia < 8000) throw new Error('el WAV tiene que ser PCM de 16 bits')
+      const fin = Math.min(b.length, i + 8 + n)
+      const muestras = Math.floor((fin - i - 8) / (2 * canales))
+      if (muestras / frecuencia > maxSegundos) throw new Error('el audio dura más de 10 minutos')
+      const mono = new Float32Array(muestras)
+      for (let k = 0; k < muestras; k++) {
+        let x = 0
+        for (let c = 0; c < canales; c++) x += b.readInt16LE(i + 8 + (k * canales + c) * 2) / 32768
+        mono[k] = x / canales
+      }
+      if (frecuencia === 16000) return mono
+      const razon = frecuencia / 16000
+      const out = new Float32Array(Math.floor(muestras / razon))
+      for (let k = 0; k < out.length; k++) {
+        const x = k * razon, j = Math.floor(x), f = x - j
+        out[k] = (mono[j] ?? 0) * (1 - f) + (mono[j + 1] ?? 0) * f
+      }
+      return out
+    }
+    i += 8 + n + (n % 2)
+  }
+  throw new Error('el WAV no tiene datos')
+}
+
 // Una a la vez: el modelo ocupa memoria y CPU.
 let cola: Promise<void> = Promise.resolve()
 
 function transcribir(t: Extract<ATranscriptor, { tipo: 'transcribir' }>) {
   cola = cola.then(async () => {
     try {
-      if (!/ogg|opus/i.test(t.mime)) throw new Error(`formato de audio no soportado (${t.mime})`)
+      const wav = /wav/i.test(t.mime)
+      if (!wav && !/ogg|opus/i.test(t.mime)) throw new Error(`formato de audio no soportado (${t.mime})`)
       const motor = await cargar()
       if (!motor) return
-      const audio = await decodificar(descifrarBytes(fs.readFileSync(t.archivo), CLAVE))
+      const datos = descifrarBytes(fs.readFileSync(t.archivo), CLAVE)
+      const audio = wav ? decodificarWav(datos) : await decodificar(datos)
       const r = await motor.asr(audio, { language: detectaIdioma ? await motor.detectar(audio) : IDIOMA, task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 })
       const texto = (Array.isArray(r) ? r.map((x) => x.text ?? '').join(' ') : r.text ?? '').replace(/\s+/g, ' ').trim()
       enviar({ tipo: 'texto', chat: t.chat, id: t.id, texto })

@@ -228,6 +228,8 @@ export class Programador implements ProgramadorEntregas {
   static readonly prefijoSecretaria = 'secretaria:'
   /** Una tanda de la importación de notas a la memoria de la secretaría: `secretaria-importar:<importación>:<tanda>`. */
   static readonly prefijoImportar = 'secretaria-importar:'
+  /** Algo que la secretaría delegó desde un recado: `recado:<recado>:<resultado>` (recados.ts). */
+  static readonly prefijoRecado = 'recado:'
 
   readonly ejecuciones: Ejecuciones
   /** Pedidos de permiso de las corridas que esperan a la persona (permisos-tareas.ts). */
@@ -531,6 +533,7 @@ export class Programador implements ProgramadorEntregas {
     if (id.startsWith(Programador.prefijoEspera)) return 'espera'
     if (id.startsWith(Programador.prefijoSecretaria)) return 'secretaria'
     if (id.startsWith(Programador.prefijoImportar)) return 'importacion'
+    if (id.startsWith(Programador.prefijoRecado)) return 'recado'
     return 'tarea'
   }
 
@@ -781,6 +784,7 @@ export function nombreCorrida(id: string): string {
   if (id.startsWith(Programador.prefijoEspera)) return 'Versión completa'
   if (id.startsWith(Programador.prefijoSecretaria)) return 'Revisión de la secretaría'
   if (id.startsWith(Programador.prefijoImportar)) return 'Importación a la memoria de la secretaría'
+  if (id.startsWith(Programador.prefijoRecado)) return 'Encargo de un recado'
   return id
 }
 

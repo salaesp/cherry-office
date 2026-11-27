@@ -497,6 +497,9 @@ export class ServicioWhatsApp {
   get cifrado() { return !!this.clave() }
   private clave() { const c = hostWhatsApp(this.s)?.clave?.(); return c && /^[0-9a-f]{64}$/i.test(c) ? c : undefined }
 
+  /** La clave con la que se cifran los medios (hex), si hay: los audios de los recados se guardan igual. */
+  claveMedios(): string | undefined { return this.clave() }
+
   /** Al arrancar la app: si quedó vinculado, reconecta. */
   arrancar() {
     if (this.store.estado('revocado') === '1') this.estado = 'revocado'
@@ -569,6 +572,7 @@ export class ServicioWhatsApp {
     const p = this.procTr
     clearTimeout(this.ocioso)
     this.procTr = undefined
+    this.fallarSueltos('Cambió el modelo de transcripción: probá de nuevo.')
     this.enCola.clear()
     this.transcriptor = { estado: 'apagado' }
     if (p) { p.removeAllListeners('message'); try { p.kill() } catch {} }
@@ -578,7 +582,39 @@ export class ServicioWhatsApp {
   ponerTranscribir(si: boolean) {
     this.store.ponerEstado('transcribir', si ? '1' : undefined)
     if (si && this.transcriptor.estado === 'sin_motor') this.transcriptor = { estado: 'apagado' }
-    if (!si) this.detenerTranscriptor()
+    if (!si && this.sueltos.size === 0) this.detenerTranscriptor()
+  }
+
+  /** Audios sueltos (los de los recados, recados.ts) que esperan su texto: id -> promesa. */
+  private sueltos = new Map<string, { archivo: string; ok: (t: string) => void; mal: (e: Error) => void }>()
+  private contadorSueltos = 0
+  static readonly chatSuelto = 'recado'
+
+  /** Transcribe un archivo WAV (cifrado con la clave de los medios, si hay) con el mismo transcriptor, aunque la
+   *  transcripción de WhatsApp esté apagada: lo pidió la persona al mandar el audio. */
+  transcribirArchivo(archivo: string): Promise<string> {
+    return new Promise<string>((ok, mal) => {
+      if (this.transcriptor.estado === 'sin_motor') this.transcriptor = { estado: 'apagado' }
+      const id = String(++this.contadorSueltos)
+      this.sueltos.set(id, { archivo, ok, mal })
+      const p = this.procTr ?? this.lanzarTranscriptor()
+      if (!p) { this.sueltos.delete(id); mal(new Error(this.transcriptor.error ?? 'No encuentro el transcriptor.')); return }
+      clearTimeout(this.ocioso)
+      this.enCola.add(ServicioWhatsApp.chatSuelto + '\u0000' + id)
+      try { p.send({ tipo: 'transcribir', chat: ServicioWhatsApp.chatSuelto, id, archivo, mime: 'audio/wav' } as never) } catch (e) {
+        this.enCola.delete(ServicioWhatsApp.chatSuelto + '\u0000' + id)
+        this.sueltos.delete(id)
+        mal(e instanceof Error ? e : new Error(String(e)))
+        return
+      }
+      if (this.transcriptor.estado === 'listo') this.transcriptor = { estado: 'trabajando' }
+    })
+  }
+
+  /** Los audios sueltos que esperaban fallan (el transcriptor se cortó o no tiene motor). */
+  private fallarSueltos(motivo: string) {
+    for (const [id, x] of this.sueltos) { this.enCola.delete(ServicioWhatsApp.chatSuelto + '\u0000' + id); x.mal(new Error(motivo)) }
+    this.sueltos.clear()
   }
 
   /** Manda al transcriptor los audios pendientes (lo lanza si hace falta). */
@@ -624,6 +660,7 @@ export class ServicioWhatsApp {
     p.on('exit', () => {
       if (this.procTr !== p) return
       this.procTr = undefined
+      this.fallarSueltos('El transcriptor se cortó.')
       this.enCola.clear()
       if (this.transcriptor.estado !== 'sin_motor') this.transcriptor = { estado: 'apagado' }
     })
@@ -638,13 +675,19 @@ export class ServicioWhatsApp {
       case 'sin_motor':
         this.transcriptor = { estado: 'sin_motor', error: m.error }
         this.s.log.error(`whatsapp transcriptor: ${prefijo(m.error, 300)}`)
+        this.fallarSueltos('No hay motor de transcripción: ' + prefijo(m.error, 200))
         for (const k of this.enCola) { const [chat, id] = k.split('\u0000'); this.store.ponerTranscripcion(chat!, id!, undefined, 'sin_motor') }
         this.enCola.clear()
         break
       case 'texto':
       case 'fallo': {
         this.enCola.delete(m.chat + '\u0000' + m.id)
-        if (m.tipo === 'texto') this.store.ponerTranscripcion(m.chat, m.id, sanear(m.texto).trim(), 'lista')
+        const suelto = m.chat === ServicioWhatsApp.chatSuelto ? this.sueltos.get(m.id) : undefined
+        if (suelto) {
+          this.sueltos.delete(m.id)
+          if (m.tipo === 'texto') suelto.ok(sanear(m.texto).trim())
+          else suelto.mal(new Error(m.error))
+        } else if (m.tipo === 'texto') this.store.ponerTranscripcion(m.chat, m.id, sanear(m.texto).trim(), 'lista')
         else { this.store.ponerTranscripcion(m.chat, m.id, undefined, 'error'); this.s.log.info(`whatsapp transcriptor: ${prefijo(m.error, 300)}`) }
         if (this.enCola.size === 0) {
           this.transcriptor = { estado: 'listo' }

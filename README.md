@@ -29,6 +29,10 @@ En los dos casos hace falta **Claude Code** instalado y con la sesión iniciada.
   archivos y notas (el lápiz abre su perfil y permisos; el pin muestra dónde está). Las reuniones tienen su pestaña en Equipo,
   desde donde se llama a una nueva. Desde una charla, «Sacar tareas» propone
   el trabajo que quedó pendiente (para ese agente o para otros) y, después de revisarlo, lo crea como tareas.
+- **Recados a la secretaría:** en la sección Recados le dejás a la secretaría un texto o un audio (se transcribe en tu
+  compu). Ella lo entiende y te contesta, anota, propone acciones que aprobás, te pregunta si algo no está claro o le pasa
+  el trabajo a alguien del equipo: lo que pediste explícito arranca a los 45 segundos (se puede deshacer) y lo que dedujo
+  queda como propuesta. Cada cosa se ve como una tarjeta con su estado, y la vista también anda en el celular.
 - **Flujos:** procesos de varios pasos que pasan de agente en agente, con aprobaciones tuyas donde haga falta. Ves
   cada corrida en vivo y una pieza viaja por la maqueta. Un flujo puede **seguir con otro** al terminar («Al terminar,
   seguir con…»): arranca solo una corrida del segundo con lo último que se entregó, y los cambios del segundo valen
@@ -62,6 +66,7 @@ En los dos casos hace falta **Claude Code** instalado y con la sesión iniciada.
 | Biblioteca | `backend/src/biblioteca.ts`, `oficina/ui/biblioteca.js` |
 | Reuniones | `backend/src/reuniones.ts`, `oficina/ui/reunion.js` |
 | Tareas programadas | `backend/src/programador.ts`, `backend/src/tareas.ts`, `oficina/ui/tareas.js` |
+| Recados a la secretaría (texto o audio, `delegar`, `preguntar`) | `backend/src/recados.ts`, `oficina/ui/recados.js` · API: [backend/API.md#recados-a-la-secretaría](backend/API.md#recados-a-la-secretaría) · plan: [docs/plan-recados.md](docs/plan-recados.md) |
 | Navegación y rutas `#/…` de la UI | `oficina/ui/nav.js` |
 
 Hasta la 0.7 la app de Mac era nativa en Swift, con su propio backend; se retiró al pasar las dos plataformas a

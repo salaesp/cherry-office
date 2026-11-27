@@ -213,7 +213,22 @@ aprobar o descartar propuestas, ver una entrega), no todo `/api`. Emparejamiento
 revocable, uno por dispositivo), `Host` y `Origin` controlados como en `servidor-dev.ts`, apagado por defecto.
 
 ## Fases
-### R0: recados en la app (la base)
+### R0: recados en la app (la base) (hecho)
+Implementado como se describe en «Recados a la secretaría» de [backend/API.md](../backend/API.md). Cambios respecto de lo
+planeado:
+- **Sección propia en el riel** («Recados», `#/recados`), no dentro de Equipo: es lo primero que se busca en el celular y
+  tiene su insignia con lo que te espera. Los filtros van en la lista de la sección (y arriba del hilo en el celular).
+- **La grabación** usa Web Audio (`ScriptProcessor`) y manda WAV 16 kHz mono; probado de punta a punta con el Whisper real
+  (micrófono simulado de Chromium). En la app de Mac hace falta `NSMicrophoneUsageDescription` (agregado).
+- **Las propuestas** del recado se ven como tarjeta con «Revisar y aprobar», que abre la entrega en la bandeja: se aprueba
+  donde siempre.
+- **Elegir una opción** de una pregunta manda un recado nuevo «Elijo: …» (así ella lo lee con todo el contexto).
+- **Sin avisos al terminar todavía** (R1): el estado de lo delegado se actualiza y la entrega llega a la bandeja; el
+  próximo recado le cuenta a la secretaría lo que terminó.
+- **Sin probar todavía:** con el claude de verdad (qué tan bien separa los pedidos, cuándo pregunta y si respeta
+  `explicito`) y la grabación dentro de la app de escritorio empaquetada.
+
+Lo planeado:
 - `recados.ts`: tabla `sec_recados(id, oficina, canal, texto, audio?, transcripcion?, estado, sesion, ejecucion, creado,
   actualizado)`, cola de a uno, `Recados.recibir`.
 - Hilo de recados como charla marcada de la secretaría; consigna del hilo (qué es un recado, los cinco resultados, cuándo
