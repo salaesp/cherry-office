@@ -129,6 +129,7 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
     capas: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5',
     carpeta: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
     subir: 'M12 16V4M7 9l5-5 5 5M5 20h14',
+    flechaArriba: 'M12 19V5M6 11l6-6 6 6',
     buscar: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4',
     enviar: 'M5 12h13M13 6l6 6-6 6',
     parar: 'M7 7h10v10H7z',
