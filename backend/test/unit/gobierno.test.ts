@@ -5,7 +5,7 @@ import { Acciones, accionesDe } from '../../src/acciones.js'
 import { CatalogoConectores, Conectores, catalogoDe } from '../../src/conectores.js'
 import { mcpDe } from '../../src/consultas.js'
 import type { AgenteDef, ConectorAsignado, Oficina } from '../../src/oficina.js'
-import { ConectoresAgente, HerramientasMCPAgente, Instrucciones, type ServidorConector } from '../../src/permisos.js'
+import { ConectoresAgente, HerramientasMCPAgente, Instrucciones, WhatsAppAgente, type ServidorConector } from '../../src/permisos.js'
 import { largo } from '../../src/validar.js'
 import { Sandbox, U } from '../support/sandbox.js'
 import { arrancar, llamar, oficina } from '../support/en-proceso.js'
@@ -48,6 +48,25 @@ describe('Instrucciones', () => {
     expect(t).toContain('Para actuar con Google Calendar (create_event); Gmail (send_message) usá la herramienta proponer_accion: Ana la aprueba')
     expect(t).toContain('## Sos coordinador/a de la oficina')
     expect(t).toContain('estado_oficina, entregas, corridas, bloqueos')
+  })
+
+  test('quien atiende la secretaría lo sabe (fuentes, pausa); con el permiso «whatsapp», que puede leer WhatsApp', () => {
+    const o = { ...oficinaDe(), secretaria: { agente: 'sofia', activa: false, fuentes: [{ id: 'whatsapp', chats: ['a@s', 'b@s'] }, { id: 'calendario' }] } }
+    const t = Instrucciones.para(o, agente(), { conMCP: true })!
+    expect(t).toContain('## Atendés la secretaría')
+    expect(t).toContain('WhatsApp: los 2 chats elegidos, con whatsapp_chats')
+    expect(t).toContain('el calendario')
+    expect(t).toContain('estás en pausa')
+    // en pausa sigue leyendo sus chats en la charla
+    expect(WhatsAppAgente.chatsSecretaria(o, agente())).toEqual(['a@s', 'b@s'])
+    expect(HerramientasMCPAgente.lista(o, agente())).toContain('mcp__hq__whatsapp_leer')
+    // sin MCP (consultas) no se nombran herramientas que no tiene
+    expect(Instrucciones.para(o, agente()) ?? '').not.toContain('secretaría')
+    // otro agente, con el permiso
+    const wa = Instrucciones.para(oficinaDe(), agente({ permisos: ['whatsapp'] }), { conMCP: true })!
+    expect(wa).toContain('## WhatsApp')
+    expect(wa).not.toContain('secretaría')
+    expect(Instrucciones.para(oficinaDe(), agente(), { conMCP: true })!).not.toContain('## WhatsApp')
   })
 
   test('undefined si no hay nada; sin dueño dice «la persona»; la frase de salida va con límites, actuar o reglas', () => {
