@@ -10,7 +10,7 @@
     "start": "node spike.mjs",
     "aguante": "node spike.mjs --cada 30",
     "diagnostico": "node diagnostico.mjs",
-    "diagnostico:electron": "node ../../desktop/node_modules/electron/cli.js diagnostico-electron.mjs",
+    "diagnostico:electron": "node lanzar-electron.mjs",
     "resumen": "node resumen.mjs",
     "test": "node --test mapeo.test.mjs",
     "borrar": "node -e \"require('node:fs').rmSync('datos',{recursive:true,force:true});console.log('datos/ borrado')\""
