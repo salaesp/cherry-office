@@ -136,12 +136,19 @@ async function transcribir(audio) {
     const trozos = (r.chunks ?? []).map((c) => ({ desde: c.timestamp?.[0] ?? null, hasta: c.timestamp?.[1] ?? null, texto: c.text.trim() })).filter((c) => c.texto)
     return { texto: (r.text ?? '').trim(), trozos }
   }
+  // Una persona hablando dice unas 2 o 3 palabras por segundo: con menos de 0,5 casi no hay voz (suele ser música y
+  // Whisper "oye" palabras sueltas en la canción).
+  const segundos = audio.length / 16000
+  const conDensidad = (t) => {
+    const palabras = t.texto ? t.texto.split(/\s+/).length : 0
+    return { ...t, palabrasPorSegundo: +(palabras / Math.max(segundos, 1)).toFixed(2), pocaVoz: palabras > 0 && palabras / Math.max(segundos, 1) < 0.5 }
+  }
   let t = await pasar({})
-  if (!transcripcionTrabada(t.texto, gzipSync)) return t
+  if (!transcripcionTrabada(t.texto, gzipSync)) return conDensidad(t)
   // Whisper se trabó (música o casi sin voz): otra pasada que no deja repetir frases.
   console.log('  la transcripción salió en bucle (suele pasar con música); pruebo otra vez sin repeticiones…')
   t = await pasar({ no_repeat_ngram_size: 4, repetition_penalty: 1.3 })
-  if (!transcripcionTrabada(t.texto, gzipSync)) return { ...t, segundoIntento: true }
+  if (!transcripcionTrabada(t.texto, gzipSync)) return { ...conDensidad(t), segundoIntento: true }
   return { texto: '', trozos: [], trabada: true }
 }
 
@@ -181,6 +188,10 @@ function ficha(p, m, dur, sueltos, trans) {
   else if (trans.error) l.push(`_(no se pudo transcribir: ${trans.error})_`)
   else if (trans.trabada) l.push('_(Whisper se trabó repitiendo frases dos veces: suele pasar cuando hay música o casi no hay voz. No hay transcripción confiable; el texto en pantalla se ve en las imágenes)_')
   else if (!trans.texto) l.push('_(no se entiende voz: puede ser solo música)_')
+  else if (trans.pocaVoz) {
+    l.push(`_(Casi no hay voz: ${trans.texto.split(/\s+/).length} palabras en todo el reel, ${trans.palabrasPorSegundo} por segundo; hablando son 2 o 3. Probablemente es música, y lo que Whisper entendió es letra o ruido. Lo que dice el reel está en el texto en pantalla: ver las imágenes)_`, '')
+    l.push(`> ${trans.texto}`)
+  }
   else if (trans.trozos.length) {
     if (trans.segundoIntento) l.push('_(Segundo intento: la primera pasada salió en bucle, probablemente por música. Puede tener errores)_', '')
     for (const c of trans.trozos) l.push(`- **${seg(c.desde)}–${seg(c.hasta)}** ${c.texto}`)
@@ -216,7 +227,7 @@ for (const p of elegidos) {
       try {
         const t0 = Date.now()
         trans = await transcribir(await audioDe(video))
-        console.log(`  transcripción: ${trans.trabada ? 'no confiable (Whisper se trabó)' : trans.texto ? `${trans.texto.split(/\s+/).length} palabras${trans.segundoIntento ? ' (segundo intento)' : ''}` : 'sin voz'} en ${Math.round((Date.now() - t0) / 1000)} s`)
+        console.log(`  transcripción: ${trans.trabada ? 'no confiable (Whisper se trabó)' : trans.pocaVoz ? 'casi sin voz (probablemente música)' : trans.texto ? `${trans.texto.split(/\s+/).length} palabras${trans.segundoIntento ? ' (segundo intento)' : ''}` : 'sin voz'} en ${Math.round((Date.now() - t0) / 1000)} s`)
       } catch (e) {
         trans = { error: e.message }
         console.log(`  transcripción: ${e.message}`)
