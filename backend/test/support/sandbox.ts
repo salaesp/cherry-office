@@ -279,14 +279,20 @@ export class Backend {
     return b
   }
 
+  /** Espera a que NUESTRO proceso escuche. Que el puerto conteste no alcanza: entre `puertoLibre()` y el bind otro
+   *  test puede ganarlo, y entonces contestaría un servidor ajeno (el nuestro muere con EADDRINUSE y el test habla con
+   *  otra oficina). Por eso se espera el aviso de dev.js («… en http://localhost:<puerto>») en la salida de este proceso. */
   private async esperarListo() {
     const limite = Date.now() + 20_000
+    const aviso = `http://localhost:${this.puerto}`
     while (Date.now() < limite) {
-      if (this.proc.exitCode !== null) break
-      try {
-        const r = await this.pedir('GET', '/api/__listo')
-        if (r.status > 0) return
-      } catch {}
+      if (this.proc.exitCode !== null || this.proc.signalCode !== null) break
+      if (this.salida.includes(aviso)) {
+        try {
+          const r = await this.pedir('GET', '/api/__listo')
+          if (r.status > 0) return
+        } catch {}
+      }
       await dormir(50)
     }
     await this.cerrar()
