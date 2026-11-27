@@ -519,7 +519,7 @@ App.Nav = (function () {
   var MAX_LADO = 3;
   function charlasDe(id) { return (sesiones || []).filter(function (s) { return s.agente === id; }); }
   function filaCharla(id, s, activa) {
-    return h('button.lat-fila.charla' + (activa ? '.act' : ''), { onclick: function () { ir('#/equipo/' + encodeURIComponent(id) + '/' + s.session); } },
+    return h('button.lat-fila.charla' + (activa ? '.act' : ''), { onclick: function () { App.Agente.alElegirCharla(); ir('#/equipo/' + encodeURIComponent(id) + '/' + s.session); } },
       App.icono('charla'), h('span', h('b', titulo(s)), h('small', activa ? 'abierta ahora' : corto(s.ts))));
   }
   function relacionado(id) {
@@ -542,7 +542,7 @@ App.Nav = (function () {
       var actualSid = App.Agente.sesion(id), ss = charlasDe(id);
       charlasN.textContent = sesiones ? String(ss.length) : '';
       var actual = ss.filter(function (s) { return s.session === actualSid; })[0];
-      if (!actual && App.Agente.actual() === id) charlas.appendChild(h('button.lat-fila.charla.act', App.icono('charla'), h('span', h('b', 'Charla nueva'), h('small', 'abierta ahora'))));
+      if (!actual && App.Agente.actual() === id) charlas.appendChild(h('button.lat-fila.charla.act', { onclick: function () { App.Agente.alElegirCharla(); } }, App.icono('charla'), h('span', h('b', 'Charla nueva'), h('small', 'abierta ahora'))));
       var vis = ss.slice(0, MAX_LADO + 1);
       if (actual && vis.indexOf(actual) < 0) vis.push(actual);
       vis.forEach(function (s) { charlas.appendChild(filaCharla(id, s, s === actual)); });
@@ -576,7 +576,7 @@ App.Nav = (function () {
       tareasN.textContent = String(ts.length);
       if (!ts.length) tareas.appendChild(h('div.lat-vacio', 'Sin tareas programadas.'));
       ts.slice(0, MAX_LADO).forEach(function (t) {
-        tareas.appendChild(h('button.lat-fila', { onclick: function () { App.Agente.verLado('tareas'); } }, App.icono('reloj'),
+        tareas.appendChild(h('button.lat-fila', { onclick: function () { if (App.movil || window.matchMedia('(max-width: 720px)').matches) App.Agente.verTarea(t.id); else App.Agente.verLado('tareas'); } }, App.icono('reloj'),
           h('span', h('b', t.nombre), h('small', t.corriendo ? 'corriendo' : t.activa === false ? 'en pausa' : (t.unica ? 'una vez' : 'programada')))));
       });
       var v = verTodas('tareas', ts.length); if (v) tareasVer.appendChild(v);
@@ -627,7 +627,7 @@ App.Nav = (function () {
     if (!sesiones) { cargarSesiones().then(function () { App.Agente.repintarLado('charlas'); }); caja.appendChild(h('div.lat-vacio', '…')); return caja; }
     ss.forEach(function (s) {
       var ult = App.Adjuntos && App.Adjuntos.separar ? App.Adjuntos.separar(s.ultimo || '').texto : s.ultimo;
-      caja.appendChild(h('button.lat-fila.charla' + (s.session === actualSid ? '.act' : ''), { onclick: function () { App.Agente.verLado('detalles'); ir('#/equipo/' + encodeURIComponent(id) + '/' + s.session); } },
+      caja.appendChild(h('button.lat-fila.charla' + (s.session === actualSid ? '.act' : ''), { onclick: function () { App.Agente.alElegirCharla(); ir('#/equipo/' + encodeURIComponent(id) + '/' + s.session); } },
         App.icono('charla'), h('span', h('b', titulo(s)), h('small', (s.de === 'u' ? 'Vos: ' : '') + (ult || '').replace(/[*#`|>]/g, ''))), h('em.meta', corto(s.ts))));
     });
     if (!ss.length) caja.appendChild(h('div.lat-vacio', q ? 'Nada con «' + q + '».' : 'Todavía no charlaron.'));

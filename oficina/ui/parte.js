@@ -141,14 +141,14 @@ App.Parte = (function () {
     var abre = b.tipo === 'espera' ? function () { var x = (esperas || {})[b.ref]; if (x) abrirEspera(x); else abrirEsperaPorId(b.ref); }
       : b.tipo === 'corrida' ? function () { if (App.Flujos && App.Flujos.verCorrida) App.Flujos.verCorrida(+b.ref); }
       : b.tipo === 'entrega' ? function () { App.Entregables.abrir(+b.ref); }
-      : b.tipo === 'tarea' ? function () { var t = b.ref && b.ref.split(':')[0]; if (App.agente(t)) App.Agente.abrir(t, 'tareas'); } : null;
+      : b.tipo === 'tarea' ? function () { App.Agente.verTarea(b.ref); } : null;   // ref = id de la tarea
     return fila(b.tipo === 'corrida' ? 'flujo' : b.tipo === 'espera' ? 'reloj' : 'cerrar', b.texto, null,
       typeof b.dias === 'number' ? h('span.insignia.aviso', diasTxt(b.dias)) : null, 'Ver', abre);
   }
 
   function filaProxima(t) {
     var ag = App.agente(t.agente);
-    return fila(ag || 'parte', t.nombre || t.tarea, (ag ? ag.nombre + ' · ' : '') + cuando(t.cuando), null, null, ag ? function () { App.Agente.abrir(t.agente, 'tareas'); } : null);
+    return fila(ag || 'parte', t.nombre || t.tarea, (ag ? ag.nombre + ' · ' : '') + cuando(t.cuando), null, null, ag ? function () { App.Agente.verTarea(t.tarea); } : null);
   }
   function cuando(iso) {
     var d = new Date(iso); if (isNaN(d)) return '';
@@ -179,7 +179,7 @@ App.Parte = (function () {
       out.push(h('div.qp-sub', 'Lo que falló'), h('div.qp-errores', errs.map(function (x) {
         var ag = x.agente && App.agente(x.agente);
         var esTarea = ag && ((App.E.oficina || {}).tareas || []).some(function (t) { return t.id === x.tarea; });
-        return h((esTarea ? 'button' : 'div') + '.qp-error', esTarea ? { type: 'button', title: 'Ver las tareas de ' + ag.nombre, onclick: function () { App.Agente.abrir(ag.id, 'tareas'); } } : null,
+        return h((esTarea ? 'button' : 'div') + '.qp-error', esTarea ? { type: 'button', title: 'Ver la tarea «' + x.nombre + '»', onclick: function () { App.Agente.verTarea(x.tarea); } } : null,
           ag ? App.retratoImg(ag, 'retrato', 48) : h('span.qp-ico', App.icono('alerta')),
           h('div.qp-txt', h('b', x.nombre), h('span', (ag ? ag.nombre + ' · ' : '') + x.error)),
           h('span.qp-cuando', App.hace(x.cuando)));
