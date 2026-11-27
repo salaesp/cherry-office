@@ -1,6 +1,6 @@
-# Build automático de los instaladores.
+# Build automático de los instaladores (Mac, Windows y el APK de Android).
 #
-# - Al subir una etiqueta vX.Y.Z: corre los tests, arma el .dmg (Mac) y el instalador .exe (Windows) y los adjunta
+# - Al subir una etiqueta vX.Y.Z: corre los tests, arma el .dmg (Mac), el instalador .exe (Windows) y el APK de Android y los adjunta
 #   a la release de esa etiqueta.
 #   Si la release ya existe (notas escritas a mano), solo sube o reemplaza el instalador, sin tocar las notas.
 #   Si no existe, la crea como borrador con las notas de docs/releases/vX.Y.Z.md (o un texto para completar a mano) y
@@ -279,3 +279,58 @@ jobs:
           fi
           # latest.yml y el .blockmap: los lee electron-updater en las apps instaladas
           gh release upload "$TAG" "$FILE" "$FILE.blockmap" desktop/release/latest.yml --clobber
+
+  android:
+    name: Android (APK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Versión
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./desktop/package.json').version")"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "name=Oficina-android-$VERSION.apk" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      # la versión de la app (versionName y versionCode) sale de desktop/package.json (android/app/build.gradle.kts)
+      - name: Armar el APK
+        working-directory: android
+        run: |
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk "../${{ steps.version.outputs.name }}"
+
+      - name: Guardar como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.name }}
+          path: ${{ steps.version.outputs.name }}
+          retention-days: 14
+
+      - name: Adjuntar a la release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+          FILE: ${{ steps.version.outputs.name }}
+        run: |
+          # los jobs de Mac y Windows corren en paralelo: si otro ya creó la release, solo se sube el APK
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            NOTAS="docs/releases/$TAG.md"
+            if [ -f "$NOTAS" ]; then
+              gh release create "$TAG" --draft --title "Oficina $VERSION" --notes-file "$NOTAS" || true
+            else
+              gh release create "$TAG" --draft --title "Oficina $VERSION" \
+                --notes "Borrador generado por el build automático. Completar las notas antes de publicar." || true
+            fi
+          fi
+          gh release upload "$TAG" "$FILE" --clobber

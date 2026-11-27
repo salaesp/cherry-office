@@ -4,6 +4,11 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// La versión es la de la app de escritorio (desktop/package.json): Oficina sale toda junta en cada release.
+fun versionOficina(): String = Regex("\"version\"\\s*:\\s*\"([^\"]+)\"")
+    .find(rootProject.file("../desktop/package.json").readText())!!.groupValues[1]
+fun codigoVersion(): Int = versionOficina().substringBefore('-').split('.').map { it.toInt() }.let { (a, b, c) -> a * 10000 + b * 100 + c }
+
 android {
     namespace = "app.oficina.android"
     compileSdk = 35
@@ -12,8 +17,8 @@ android {
         applicationId = "app.oficina.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = codigoVersion()
+        versionName = versionOficina()
     }
 
     // Clave de depuración fija (la de siempre de Android, contraseña «android»; no protege nada): así el APK que arma
