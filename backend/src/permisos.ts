@@ -11,6 +11,7 @@ import { Habilitados, prefijoMCP } from './habilitados.js'
 import type { AgenteDef, AlcanceVinculo, Oficina } from './oficina.js'
 import type { OficinaActiva } from './oficinas.js'
 import { Validar, largo, prefijo } from './validar.js'
+import { regla, sumarVedadas, vedadasDatos } from './datos-vedados.js'
 
 /** Carpeta de trabajo (cwd) y permisos de un agente dentro de su oficina (ContextoOficina de Swift). */
 export type ContextoOficina = {
@@ -321,11 +322,7 @@ export function rutasEscritura(cfg: Config, agente: string): string[] {
   return out
 }
 
-/** `Edit(//abs/path)`: la doble barra marca una ruta absoluta para Claude Code. En Windows la ruta va con `/`
- *  (`Edit(//C:/Users/…)`): cómo la interpreta Claude Code queda para el spike de Windows (plan, riesgo 2). */
-export function regla(herramienta: string, ruta: string): string {
-  return `${herramienta}(//${ruta.replace(/\\/g, '/').replace(/^\/+/, '')})`
-}
+export { regla }
 
 /** `--mcp-config` (JSON inline) del servidor `hq`: `Authorization: Bearer ${HQ_MCP_TOKEN}`, que claude expande. */
 export function configMCP(url: string): string {
@@ -451,7 +448,8 @@ export function herramientasOficina(cfg: Config, ctx: ContextoOficina, agente: s
 /** Argumentos (sin el binario) de un chat de oficina. Orden fijo; `--` antes del mensaje. */
 export function argumentos(cfg: Config, ctx: ContextoOficina, p: { agente: string; mensaje: string; sid: string; flag: string }): string[] {
   const a = ['-p', '--agent', p.agente, p.flag, p.sid, ...ClaudeRunner.formatoSalida]
-  a.push('--tools', herramientasOficina(cfg, ctx, p.agente))
+  const herramientas = herramientasOficina(cfg, ctx, p.agente)
+  a.push('--tools', herramientas)
   // con la persona presente: la herramienta que le pregunta (en auto, solo lo que frena el clasificador); sin ella, lo no
   // permitido se rechaza (en auto, solo lo que frena el clasificador)
   a.push('--permission-mode', modoPermiso(cfg, puedePreguntar(ctx)))
@@ -470,7 +468,8 @@ export function argumentos(cfg: Config, ctx: ContextoOficina, p: { agente: strin
   // conectores de claude.ai, que --strict-mcp-config dejaría afuera); con algunos elegidos, se vedan los demás
   const sinMCPLocales = !op.mcpLocales || (ctx.mcpElegidos !== undefined && ctx.mcpElegidos.length === 0)
   const estricto = sinMCPLocales && !usaConectores(ctx)
-  const vedadas = [...ctx.vedadas]
+  // la carpeta de datos de la app (hq.db, WhatsApp, memoria de la secretaría) no la lee ni la escribe ningún agente
+  const vedadas = sumarVedadas(ctx.vedadas, vedadasDatos(cfg.datosDir, [ctx.carpeta], herramientas.split(',').includes('Bash')))
   if (op.mcpLocales && !estricto) for (const v of mcpVedados(cfg, ctx)) if (!vedadas.includes(v)) vedadas.push(v)
   if (vedadas.length > 0) a.push('--disallowedTools', ...vedadas)
   if (estricto) a.push('--strict-mcp-config')

@@ -119,6 +119,12 @@ export class Sandbox {
   /** Llamadas de chat al claude falso, cada una como lista de argumentos.
    *  En NFC: Swift (Process) en macOS pasa los argumentos en NFD y su `==` compara por equivalencia canónica; JS no. */
   get llamadas(): string[][] {
+    // sin las reglas que vedan la carpeta de datos: están en todas las corridas y se prueban aparte (datos-vedados.test.ts)
+    return this.llamadasCrudas.map((a) => a.filter((x) => !(/^(Read|Glob|Grep|Edit|Write|Bash)\(/.test(x) && x.includes(this.datos.replace(/\\/g, '/').replace(/^\/+/, '')))))
+  }
+
+  /** Como `llamadas`, con todos los argumentos tal cual los recibió el claude falso. */
+  get llamadasCrudas(): string[][] {
     const s = leerTexto(path.join(this.binDir, 'args.log')).normalize('NFC')
     return s.split('\u001e').filter((r) => r !== '').map((rec) => {
       const a = rec.split('\u001f')

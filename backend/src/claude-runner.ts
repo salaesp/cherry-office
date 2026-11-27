@@ -21,6 +21,7 @@ import { CortadorLineas, parsearEvento, type Observador } from './stream.js'
 import { largo } from './validar.js'
 import { CatalogoNombres, CatalogoSkills } from './skills.js'
 import { mcpLocalesDe } from './habilitados.js'
+import { fijarAvisoDatos, vedadasDatos } from './datos-vedados.js'
 
 const esWindows = process.platform === 'win32'
 /** Ruta completa: no depender del PATH que tenga la app (o el entorno de un test). */
@@ -317,6 +318,7 @@ export class ClaudeRunner {
     const n = parseInt((env.HQ_MAX_CLAUDE ?? '').trim(), 10)
     this.limite = new Limite(Math.max(1, maxConcurrentes ?? (n >= 1 ? n : ClaudeRunner.maxClaudePorDefecto)))
     this.grace = grace
+    fijarAvisoDatos((m) => log.warn(m))
     this.mensajePorStdin = esWindows || env.HQ_MENSAJE_STDIN === '1'
     this.skills = new CatalogoSkills(path.join(config.datosDir, 'skills.json'))
     config.skillsInstaladas = () => this.skills.lista
@@ -394,7 +396,7 @@ export class ClaudeRunner {
     for (const d of [...this.config.oficinaDirsExtra, ...(p.dirsExtra ?? [])]) a.push('--add-dir', d)
     a.push('--allowedTools', 'Read', 'Glob', 'Grep')
     if (q) a.push(...q.permitidas, q.herramientaPermiso)
-    a.push('--disallowedTools', 'mcp__claude_ai_*')
+    a.push('--disallowedTools', 'mcp__claude_ai_*', ...vedadasDatos(this.config.datosDir, [p.cwd], herramientas.includes('Bash')))
     if (p.instrucciones) a.push('--append-system-prompt', p.instrucciones)
     // sin modelo manda el del `.md` del agente
     if (p.modelo !== undefined) a.push(...ClaudeRunner.argsModelo(p.modelo))

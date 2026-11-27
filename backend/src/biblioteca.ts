@@ -26,6 +26,7 @@ import { CajaCosto, type Observador } from './stream.js'
 import { Slug, Validar, largo, plegar, prefijo, uuidValido } from './validar.js'
 import { dia, decisiones, palabras, plano } from './reuniones.js'
 import * as Extraccion from './extraccion.js'
+import { vedadasDatos } from './datos-vedados.js'
 import { TipoArchivo } from './extraccion.js'
 
 // MARK: - modelo
@@ -595,7 +596,7 @@ export async function correrConLectura(runner: ClaudeRunner, p: { prompt: string
   runner.verificar(p.cwd)
   const a = ['-p', ...ClaudeRunner.formatoSalida, '--tools', 'Read', ...ClaudeRunner.argsModelo(runner.config.modelo('internos'))]
   for (const d of p.dirs) a.push('--add-dir', d)
-  a.push('--allowedTools', 'Read', ...ClaudeRunner.sinConectores)
+  a.push('--allowedTools', 'Read', ...ClaudeRunner.sinConectores, ...vedadasDatos(runner.config.datosDir, [p.cwd], false))
   return runner.resultado([...a, '--', p.prompt], { timeout: p.timeout, cwd: p.cwd, obs: p.obs })
 }
 
