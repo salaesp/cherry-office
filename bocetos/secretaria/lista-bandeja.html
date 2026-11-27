@@ -1,0 +1,249 @@
+<title>Lista de la bandeja</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: arriba, cómo se ve hoy; abajo, tres direcciones para la lista de la bandeja («Hoy» y «Para revisar»), al
+   ancho real del panel (440 px). Mismos datos en todas. Colores de oficina/ui/estilo.css. */
+:root {
+  --fondo: #f2f0ec; --panel: #ffffff; --panel-2: #f8f7f4; --linea: #e4e1db; --linea-fuerte: #d3cfc7;
+  --texto: #1d1d1f; --suave: #6d6962; --tenue: #9a958d; --acento: #1d1d1f; --sobre-acento: #ffffff;
+  --peligro: #b3362c; --ok: #3b7a4b; --aviso: #a46a12;
+  --sombra: 0 1px 2px rgba(20,18,15,.06), 0 8px 24px rgba(20,18,15,.08);
+  --cal: #2f6db5; --cal-suave: #e8f0fa; --mail: #b3542c; --mail-suave: #fbeee7; --wa: #2e8a57; --wa-suave: #e6f4ec; --urg-suave: #fbecea;
+  --f: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --radio: 10px; --radio-chico: 7px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+  --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --acento: #f1f1f2; --sobre-acento: #1b1b1d;
+  --peligro: #e0675d; --ok: #6cbf80; --aviso: #e0a84a; --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  --cal: #7fb0ea; --cal-suave: #1f2b3a; --mail: #e79a74; --mail-suave: #3a2720; --wa: #6cc495; --wa-suave: #1c3127; --urg-suave: #3a2220; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+  --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --acento: #f1f1f2; --sobre-acento: #1b1b1d;
+  --peligro: #e0675d; --ok: #6cbf80; --aviso: #e0a84a; --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  --cal: #7fb0ea; --cal-suave: #1f2b3a; --mail: #e79a74; --mail-suave: #3a2720; --wa: #6cc495; --wa-suave: #1c3127; --urg-suave: #3a2220; color-scheme: dark }
+* { box-sizing: border-box; }
+body { background: var(--fondo); color: var(--texto); font: 13px/1.45 var(--f); }
+.pagina { max-width: 1440px; margin: 0 auto; padding-block: 28px 60px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1 { font-size: 24px; margin: 0 0 6px; text-wrap: balance; }
+.intro { color: var(--suave); max-width: 70ch; margin: 0 0 22px; font-size: 14px; }
+.selector { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--fondo); padding: 8px 0; }
+.selector button { font: inherit; height: 34px; padding: 0 14px; border-radius: 17px; border: 1px solid var(--linea-fuerte); background: var(--panel); color: var(--texto); cursor: pointer; }
+.selector button[aria-pressed="true"] { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); }
+.dir-cab h2 { font-size: 19px; margin: 0 0 4px; }
+.dir-desc { color: var(--suave); max-width: 80ch; margin: 0 0 16px; font-size: 14px; }
+.fila { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.marco { width: 440px; max-width: 100%; flex: 0 1 440px; min-width: 0; }
+.marco-titulo { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--tenue); margin: 0 0 6px 2px; }
+.panel { background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); box-shadow: var(--sombra); overflow: hidden; }
+.por-dentro { margin-top: 18px; font-size: 13px; color: var(--suave); max-width: 90ch; border-top: 1px dashed var(--linea-fuerte); padding-top: 10px; }
+.por-dentro b { color: var(--texto); }
+.cab { display: flex; gap: 10px; align-items: center; padding: 14px 14px 8px; }
+.cab .ico { width: 40px; height: 40px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--linea); display: grid; place-items: center; color: var(--suave); }
+.cab .t { font-weight: 600; font-size: 15px; }
+.cab .s { font-size: 12px; color: var(--suave); }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: var(--radio-chico); border: 1px solid var(--linea-fuerte); background: var(--panel); color: var(--texto); font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.btn.primario { background: var(--acento); border-color: var(--acento); color: var(--sobre-acento); }
+.btn.fantasma { border-color: transparent; background: transparent; color: var(--suave); }
+.insignia { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 10px; font-size: 11px; font-weight: 500; background: var(--panel-2); border: 1px solid var(--linea); color: var(--suave); white-space: nowrap; }
+.insignia.aviso { color: var(--aviso); }
+.av { width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; }
+.av.clara { background: linear-gradient(160deg, #d18b4a, #8a5a2c); } .av.marta { background: linear-gradient(160deg, #7b5ea8, #4a3a6e); }
+.av.chico { width: 22px; height: 22px; border-radius: 6px; font-size: 10px; }
+.sec { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--tenue); padding: 12px 14px 4px; display: flex; align-items: center; gap: 8px; }
+.sec .n { font-variant-numeric: tabular-nums; color: var(--suave); }
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 6px; border-radius: 9px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.chip.wa { color: var(--wa); background: var(--wa-suave); } .chip.mail { color: var(--mail); background: var(--mail-suave); } .chip.cal { color: var(--cal); background: var(--cal-suave); }
+.chip.gris { color: var(--suave); background: var(--panel-2); }
+
+/* hoy */
+.hoy-fila { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: start; padding: 10px 14px; border-top: 1px solid var(--linea); }
+.hoy-fila .t { font-weight: 600; }
+.hoy-fila .s { color: var(--suave); font-size: 12px; }
+.hoy-fila .r { color: var(--suave); font-size: 12px; line-height: 1.4; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.punto { width: 7px; height: 7px; border-radius: 50%; background: var(--aviso); display: inline-block; margin-right: 6px; transform: translateY(-1px); }
+
+/* A */
+.a-fila { display: grid; grid-template-columns: 30px 1fr auto; gap: 10px; align-items: center; padding: 9px 14px; }
+.a-fila + .a-fila { border-top: 1px solid var(--linea); }
+.a-fila.nueva .t { font-weight: 600; }
+.a-fila .t { font-size: 13.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.a-fila .s { color: var(--suave); font-size: 12px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
+.a-fila .h { color: var(--tenue); font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; align-self: start; padding-top: 2px; }
+.a-fila .acc { display: flex; gap: 6px; margin-top: 6px; }
+.a-urg { background: var(--urg-suave); }
+.a-urg .t { color: var(--peligro); }
+.a-plegado { padding: 10px 14px; color: var(--suave); font-size: 12px; border-top: 1px solid var(--linea); display: flex; justify-content: space-between; }
+
+/* B */
+.b-lista { padding: 8px 10px 12px; display: grid; gap: 8px; }
+.b-card { border: 1px solid var(--linea); border-radius: var(--radio); padding: 10px 12px; display: grid; gap: 8px; background: var(--panel); }
+.b-card.nueva { border-color: var(--linea-fuerte); box-shadow: 0 1px 0 var(--linea); }
+.b-card.urg { border-color: color-mix(in srgb, var(--peligro) 45%, var(--linea)); background: var(--urg-suave); }
+.b-top { display: flex; gap: 8px; align-items: center; }
+.b-top .t { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.b-top .h { color: var(--tenue); font-size: 11.5px; }
+.b-mini-ticket { display: flex; gap: 10px; align-items: center; }
+.b-dia { width: 42px; border-radius: 6px; overflow: hidden; text-align: center; border: 1px solid var(--linea); flex: none; }
+.b-dia .m { background: var(--cal); color: #fff; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; padding: 1px 0; }
+.b-dia .n { font-weight: 700; font-size: 16px; padding: 1px 0 2px; }
+.b-info { font-size: 12px; color: var(--suave); min-width: 0; }
+.b-info b { color: var(--texto); font-weight: 600; display: block; font-size: 13px; }
+.b-cifras { display: flex; gap: 14px; }
+.b-cifras div { display: grid; }
+.b-cifras b { font-size: 17px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.b-cifras span { font-size: 11px; color: var(--suave); }
+.b-pie { display: flex; gap: 6px; justify-content: flex-end; }
+.b-txt { color: var(--suave); font-size: 12.5px; }
+
+/* C */
+.c-dia { font-size: 11px; font-weight: 600; color: var(--tenue); padding: 10px 14px 4px; text-transform: uppercase; letter-spacing: .06em; }
+.c-fila { display: grid; grid-template-columns: 8px 22px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 14px; border-top: 1px solid var(--linea); position: relative; }
+.c-fila .p { width: 7px; height: 7px; border-radius: 50%; }
+.c-fila.nueva .p { background: var(--aviso); }
+.c-fila .linea { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.c-fila .quien { font-weight: 500; margin-right: 6px; }
+.c-fila.nueva .t { font-weight: 600; }
+.c-fila .r { color: var(--tenue); }
+.c-fila .h { color: var(--tenue); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.c-fila.hover { background: var(--panel-2); }
+.c-fila.hover .h { display: none; }
+.c-hover { display: none; gap: 4px; }
+.c-fila.hover .c-hover { display: flex; }
+.c-fila.urg .t { color: var(--peligro); }
+.c-filtros { display: flex; gap: 6px; padding: 0 14px 8px; flex-wrap: wrap; }
+.c-filtros .btn { border-radius: 14px; }
+.c-filtros .btn.sel { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); }
+</style>
+
+<main class="pagina">
+  <h1>La lista de la bandeja, más fácil de leer</h1>
+  <p class="intro">Bocetos con datos de ejemplo de «Hoy» y «Para revisar». Arriba de todo, cómo se ven ahora: todas las filas pesan igual, todas dicen «Revisar» o «Sin revisar» y el resumen es un bloque de texto que no se entiende de un vistazo.</p>
+
+  <nav class="selector" aria-label="Elegir dirección">
+    <button type="button" data-ir="hoy" aria-pressed="false">Hoy</button>
+    <button type="button" data-ir="a" aria-pressed="true">A · Lo que te pide</button>
+    <button type="button" data-ir="b" aria-pressed="false">B · Tarjetas</button>
+    <button type="button" data-ir="c" aria-pressed="false">C · Como el correo</button>
+  </nav>
+
+  <section data-dir="hoy" hidden>
+    <div class="dir-cab"><h2>Cómo se ve ahora</h2></div>
+    <p class="dir-desc">Mismo peso para un aviso urgente que para un resumen semanal. «Sin revisar» se repite en cada fila y el texto de abajo mezcla todo.</p>
+    <div class="fila">
+      <div class="marco"><div class="marco-titulo">Bandeja › Hoy</div>
+        <div class="panel">
+          <div class="cab"><div class="ico">▤</div><div><div class="t">Hoy</div><div class="s">Lo que te espera y lo que pasó desde hace 1 d</div></div></div>
+          <div class="sec">Para revisar</div>
+          <div class="hoy-fila"><div class="av clara">C</div><div><div>Reporte de la secretaría</div><div class="s">Clara · recién</div></div><button class="btn">Revisar</button></div>
+          <div class="hoy-fila"><div class="av clara">C</div><div><div>Urgente: Mamá se quedó sin los remedios de la presión.</div><div class="s">Clara · recién</div></div><button class="btn">Revisar</button></div>
+          <div class="hoy-fila"><div class="av clara">C</div><div><div>Propuesta: Agendar turno de psiquiatra de Mamá el jueves 10/12 (todo el día, hora…</div><div class="s">Clara · hace 10 min</div></div><button class="btn">Revisar</button></div>
+          <div class="hoy-fila"><div class="av marta">M</div><div><div>Resumen semanal de gastos</div><div class="s">Marta · recién</div></div><button class="btn">Revisar</button></div>
+          <div class="sec">Qué pasó</div>
+          <div style="padding: 0 14px 14px 30px">• 4 entregas nuevas</div>
+        </div>
+      </div>
+      <div class="marco"><div class="marco-titulo">Bandeja › Para revisar</div>
+        <div class="panel">
+          <div class="hoy-fila"><div class="av clara">C</div><div><div class="t"><span class="punto"></span>Lo de hoy, viernes 27</div><div class="s">Clara · Reporte de la secretaría · recién</div><div class="r">Mamá pidió turno y Fede espera el presupuesto. Para saber: Mamá · WhatsApp · 10:00 — Pidió turno con el cardiólogo. · Federico Ríos · Gmail · 11:05 — Pide el presupuesto…</div></div><span class="insignia aviso">Sin revisar</span></div>
+          <div class="hoy-fila"><div class="av clara">C</div><div><div class="t"><span class="punto"></span>Urgente: Mamá se quedó sin los remedios…</div><div class="s">Clara · Reporte de la secretaría · recién</div><div class="r">URGENTE: Mamá se quedó sin los remedios de la presión. Para saber: Mamá · WhatsApp · 15:40 — Dice que mañana no tiene…</div></div><span class="insignia aviso">Sin revisar</span></div>
+          <div class="hoy-fila"><div class="av marta">M</div><div><div class="t"><span class="punto"></span>Resumen semanal de gastos</div><div class="s">Marta · Tarea programada · recién</div><div class="r">Esta semana gastaste $ 184.300, un 12 % menos que la anterior. Lo más grande: Supermercado: $ 62.400 · Nafta: $ 38.000…</div></div><span class="insignia aviso">Sin revisar</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- A -->
+  <section data-dir="a">
+    <div class="dir-cab"><h2>A · Lo que te pide</h2></div>
+    <p class="dir-desc">La lista se ordena por lo que tenés que hacer vos. Arriba, «Te necesita»: lo urgente y las propuestas, con los botones para decidir ahí mismo. Después, «Para leer», con una línea corta por fila (chips en vez de texto corrido). Lo ya visto queda plegado. Sin la pastilla «Sin revisar»: lo nuevo va en negrita.</p>
+    <div class="fila">
+      <div class="marco"><div class="marco-titulo">Bandeja › Hoy</div>
+        <div class="panel">
+          <div class="cab"><div class="ico">▤</div><div><div class="t">Hoy, viernes 27</div><div class="s">2 te necesitan · 3 para leer</div></div></div>
+          <div class="sec">Te necesita <span class="n">2</span></div>
+          <div class="a-fila nueva a-urg"><div class="av clara">C</div><div style="min-width:0"><div class="t">Mamá se quedó sin los remedios de la presión</div><div class="s"><span class="chip wa">WhatsApp</span>Urgente · Clara te avisa</div></div><div class="h">15:42</div></div>
+          <div class="a-fila nueva"><div class="av clara">C</div><div style="min-width:0"><div class="t">Agendar psiquiatra de Mamá</div><div class="s"><span class="chip cal">Evento</span>jue 10 dic · todo el día</div><div class="acc"><button class="btn primario">Crear el evento</button><button class="btn">Ver</button><button class="btn fantasma">Descartar</button></div></div><div class="h">15:30</div></div>
+          <div class="sec">Para leer <span class="n">3</span></div>
+          <div class="a-fila nueva"><div class="av clara">C</div><div style="min-width:0"><div class="t">Reporte de las 19:00</div><div class="s"><span class="chip wa">WhatsApp 2</span><span class="chip mail">Mails 1</span><span class="chip gris">Seguimiento 1</span></div></div><div class="h">19:01</div></div>
+          <div class="a-fila nueva"><div class="av marta">M</div><div style="min-width:0"><div class="t">Resumen semanal de gastos</div><div class="s">Gastaste $ 184.300, un 12 % menos</div></div><div class="h">12:00</div></div>
+          <div class="a-fila nueva"><div class="av clara">C</div><div style="min-width:0"><div class="t">Importé tus notas de «mama»</div><div class="s">4 temas para revisar · 3 fichas</div></div><div class="h">10:15</div></div>
+          <div class="a-plegado"><span>Ya lo viste hoy · 4</span><span>Mostrar</span></div>
+        </div>
+      </div>
+      <div class="marco"><div class="marco-titulo">Bandeja › Para revisar (filtrado: Clara)</div>
+        <div class="panel">
+          <div class="cab"><div class="ico">▤</div><div><div class="t">Para revisar</div><div class="s">De Clara · 4 sin revisar</div></div></div>
+          <div class="sec">Te necesita <span class="n">2</span></div>
+          <div class="a-fila nueva a-urg"><div class="av clara">C</div><div style="min-width:0"><div class="t">Mamá se quedó sin los remedios de la presión</div><div class="s"><span class="chip wa">WhatsApp</span>Urgente</div></div><div class="h">15:42</div></div>
+          <div class="a-fila nueva"><div class="av clara">C</div><div style="min-width:0"><div class="t">Responderle a Fede por el presupuesto</div><div class="s"><span class="chip mail">Mail</span>Para Federico Ríos</div><div class="acc"><button class="btn primario">Mandar el mail</button><button class="btn">Ver</button><button class="btn fantasma">Descartar</button></div></div><div class="h">ayer</div></div>
+          <div class="sec">Para leer <span class="n">2</span></div>
+          <div class="a-fila nueva"><div class="av clara">C</div><div style="min-width:0"><div class="t">Reporte de las 19:00</div><div class="s"><span class="chip wa">WhatsApp 2</span><span class="chip mail">Mails 1</span></div></div><div class="h">19:01</div></div>
+          <div class="a-fila nueva"><div class="av clara">C</div><div style="min-width:0"><div class="t">Reporte de las 9:00</div><div class="s"><span class="chip gris">Seguimiento 3</span><span class="chip cal">Agenda 1</span></div></div><div class="h">9:02</div></div>
+        </div>
+      </div>
+    </div>
+    <p class="por-dentro"><b>Qué cambia por dentro.</b> Solo la interfaz: la línea corta y los chips salen de lo que ya tiene cada entrega (el tipo de acción y su fecha, las secciones del reporte, las cifras de la importación). Para aprobar desde la lista se usan los mismos botones que ya existen en el detalle.</p>
+  </section>
+
+  <!-- B -->
+  <section data-dir="b" hidden>
+    <div class="dir-cab"><h2>B · Tarjetas</h2></div>
+    <p class="dir-desc">Cada entrega es una tarjeta chica con un adelanto de su forma: la fecha de un evento, las cifras de una importación, los chips de un reporte. Se entiende qué es sin abrirla. Ocupa más lugar, así que entran menos por pantalla.</p>
+    <div class="fila">
+      <div class="marco"><div class="marco-titulo">Bandeja › Hoy</div>
+        <div class="panel">
+          <div class="cab"><div class="ico">▤</div><div><div class="t">Hoy, viernes 27</div><div class="s">5 sin revisar</div></div></div>
+          <div class="b-lista">
+            <div class="b-card urg"><div class="b-top"><div class="av chico clara">C</div><div class="t" style="color:var(--peligro)">Mamá se quedó sin los remedios</div><span class="h">15:42</span></div><div class="b-txt">Dice que mañana no tiene para tomar el Valsartán.</div></div>
+            <div class="b-card nueva"><div class="b-top"><div class="av chico clara">C</div><div class="t">Agendar psiquiatra de Mamá</div><span class="h">15:30</span></div>
+              <div class="b-mini-ticket"><div class="b-dia"><div class="m">dic</div><div class="n">10</div></div><div class="b-info"><b>Mamá: psiquiatra</b>jueves · todo el día · hora a confirmar</div></div>
+              <div class="b-pie"><button class="btn fantasma">Descartar</button><button class="btn primario">Crear el evento</button></div></div>
+            <div class="b-card nueva"><div class="b-top"><div class="av chico clara">C</div><div class="t">Reporte de las 19:00</div><span class="h">19:01</span></div><div class="b-txt">Mamá pidió turno y Fede espera el presupuesto.</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span class="chip wa">WhatsApp 2</span><span class="chip mail">Mails 1</span><span class="chip gris">Seguimiento 1</span></div></div>
+            <div class="b-card nueva"><div class="b-top"><div class="av chico clara">C</div><div class="t">Importé tus notas de «mama»</div><span class="h">10:15</span></div><div class="b-cifras"><div><b>121</b><span>archivos</span></div><div><b>4</b><span>temas</span></div><div><b>3</b><span>fichas</span></div><div><b>10</b><span>días</span></div></div></div>
+            <div class="b-card nueva"><div class="b-top"><div class="av chico marta">M</div><div class="t">Resumen semanal de gastos</div><span class="h">12:00</span></div><div class="b-txt">Esta semana gastaste $ 184.300, un 12 % menos que la anterior.</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="por-dentro"><b>Qué cambia por dentro.</b> Igual que A en datos: todo sale de lo que ya guarda cada entrega. Las tarjetas reusan las piezas del detalle (ticket, cifras, chips) en tamaño chico.</p>
+  </section>
+
+  <!-- C -->
+  <section data-dir="c" hidden>
+    <div class="dir-cab"><h2>C · Como el correo</h2></div>
+    <p class="dir-desc">Una línea por entrega, agrupadas por día: quién, el título en negrita si es nuevo y, en gris, lo primero que dice. Al pasar el mouse aparecen «Listo» y, en una propuesta, el botón para aprobarla. Es la más compacta: entra mucho en poco lugar.</p>
+    <div class="fila">
+      <div class="marco"><div class="marco-titulo">Bandeja › Para revisar</div>
+        <div class="panel">
+          <div class="cab"><div class="ico">▤</div><div><div class="t">Para revisar</div><div class="s">5 sin revisar</div></div></div>
+          <div class="c-filtros"><button class="btn sel">Sin revisar 5</button><button class="btn">Propuestas 2</button><button class="btn">Reportes</button><button class="btn">Todas</button></div>
+          <div class="c-dia">Hoy</div>
+          <div class="c-fila nueva urg"><span class="p"></span><div class="av chico clara">C</div><div class="linea"><span class="t">Mamá se quedó sin los remedios</span> <span class="r">— Mañana no tiene Valsartán</span></div><span class="h">15:42</span></div>
+          <div class="c-fila nueva hover"><span class="p"></span><div class="av chico clara">C</div><div class="linea"><span class="t">Agendar psiquiatra de Mamá</span> <span class="r">— jue 10 dic, todo el día</span></div><span class="h">15:30</span><span class="c-hover"><button class="btn primario">Crear el evento</button><button class="btn">Listo</button></span></div>
+          <div class="c-fila nueva"><span class="p"></span><div class="av chico clara">C</div><div class="linea"><span class="t">Reporte de las 19:00</span> <span class="r">— Mamá pidió turno y Fede espera el presupuesto</span></div><span class="h">19:01</span></div>
+          <div class="c-fila nueva"><span class="p"></span><div class="av chico marta">M</div><div class="linea"><span class="t">Resumen semanal de gastos</span> <span class="r">— $ 184.300, un 12 % menos</span></div><span class="h">12:00</span></div>
+          <div class="c-dia">Ayer</div>
+          <div class="c-fila nueva"><span class="p"></span><div class="av chico clara">C</div><div class="linea"><span class="t">Importé tus notas de «mama»</span> <span class="r">— 4 temas para revisar</span></div><span class="h">jue</span></div>
+          <div class="c-fila"><span class="p"></span><div class="av chico clara">C</div><div class="linea"><span class="t">Reporte de las 9:00</span> <span class="r">— Día tranquilo</span></div><span class="h">jue</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="por-dentro"><b>Qué cambia por dentro.</b> Solo la interfaz. Los filtros «Propuestas» y «Reportes» reemplazan al menú de origen.</p>
+  </section>
+</main>
+
+<script>
+(function () {
+  var botones = document.querySelectorAll('[data-ir]'), secciones = document.querySelectorAll('[data-dir]');
+  function mostrar(id) {
+    var hay = false;
+    secciones.forEach(function (s) { var es = s.getAttribute('data-dir') === id; s.hidden = !es; if (es) hay = true; });
+    if (!hay) return mostrar('a');
+    botones.forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-ir') === id)); });
+  }
+  botones.forEach(function (b) { b.addEventListener('click', function () { var id = b.getAttribute('data-ir'); history.replaceState(null, '', '#' + id); mostrar(id); }); });
+  window.addEventListener('hashchange', function () { mostrar(location.hash.slice(1)); });
+  mostrar(location.hash.slice(1) || 'a');
+})();
+</script>
