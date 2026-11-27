@@ -317,10 +317,13 @@ describe('Tareas programadas (API y programador)', () => {
     const primera = f.sb.llamadas.at(-1)!
     expect(primera.at(-1)).toBe('Armá el informe')
     expect((await f.post('/api/tareas/informe-diario/correr')).status).toBe(202)
-    await esperar(() => f.sb.llamadas.length > 1 && f.sb.llamadas.at(-1)!.at(-1)!.includes('La vez anterior'))
+    await esperar(() => f.sb.llamadas.length > 1 && f.sb.llamadas.at(-1)!.some((x) => x.includes('# La vez anterior')))
     const segunda = f.sb.llamadas.at(-1)!
-    expect(segunda.at(-1)!.startsWith('Armá el informe\n\n---\nLa vez anterior (')).toBe(true)
-    expect(segunda.at(-1)!.endsWith(':\nhola marce')).toBe(true)
+    // en la charla queda solo la consigna; lo de la vez anterior va como mensaje de sistema
+    expect(segunda.at(-1)).toBe('Armá el informe')
+    const sistema = segunda[segunda.indexOf('--append-system-prompt') + 1]!
+    expect(sistema).toContain('# La vez anterior\nEsta tarea ya corrió (')
+    expect(sistema.endsWith(':\nhola marce')).toBe(true)
     expect(segunda.includes('--session-id') && !segunda.includes('--resume')).toBe(true)
   })
 

@@ -46,6 +46,10 @@ export type TareaProgramada = {
   hecha?: string
   /** Archivos adjuntos (rutas relativas a la oficina, dentro de `archivos/adjuntos/`): el agente los recibe con la consigna. */
   archivos?: string[]
+  /** Solo en memoria (no va a `oficina.json`): instrucciones de esta corrida que van como mensaje de sistema, sumadas a las
+   *  del agente (`--append-system-prompt`), en vez de quedar en la charla. Las arman la secretaría (revisión y reporte) y
+   *  el programador (lo que entregó la vez anterior). */
+  sistema?: string
 }
 
 /** Lo que recibe el agente: la consigna y, si tiene, la lista de adjuntos. */

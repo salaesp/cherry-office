@@ -29,12 +29,12 @@ import { Slug, Validar, largo, prefijo } from './validar.js'
 
 // MARK: - ejecución (una corrida de una tarea)
 
-/** Lo que entregó la ejecución anterior de una tarea repetida, recortado, para el pedido de la siguiente. */
+/** Lo que entregó la ejecución anterior de una tarea repetida, recortado, para las instrucciones de la siguiente. */
 export const maxVezAnterior = 1500
 export function vezAnterior(e: Ejecucion): string {
   const cuando = new Date((e.fin ?? e.inicio) * 1000).toISOString().slice(0, 16).replace('T', ' ')
   const r = e.resultado.trim()
-  return `\n\n---\nLa vez anterior (${cuando} UTC) respondiste esto${largo(r) > maxVezAnterior ? ' (recortado)' : ''}. Usalo para seguir desde ahí y no repetir; no hace falta rehacer lo que ya estaba:\n${prefijo(r, maxVezAnterior)}`
+  return `# La vez anterior\nEsta tarea ya corrió (${cuando} UTC) y respondiste esto${largo(r) > maxVezAnterior ? ' (recortado)' : ''}. Usalo para seguir desde ahí y no repetir; no hace falta rehacer lo que ya estaba:\n${prefijo(r, maxVezAnterior)}`
 }
 
 export type Ejecucion = {
@@ -424,9 +424,10 @@ export class Programador implements ProgramadorEntregas {
   }
 
   /** Una corrida única con un id de tarea cualquiera (`encargo:`, `flujo:`, `accion:`, `coord:`, `parte:`): misma maquinaria
-   *  que una tarea. `actuar`: herramientas de conectores de actuar que esta corrida puede usar. */
-  encargarLibre(act: OficinaActiva, def: AgenteDef, p: { id: string; nombre: string; consigna: string; actuar?: string[]; sid?: string }): Promise<Ejecucion> {
-    const t: TareaProgramada = { id: p.id, agente: def.id, nombre: p.nombre, consigna: p.consigna, dias: [1], hora: '00:00', activa: false }
+   *  que una tarea. `actuar`: herramientas de conectores de actuar que esta corrida puede usar. `sistema`: instrucciones que
+   *  van como mensaje de sistema (no quedan en la charla); `consigna` es entonces solo el material. */
+  encargarLibre(act: OficinaActiva, def: AgenteDef, p: { id: string; nombre: string; consigna: string; sistema?: string; actuar?: string[]; sid?: string }): Promise<Ejecucion> {
+    const t: TareaProgramada = { id: p.id, agente: def.id, nombre: p.nombre, consigna: p.consigna, dias: [1], hora: '00:00', activa: false, ...(p.sistema ? { sistema: p.sistema } : {}) }
     return this.correrAhora(act, t, def, p.actuar ?? [], p.sid)
   }
 
@@ -601,8 +602,10 @@ export class Programador implements ProgramadorEntregas {
   private async correr(ej: Ejecucion, act: OficinaActiva, t: TareaProgramada, def: AgenteDef, actuar: string[]) {
     // una tarea repetida corre cada horas o días: retomar su conversación saldría más caro (la caché de claude ya venció
     // y habría que reescribir toda la historia). Arranca de cero, con lo que entregó la vez anterior para seguir desde ahí.
+    // Va como mensaje de sistema (con la tarea, así lo retoma igual si se frena por permisos): en la charla queda solo la consigna.
     const previa = esUnica(t) ? undefined : this.ejecuciones.lista(act.carpeta, t.id, 5).find((x) => x.id !== ej.id && x.estado === 'ok' && x.resultado.trim() !== '')
-    await this.vuelta(ej, act, t, def, actuar, { mensaje: mensajeTarea(t) + (previa ? vezAnterior(previa) : ''), activa: false, reglasExtra: [] })
+    const tc: TareaProgramada = previa ? { ...t, sistema: [t.sistema, vezAnterior(previa)].filter(Boolean).join('\n\n') } : t
+    await this.vuelta(ej, act, tc, def, actuar, { mensaje: mensajeTarea(t), activa: false, reglasExtra: [] })
   }
 
   /** Una vuelta de una corrida: la primera (la consigna, en una sesión nueva) o la que retoma la conversación después de
@@ -613,6 +616,7 @@ export class Programador implements ProgramadorEntregas {
     const { store, runner, config, entregas } = this.s
     const ctx = contexto(act, def, { dirsExtra: config.oficinaDirsExtra, actuar, catalogo: this.s.catalogo?.(), config })
     ctx.anotarRechazos = true
+    if (t.sistema) ctx.instrucciones = ctx.instrucciones ? `${ctx.instrucciones}\n\n${t.sistema}` : t.sistema
     for (const r of v.reglasExtra) if (!(ctx.reglas ?? []).includes(r)) ctx.reglas = [...(ctx.reglas ?? []), r]
     // MCP también fuera del chat: token con el perfil del agente, que vive lo que dura la corrida
     const mcp = this.s.mcp?.()

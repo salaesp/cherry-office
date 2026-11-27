@@ -37,8 +37,11 @@ async function preparar() {
   let n = 0
   const mensaje = (texto: string, ts: number, chat = MAMA, propio = false) =>
     c.emitir({ tipo: 'mensaje', m: { id: 'm' + ++n, chat, de: propio ? 'yo' : chat === GRUPO ? '5491177777777@s.whatsapp.net' : chat, propio, ts, tipo: 'texto', texto } })
-  const ultimaConsigna = () => { const ls = sb.llamadas; const a = ls[ls.length - 1] ?? []; return a[a.length - 1] ?? '' }
-  return { sb, b, carpeta, wa, sec, mensaje, ultimaConsigna }
+  /** La última corrida: el mensaje (lo que queda en la charla) y el mensaje de sistema (`--append-system-prompt`). */
+  const ultima = () => { const a = sb.llamadas.at(-1) ?? []; const i = a.indexOf('--append-system-prompt'); return { mensaje: a[a.length - 1] ?? '', sistema: i >= 0 ? a[i + 1] ?? '' : '' } }
+  /** Lo que recibió la última corrida: las instrucciones (mensaje de sistema) y el mensaje, juntos. */
+  const ultimaConsigna = () => { const u = ultima(); return u.sistema + '\n\n' + u.mensaje }
+  return { sb, b, carpeta, wa, sec, mensaje, ultimaConsigna, ultima }
 }
 
 const ahora = () => Math.floor(Date.now() / 1000)
@@ -127,7 +130,7 @@ describe('secretaría', () => {
   })
 
   test('revisa lo nuevo, avanza el cursor al terminar bien y la próxima trae lo anterior como contexto', async () => {
-    const { b, carpeta, sec, mensaje, ultimaConsigna } = await preparar()
+    const { b, carpeta, sec, mensaje, ultimaConsigna, ultima } = await preparar()
     await configurar(b)
     expect(await sec.revisar()).toBeUndefined()   // sin mensajes, no gasta
     mensaje('El jueves a las 10 tengo turno con el cardiólogo', ahora() - 300)
@@ -137,7 +140,7 @@ describe('secretaría', () => {
     await esperar(() => sec.store.una(r!.id)?.estado !== 'corriendo')
     expect(sec.store.una(r!.id)).toMatchObject({ estado: 'ok', vacia: false })
     const c1 = ultimaConsigna()
-    expect(c1).toContain('atendés la secretaría de Ana')
+    expect(c1).toContain('revisás lo que le llega a Ana')
     expect(c1).toContain('<mensajes_whatsapp chat="Mamá">')
     expect(c1).toContain('Nota de Ana sobre este chat: tiene turnos médicos')
     expect(c1).toContain('Nuevo:')
@@ -146,6 +149,13 @@ describe('secretaría', () => {
     expect(c1).not.toContain('Ya revisado (solo como contexto')
     expect(sec.store.cursor(carpeta, 'whatsapp')[MAMA]).toBeGreaterThan(0)
     expect(c1).toContain('son tus notas para el próximo reporte')
+    // las instrucciones van como mensaje de sistema, junto con las reglas de siempre; en la charla queda solo el material
+    const u1 = ultima()
+    expect(u1.sistema).toMatch(/# Revisión de la secretaría[\s\S]*son tus notas para el próximo reporte/)
+    expect(u1.mensaje.startsWith('Lo nuevo para revisar (WhatsApp):')).toBe(true)
+    expect(u1.mensaje).toContain('turno con el cardiólogo')
+    expect(u1.mensaje).not.toContain('Qué hacer:')
+    expect(u1.mensaje).not.toContain('Cómo responder:')
     // la revisión no deja entrega: sus notas quedan para el reporte
     expect(sec.store.una(r!.id)).toMatchObject({ notas: 'hola sofia', urgente: false })
     expect(sec.store.una(r!.id)!.entrega).toBeUndefined()
@@ -201,7 +211,7 @@ describe('secretaría', () => {
   })
 
   test('el reporte junta las notas a la hora elegida; sin nada nuevo no gasta', async () => {
-    const { sb, b, carpeta, sec, mensaje, ultimaConsigna } = await preparar()
+    const { sb, b, carpeta, sec, mensaje, ultimaConsigna, ultima } = await preparar()
     await configurar(b, { reporte: { horas: ['09:00', '19:00'] } })
     expect(await sec.reportar()).toBeUndefined()   // la primera vuelta marca desde cuándo junta
     mensaje('El jueves a las 10 tengo turno', ahora() - 300)
@@ -221,6 +231,12 @@ describe('secretaría', () => {
     expect(c).toContain('Juntá en UN solo reporte')
     expect(c).toContain('<notas_revisiones>')
     expect(c.match(/hola sofia/g)).toHaveLength(2)
+    const u = ultima()
+    expect(u.sistema).toContain('# Reporte de la secretaría')
+    expect(u.sistema).toContain('Juntá en UN solo reporte')
+    expect(u.mensaje.startsWith('Reporte desde ')).toBe(true)
+    expect(u.mensaje).toContain('<notas_revisiones>')
+    expect(u.mensaje).not.toContain('Juntá en UN solo reporte')
     const r = sec.store.reporte(rep!.id)!
     expect(r.estado).toBe('ok')
     const e = b.servicios.entregas.una(carpeta, r.entrega!)!
