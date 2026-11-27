@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recados a la secretaría</title>
+<style>
+/* Boceto de la vista de recados (docs/plan-recados.md). A la izquierda, el celular con la vista; a la derecha, lo que
+   pasa por dentro en ese ejemplo. Los colores son los de oficina/ui/estilo.css y los de los bocetos de la secretaría. */
+:root {
+  --fondo: #f2f0ec; --panel: #ffffff; --panel-2: #f8f7f4; --linea: #e4e1db; --linea-fuerte: #d3cfc7;
+  --texto: #1d1d1f; --suave: #6d6962; --tenue: #9a958d; --acento: #1d1d1f; --sobre-acento: #ffffff;
+  --peligro: #b3362c; --ok: #3b7a4b; --aviso: #a46a12;
+  --sombra: 0 1px 2px rgba(20,18,15,.06), 0 8px 24px rgba(20,18,15,.08);
+  --cal: #2f6db5; --cal-suave: #e8f0fa; --wa: #2e8a57; --wa-suave: #e6f4ec; --flujo: #6b4fb3; --flujo-suave: #efeafa;
+  --deleg: #a46a12; --deleg-suave: #fbf2e2; --burbuja: #1d1d1f; --sobre-burbuja: #ffffff;
+  --f-texto: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --f-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radio: 10px; --radio-chico: 7px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+  --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --acento: #f1f1f2; --sobre-acento: #1b1b1d;
+  --peligro: #e0675d; --ok: #6cbf80; --aviso: #e0a84a;
+  --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  --cal: #7fb0ea; --cal-suave: #1f2b3a; --wa: #6cc495; --wa-suave: #1c3127; --flujo: #b8a2f0; --flujo-suave: #2a2440;
+  --deleg: #e0a84a; --deleg-suave: #352a18; --burbuja: #f1f1f2; --sobre-burbuja: #1b1b1d; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --fondo: #19191b; --panel: #232326; --panel-2: #1e1e21; --linea: #333337; --linea-fuerte: #45454a;
+  --texto: #f1f1f2; --suave: #a3a3a8; --tenue: #75757b; --acento: #f1f1f2; --sobre-acento: #1b1b1d;
+  --peligro: #e0675d; --ok: #6cbf80; --aviso: #e0a84a;
+  --sombra: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  --cal: #7fb0ea; --cal-suave: #1f2b3a; --wa: #6cc495; --wa-suave: #1c3127; --flujo: #b8a2f0; --flujo-suave: #2a2440;
+  --deleg: #e0a84a; --deleg-suave: #352a18; --burbuja: #f1f1f2; --sobre-burbuja: #1b1b1d; color-scheme: dark }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--fondo); color: var(--texto); font: 14px/1.5 var(--f-texto); }
+.pagina { max-width: 1180px; margin: 0 auto; padding: 28px 16px 60px; }
+h1 { font-size: 24px; margin: 0 0 6px; text-wrap: balance; }
+.intro { color: var(--suave); max-width: 72ch; margin: 0 0 18px; }
+.selector { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; position: sticky; top: 0; z-index: 5; background: var(--fondo); padding: 8px 0; }
+.selector button { font: inherit; font-size: 13px; height: 32px; padding: 0 13px; border-radius: 16px; border: 1px solid var(--linea-fuerte); background: var(--panel); color: var(--texto); cursor: pointer; }
+.selector button[aria-pressed="true"] { background: var(--acento); color: var(--sobre-acento); border-color: var(--acento); }
+.selector button:focus-visible, .btn:focus-visible, .tab:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.fila { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+
+/* ---------- celular ---------- */
+.cel { width: 390px; max-width: 100%; flex: 0 0 auto; border-radius: 34px; border: 1px solid var(--linea-fuerte); background: var(--panel-2); box-shadow: var(--sombra); overflow: hidden; display: flex; flex-direction: column; height: 760px; }
+.cel-cab { display: flex; align-items: center; gap: 10px; padding: 18px 16px 10px; background: var(--panel); }
+.avatar { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 600; font-size: 13px; color: #fff; background: linear-gradient(160deg, #c27a5a, #8c4f3a); }
+.avatar.m { background: linear-gradient(160deg, #5a8bc2, #3a5a8c); }
+.avatar.chico { width: 20px; height: 20px; font-size: 9px; }
+.cel-cab .t { font-weight: 600; font-size: 15px; line-height: 1.2; }
+.cel-cab .s { font-size: 12px; color: var(--suave); }
+.tabs { display: flex; gap: 4px; padding: 0 12px 10px; background: var(--panel); border-bottom: 1px solid var(--linea); }
+.tab { font: inherit; font-size: 12.5px; height: 28px; padding: 0 10px; border-radius: 14px; border: 0; background: transparent; color: var(--suave); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.tab[aria-pressed="true"] { background: var(--panel-2); color: var(--texto); font-weight: 600; }
+.tab .n { min-width: 18px; height: 18px; border-radius: 9px; background: var(--peligro); color: #fff; font-size: 11px; display: grid; place-items: center; padding: 0 5px; }
+.hilo { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 12px 18px; display: flex; flex-direction: column; gap: 10px; }
+.hilo > * { flex: none; }
+.hilo > .dia { align-self: center; }
+.hilo > .mio { align-self: flex-end; }
+.dia { justify-self: center; font-size: 11px; color: var(--tenue); text-transform: uppercase; letter-spacing: .05em; }
+.anterior { font-size: 12.5px; color: var(--suave); background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); padding: 8px 10px; display: flex; gap: 8px; align-items: center; }
+.anterior .est { margin-left: auto; }
+.mio { justify-self: end; max-width: 86%; background: var(--burbuja); color: var(--sobre-burbuja); border-radius: 16px 16px 4px 16px; padding: 9px 12px; }
+.mio .audio { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: .85; margin-bottom: 5px; }
+.onda { display: inline-flex; gap: 2px; align-items: center; height: 14px; }
+.onda i { width: 2px; border-radius: 1px; background: currentColor; display: block; }
+.mio .tx { font-size: 13.5px; }
+.mio .hora { font-size: 10.5px; opacity: .6; text-align: right; margin-top: 3px; }
+.entendi { font-size: 12.5px; color: var(--suave); padding: 0 4px; display: flex; gap: 6px; align-items: baseline; }
+.entendi b { color: var(--texto); font-weight: 600; }
+.tarjeta { background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); overflow: hidden; border-left: 3px solid var(--tinta, var(--linea-fuerte)); }
+.tarjeta.flujo { --tinta: var(--flujo); --suave-t: var(--flujo-suave); }
+.tarjeta.wa { --tinta: var(--wa); --suave-t: var(--wa-suave); }
+.tarjeta.cal { --tinta: var(--cal); --suave-t: var(--cal-suave); }
+.tarjeta.deleg { --tinta: var(--deleg); --suave-t: var(--deleg-suave); }
+.tarjeta.preg { --tinta: var(--acento); }
+.tarjeta.resp { --tinta: var(--linea-fuerte); }
+.t-cab { display: flex; align-items: center; gap: 6px; padding: 9px 11px 0; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--tinta); font-weight: 600; }
+.t-cab .est { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 500; }
+.t-cuerpo { padding: 6px 11px 10px; display: grid; gap: 7px; font-size: 13.5px; }
+.t-titulo { font-weight: 600; font-size: 14px; line-height: 1.3; }
+.pasos { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 11.5px; color: var(--suave); }
+.pasos span.p { background: var(--panel-2); border: 1px solid var(--linea); border-radius: 10px; padding: 1px 7px; }
+.pasos span.p.act { border-color: var(--tinta); color: var(--texto); }
+.datos { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12.5px; background: var(--panel-2); border-radius: var(--radio-chico); padding: 7px 9px; }
+.datos dt { color: var(--suave); }
+.datos dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.datos dd .de { color: var(--tenue); font-size: 11px; }
+.falta { color: var(--peligro); }
+.porque { font-size: 12px; color: var(--suave); }
+.cita { font-size: 12.5px; background: var(--suave-t, var(--panel-2)); border-radius: var(--radio-chico); padding: 7px 9px; }
+.cita .q { display: flex; gap: 6px; font-size: 11px; color: var(--suave); margin-bottom: 2px; }
+.cita + .cita { margin-top: -2px; }
+.nota-priv { font-size: 11.5px; color: var(--suave); display: flex; gap: 5px; align-items: center; }
+.opciones { display: grid; gap: 6px; }
+.opcion { text-align: left; font: inherit; font-size: 13px; padding: 8px 10px; border-radius: var(--radio-chico); border: 1px solid var(--linea-fuerte); background: var(--panel); color: var(--texto); cursor: pointer; }
+.opcion small { display: block; color: var(--suave); font-size: 11.5px; }
+.t-pie { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 11px; border-top: 1px solid var(--linea); background: var(--panel-2); }
+.btn { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 11px; border-radius: var(--radio-chico); border: 1px solid var(--linea-fuerte); background: var(--panel); color: var(--texto); font: inherit; font-size: 12.5px; cursor: pointer; }
+.btn.primario { background: var(--acento); border-color: var(--acento); color: var(--sobre-acento); }
+.btn.fantasma { border-color: transparent; background: transparent; color: var(--suave); }
+.reloj { font-variant-numeric: tabular-nums; }
+.aviso-flujo { font-size: 11px; color: var(--tenue); text-align: center; text-transform: uppercase; letter-spacing: .05em; }
+.componer { display: flex; gap: 8px; align-items: center; padding: 10px 12px 22px; background: var(--panel); border-top: 1px solid var(--linea); }
+.componer .campo { flex: 1; height: 38px; border-radius: 19px; border: 1px solid var(--linea-fuerte); background: var(--panel-2); display: flex; align-items: center; padding: 0 14px; color: var(--tenue); font-size: 13.5px; }
+.mic { width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--acento); color: var(--sobre-acento); display: grid; place-items: center; cursor: pointer; flex: none; }
+.ico { width: 16px; height: 16px; flex: none; }
+
+/* ---------- por dentro ---------- */
+.dentro { flex: 1 1 380px; min-width: 0; }
+.dentro h2 { font-size: 19px; margin: 0 0 4px; }
+.dentro .que { color: var(--suave); margin: 0 0 14px; max-width: 64ch; }
+.linea-t { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.linea-t li { position: relative; padding: 0 0 14px 26px; }
+.linea-t li::before { content: ""; position: absolute; left: 7px; top: 6px; bottom: -6px; width: 1px; background: var(--linea-fuerte); }
+.linea-t li:last-child::before { display: none; }
+.linea-t li::after { content: ""; position: absolute; left: 3px; top: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--panel); border: 2px solid var(--suave); }
+.linea-t li.regla::after { border-color: var(--flujo); background: var(--flujo); }
+.linea-t .paso { font-weight: 600; font-size: 13.5px; }
+.linea-t .det { color: var(--suave); font-size: 13px; }
+pre { font: 12px/1.5 var(--f-mono); background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio-chico); padding: 8px 10px; margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--texto); }
+pre .c { color: var(--tenue); }
+.clave { margin-top: 10px; padding: 10px 12px; background: var(--flujo-suave); border-radius: var(--radio); font-size: 13px; }
+.clave b { color: var(--flujo); }
+
+.vista { margin-top: 40px; border-top: 1px dashed var(--linea-fuerte); padding-top: 18px; }
+.vista h2 { font-size: 19px; margin: 0 0 10px; }
+.partes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.parte { background: var(--panel); border: 1px solid var(--linea); border-radius: var(--radio); padding: 12px 14px; border-left: 3px solid var(--tinta, var(--linea-fuerte)); }
+.parte h3 { font-size: 14px; margin: 0 0 4px; }
+.parte p { margin: 0; color: var(--suave); font-size: 13px; }
+@media (max-width: 440px) { .cel { border-radius: 20px; height: 700px; } }
+</style>
+</head>
+<body>
+<div class="pagina">
+  <h1>Recados a la secretaría</h1>
+  <p class="intro">Seis recados de ejemplo en la vista de recados del celular y, al lado, qué hace la secretaría por dentro para
+    decidir: arrancar un flujo, preguntar, buscar en WhatsApp, pasarle datos a otro agente o aprobar un paso.</p>
+
+  <div class="selector" role="group" aria-label="Ejemplo" id="selector"></div>
+
+  <div class="fila">
+    <div class="cel" aria-label="Vista de recados en el celular">
+      <div class="cel-cab">
+        <div class="avatar">S</div>
+        <div><div class="t">Recados</div><div class="s">Sofía · Secretaría · Oficina Prospera</div></div>
+      </div>
+      <div class="tabs" role="group" aria-label="Filtro">
+        <button class="tab" aria-pressed="true">Todo</button>
+        <button class="tab" aria-pressed="false">Te esperan <span class="n" id="n-esperan">2</span></button>
+        <button class="tab" aria-pressed="false">En curso</button>
+        <button class="tab" aria-pressed="false">Hechos</button>
+      </div>
+      <div class="hilo" id="hilo"></div>
+      <div class="componer">
+        <div class="campo">Dejale un recado a Sofía…</div>
+        <button class="mic" aria-label="Grabar audio"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5"/><path d="M3 7.5a5 5 0 0 0 10 0M8 12.5V15"/></svg></button>
+      </div>
+    </div>
+
+    <div class="dentro" id="dentro"></div>
+  </div>
+
+  <section class="vista">
+    <h2>La vista de recados, por partes</h2>
+    <div class="partes">
+      <div class="parte"><h3>Tu recado</h3><p>Texto o audio. El audio muestra la transcripción debajo, para que veas qué entendió antes de mirar qué hizo.</p></div>
+      <div class="parte"><h3>«Entendí»</h3><p>Una línea con su lectura del recado, siempre antes de las tarjetas. Si entendió mal, lo ves de un vistazo y lo deshacés.</p></div>
+      <div class="parte" style="--tinta: var(--flujo)"><h3>Tarjeta de flujo</h3><p>Qué flujo, sus pasos, los datos con los que arranca (y de dónde salió cada uno), por qué eligió ese flujo y unos segundos para deshacer.</p></div>
+      <div class="parte" style="--tinta: var(--wa)"><h3>Tarjeta de consulta</h3><p>La respuesta con los mensajes originales citados (WhatsApp, mail, calendario). La cita la arma el backend con el mensaje guardado, no la escribe ella.</p></div>
+      <div class="parte" style="--tinta: var(--deleg)"><h3>Tarjeta de delegación</h3><p>A quién, qué consigna y en qué va. Si le pasó datos privados (de WhatsApp o de su memoria), muestra exactamente qué compartió.</p></div>
+      <div class="parte" style="--tinta: var(--cal)"><h3>Propuesta</h3><p>Lo que sale para afuera (evento, mail): siempre con Agregar / Editar / Descartar, como en la bandeja.</p></div>
+      <div class="parte" style="--tinta: var(--acento)"><h3>Pregunta</h3><p>Cuando duda, opciones concretas con lo que haría en cada caso. Tocás una o le contestás con tus palabras.</p></div>
+      <div class="parte"><h3>Te esperan · En curso · Hechos</h3><p>Los filtros de arriba: «Te esperan» junta preguntas, propuestas y pasos de flujos para aprobar, de todos los recados.</p></div>
+    </div>
+  </section>
+</div>
+
+<script>
+const ico = {
+  flujo: '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="3" cy="8" r="1.8"/><circle cx="13" cy="3.5" r="1.8"/><circle cx="13" cy="12.5" r="1.8"/><path d="M4.7 7.2 11.3 4.3M4.7 8.8l6.6 2.9"/></svg>',
+  wa: '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 1.8a6.2 6.2 0 0 0-5.3 9.4L1.8 14.2l3.1-.9A6.2 6.2 0 1 0 8 1.8Z"/></svg>',
+  cal: '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="11" rx="2"/><path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3"/></svg>',
+  deleg: '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 8h9M8 4.5 11.5 8 8 11.5M14 3v10"/></svg>',
+  preg: '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="8" cy="8" r="6.2"/><path d="M6.2 6.3a1.9 1.9 0 1 1 2.6 1.8c-.5.2-.8.6-.8 1.1v.4M8 11.6v.1"/></svg>',
+  resp: '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.5 3h11v7.5H7L4 13v-2.5H2.5Z"/></svg>',
+  candado: '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
+}
+const onda = (n = 22) => '<span class="onda">' + Array.from({ length: n }, (_, i) => `<i style="height:${3 + Math.round(Math.abs(Math.sin(i * 1.7)) * 11)}px"></i>`).join('') + '</span>'
+
+const mio = (m) => `<div class="mio">${m.audio ? `<div class="audio">▶ ${onda()} ${m.audio}</div>` : ''}<div class="tx">${m.texto}</div><div class="hora">${m.hora}${m.audio ? ' · transcripto en tu compu' : ''}</div></div>`
+const entendi = (t) => `<div class="entendi"><span>Entendí:</span><b>${t}</b></div>`
+const datos = (filas) => `<dl class="datos">${filas.map(([k, v, de]) => `<dt>${k}</dt><dd${v === null ? ' class="falta"' : ''}>${v === null ? 'falta' : v}${de ? ` <span class="de">· ${de}</span>` : ''}</dd>`).join('')}</dl>`
+const pasos = (l, act) => `<div class="pasos">${l.map((p, i) => `<span class="p${i === act ? ' act' : ''}">${p}</span>`).join('<span>→</span>')}</div>`
+const cita = (c) => `<div class="cita"><div class="q">${ico.wa}<span>${c.de}</span><span>·</span><span>${c.cuando}</span></div>«${c.texto}»</div>`
+const pie = (bs) => `<div class="t-pie">${bs.map((b) => `<button class="btn${b[1] ? ' ' + b[1] : ''}">${b[0]}</button>`).join('')}</div>`
+const tarjeta = (tipo, cab, est, cuerpo, botones) => `<div class="tarjeta ${tipo}"><div class="t-cab">${ico[tipo] || ''}<span>${cab}</span>${est ? `<span class="est">${est}</span>` : ''}</div><div class="t-cuerpo">${cuerpo}</div>${botones ? pie(botones) : ''}</div>`
+
+const ejemplos = [
+  {
+    id: 'flujo', boton: '1 · Arranca un flujo',
+    titulo: 'Le pedís un flujo por su nombre',
+    que: 'Dijiste el nombre del flujo y diste los datos que pide: lo arranca sola, con unos segundos para deshacer.',
+    hilo: () => mio({ audio: '0:14', texto: 'Arrancá el alta de cliente para Prospera. La contacto es Laura Gómez, laura@prospera.com, y arrancan en enero.', hora: '10:12' })
+      + entendi('Arrancar el flujo «Alta de cliente» para Prospera.')
+      + tarjeta('flujo', 'Flujo', '<span class="reloj">Arranca en 0:42</span>',
+        `<div class="t-titulo">Alta de cliente · Prospera</div>`
+        + pasos(['Nicolás carga datos', 'Patricia arma contrato', 'Vos aprobás', 'Betty da la bienvenida'], 0)
+        + datos([['Cliente', 'Prospera', 'lo dijiste'], ['Contacto', 'Laura Gómez', 'lo dijiste'], ['Mail', 'laura@prospera.com', 'lo dijiste'], ['Inicio', 'enero 2027', 'lo dijiste']])
+        + `<div class="porque">Elegí este flujo porque dijiste «alta de cliente», que es su nombre.</div>`,
+        [['Deshacer', ''], ['Arrancar ya', 'primario']]),
+    dentro: [
+      { paso: 'Transcribe el audio en la compu', det: 'Whisper local, unos 2 segundos. El texto aparece en tu burbuja.' },
+      { paso: 'Lee el catálogo de flujos en su consigna', det: 'Cada flujo trae nombre, descripción, frases que lo disparan y qué datos necesita para arrancar.', code: `<span class="c">// en la consigna del hilo de recados</span>
+- Alta de cliente (alta-cliente): incorporar un cliente nuevo.
+  Se dispara con: «alta», «cliente nuevo», «sumamos a…»
+  Necesita: cliente*, contacto*, mail*, inicio
+- Presupuesto (presupuesto): precios para un cliente.
+  Se dispara con: «presupuesto», «cotización»
+  Necesita: cliente*, pedido*, plazo` },
+      { paso: 'Llama a arrancar_flujo', code: `arrancar_flujo({
+  flujo: "alta-cliente",
+  modo: "directo",
+  por_que: "nombró el flujo: «alta de cliente»",
+  datos: { cliente: "Prospera", contacto: "Laura Gómez",
+           mail: "laura@prospera.com", inicio: "enero 2027" }
+})` },
+      { paso: 'El backend controla antes de arrancar', regla: true, det: '«Directo» solo vale si el texto del recado nombra el flujo o usa una de sus frases. Si no, la tarjeta sale como propuesta, diga lo que diga ella. Si falta un dato obligatorio, no arranca y le devuelve el error para que te lo pregunte.' },
+      { paso: 'Ventana para deshacer', det: 'La corrida espera 45 segundos antes del primer paso. «Deshacer» la cancela sin que nadie haya trabajado.' },
+    ],
+    clave: 'Se da cuenta por el <b>catálogo</b> (nombre, frases, datos que pide), pero la regla de cuándo arranca sola la aplica el <b>backend</b>, no el modelo.',
+  },
+  {
+    id: 'duda', boton: '2 · Duda: ¿flujo o no?',
+    titulo: 'Le pedís algo que se parece a un flujo',
+    que: 'No nombraste ningún flujo y faltan datos: en vez de adivinar, te muestra qué haría en cada caso.',
+    hilo: () => mio({ texto: 'Habría que mandarle a los de Prospera algo con los precios nuevos', hora: '11:40' })
+      + entendi('Mandarle a Prospera los precios nuevos. No sé si querés un presupuesto formal o un mail.')
+      + tarjeta('preg', 'Te pregunto', 'Te espera',
+        `<div class="opciones">
+          <button class="opcion">Arrancar «Presupuesto»<small>Marce lo arma → vos aprobás → Betty lo envía. Me falta: qué incluye.</small></button>
+          <button class="opcion">Que Marce escriba un mail con la lista<small>Te lo muestro antes de mandarlo.</small></button>
+          <button class="opcion">Por ahora nada, anotalo<small>Lo dejo en seguimiento: «Precios nuevos a Prospera».</small></button>
+        </div><div class="porque">O contestame con tus palabras.</div>`),
+    dentro: [
+      { paso: 'Compara con el catálogo', det: '«Precios» se parece a la descripción de «Presupuesto», pero no lo nombraste ni usaste una de sus frases.' },
+      { paso: 'Le faltan datos', det: '«Presupuesto» pide pedido*: no sabe qué precios ni qué productos.' },
+      { paso: 'Pregunta con opciones', code: `preguntar({
+  texto: "…",
+  opciones: [
+    { texto: "Arrancar «Presupuesto»", accion: { arrancar_flujo: "presupuesto" }, faltan: ["pedido"] },
+    { texto: "Que Marce escriba un mail", accion: { delegar: "marce" } },
+    { texto: "Por ahora nada, anotalo", accion: { anotar: true } }
+  ]
+})` },
+      { paso: 'El recado queda «esperando tu respuesta»', regla: true, det: 'Aparece en «Te esperan». Tocar una opción la ejecuta tal cual. Si contestás con palabras, tu próximo recado se lee como respuesta a esta pregunta.' },
+    ],
+    clave: 'Parecido no alcanza: si <b>no lo nombraste</b> o <b>falta un dato obligatorio</b>, pregunta. Equivocarse arrancando un flujo cuesta trabajo de varios agentes.',
+  },
+  {
+    id: 'wa', boton: '3 · Busca en WhatsApp',
+    titulo: 'Le preguntás algo que está en WhatsApp',
+    que: 'Busca en el chat elegido, te contesta y cita los mensajes originales. Como el turno no está en tu calendario, te lo propone.',
+    hilo: () => mio({ texto: '¿Qué me dijo mamá del turno del cardiólogo?', hora: '15:03' })
+      + entendi('Buscar en WhatsApp (Mamá) lo del turno del cardiólogo.')
+      + tarjeta('wa', 'Consulta · WhatsApp', '',
+        `<div>Jueves 4 a las 10 en el Italiano. Te pidió que la lleves.</div>`
+        + cita({ de: 'Mamá', cuando: 'mar 25/11 18:02', texto: 'el jueves 4 a las 10 tengo turno con el cardiólogo en el italiano' })
+        + cita({ de: 'Mamá', cuando: 'mar 25/11 18:03', texto: 'me llevás vos?' }),
+        [['Ver en el chat', 'fantasma']])
+      + tarjeta('cal', 'Propuesta · Calendario', 'Te espera',
+        `<div class="t-titulo">Llevar a mamá al cardiólogo</div>${datos([['Cuándo', 'jue 4/12 · 9:15 a 11:30'], ['Dónde', 'Hospital Italiano'], ['Aviso', '1 día antes y 1 hora antes']])}<div class="porque">No está en tu calendario.</div>`,
+        [['Descartar', 'fantasma'], ['Editar', ''], ['Agregar', 'primario']]),
+    dentro: [
+      { paso: 'Mira su memoria primero', code: `memoria_buscar({ texto: "cardiólogo" })
+<span class="c">→ tema «Salud de mamá» (abierto): turno cardiólogo, sin fecha confirmada</span>` },
+      { paso: 'Busca en el chat de WhatsApp', code: `whatsapp_buscar({ chat: "Mamá", texto: "cardiólogo" })
+<span class="c">→ 2 mensajes [wa:8812] [wa:8813]</span>` },
+      { paso: 'Contesta citando', det: 'En su respuesta escribe las referencias [wa:8812]. El backend las cambia por la tarjeta de cita con el texto guardado: lo que ves citado es el mensaje real, no su versión.' },
+      { paso: 'Mira el calendario antes de proponer', det: 'Lo mismo que hace en las revisiones: si el evento ya existe, no lo propone. Acá no estaba → proponer_accion.' },
+      { paso: 'Anota en su memoria', det: 'Tema «Salud de mamá»: turno confirmado jue 4/12 10 h, origen [WhatsApp · Mamá].' },
+    ],
+    clave: 'La consulta es de <b>solo lectura</b> y cita la fuente. Lo único que puede salir para afuera es la propuesta, que aprobás vos.',
+  },
+  {
+    id: 'datos', boton: '4 · Datos de WhatsApp a un flujo',
+    titulo: 'Le pedís un flujo con datos que están en WhatsApp',
+    que: 'Busca el mensaje, arranca el flujo con esos datos y te muestra exactamente qué parte del chat le pasó a Marce.',
+    hilo: () => mio({ audio: '0:07', texto: 'Con lo que me mandó Juan ayer por WhatsApp armale el presupuesto', hora: '09:20' })
+      + entendi('Arrancar «Presupuesto» con el pedido que te mandó Juan (Prospera) ayer.')
+      + tarjeta('flujo', 'Flujo', 'En curso · paso 1',
+        `<div class="t-titulo">Presupuesto · Prospera</div>`
+        + pasos(['Marce lo arma', 'Vos aprobás', 'Betty lo envía'], 0)
+        + datos([['Cliente', 'Prospera', 'ficha de Juan'], ['Pedido', '3 licencias + soporte 12 meses', 'WhatsApp'], ['Plazo', 'antes del 15/12', 'WhatsApp']])
+        + `<div class="cita"><div class="q">${ico.wa}<span>Juan (Prospera)</span><span>·</span><span>mié 26/11 14:32</span></div>«necesitamos 3 licencias más y soporte por 12 meses, si puede ser antes del 15»</div>`
+        + `<div class="nota-priv">${ico.candado}<span>Esto es lo único de WhatsApp que ve Marce.</span></div>`,
+        [['Ver corrida', ''], ['Cancelar', 'fantasma']]),
+    dentro: [
+      { paso: 'Busca el mensaje', code: `memoria_buscar({ texto: "Juan" })
+<span class="c">→ ficha «Juan»: compras de Prospera, chat «Juan Prospera»</span>
+whatsapp_leer({ chat: "Juan Prospera", desde: "ayer" })
+<span class="c">→ [wa:9120] «necesitamos 3 licencias más…»</span>` },
+      { paso: 'Arranca con «directo»', det: 'Dijiste «presupuesto», una frase del flujo, y los datos obligatorios salen del mensaje.' },
+      { paso: 'Comparte solo el fragmento', regla: true, det: 'Los demás agentes no leen WhatsApp ni la memoria de la secretaría. En el contexto de la corrida va copiado solo el mensaje citado. arrancar_flujo y delegar reciben las citas aparte (citas: ["wa:9120"]) y la tarjeta las muestra con el candado.', code: `arrancar_flujo({
+  flujo: "presupuesto", modo: "directo",
+  datos: { cliente: "Prospera", pedido: "3 licencias + soporte 12 meses", plazo: "15/12" },
+  citas: ["wa:9120"]
+})` },
+    ],
+    clave: 'Cuando la información sale de su mundo privado (WhatsApp, su memoria) hacia otro agente, <b>se ve qué se compartió</b>. Nada se pasa entero «por las dudas».',
+  },
+  {
+    id: 'aprobar', boton: '5 · Aprobar un paso',
+    titulo: 'Un flujo te necesita y contestás desde el celular',
+    que: 'El flujo de presupuesto llegó a tu paso de aprobación. Pedís cambios por audio y Marce lo rehace con tu nota.',
+    hilo: () => `<div class="aviso-flujo">Aviso de un flujo · 12:05</div>`
+      + tarjeta('flujo', 'Para aprobar', 'Paso 2 de 3',
+        `<div class="t-titulo">Presupuesto · Prospera</div>${pasos(['Marce lo arma', 'Vos aprobás', 'Betty lo envía'], 1)}${datos([['Archivo', 'Presupuesto Prospera.pdf'], ['Total', 'USD 4.200'], ['Incluye', '3 licencias + soporte 12 meses']])}`,
+        [['Ver', ''], ['Pedir cambios', ''], ['Aprobar', 'primario']])
+      + mio({ audio: '0:06', texto: 'Pedile que le haga 10% de descuento por pago anual', hora: '12:09' })
+      + entendi('Pedir cambios en el presupuesto de Prospera: 10% de descuento por pago anual.')
+      + tarjeta('flujo', 'Cambios pedidos', 'Marce lo está rehaciendo',
+        `<div class="t-titulo">Presupuesto · Prospera</div>${pasos(['Marce lo arma', 'Vos aprobás', 'Betty lo envía'], 0)}<div class="porque">Nota para Marce: «10% de descuento por pago anual».</div>`),
+    dentro: [
+      { paso: 'El motor de flujos avisa', det: 'La corrida llega a un paso con aprobación. Como nació de un recado, sale un aviso al hilo y por el canal (notificación, o Telegram más adelante).' },
+      { paso: 'Con botones, no interpreta nada', det: 'Aprobar y Pedir cambios llevan el id de la corrida y del paso: van directo a MotorFlujos.avanzar / volver.' },
+      { paso: 'Por voz, busca un único candidato', code: `pedir_cambios({ corrida: 42, paso: 2,
+  nota: "10% de descuento por pago anual" })` },
+      { paso: 'Si hay más de un paso esperando, pregunta', regla: true, det: 'El backend rechaza aprobar_paso / pedir_cambios si hay varias corridas que encajan y ella no dijo cuál. Estas herramientas existen solo en el hilo de recados: un mensaje de WhatsApp de otra persona no puede aprobar nada.' },
+    ],
+    clave: 'El celular sirve para <b>destrabar flujos</b>: aprobar, pedir cambios con tu voz o marcar como hecho tu paso con una foto.',
+  },
+  {
+    id: 'mezcla', boton: '6 · Varias cosas en un audio',
+    titulo: 'Un audio con tres pedidos distintos',
+    que: 'Una delegación suelta (no hay flujo para eso), un recordatorio que sale de su memoria y una pregunta a WhatsApp.',
+    hilo: () => mio({ audio: '0:21', texto: 'Decile a Marce que revise el contrato de Nicolás, recordame el viernes llamar al contador y… ¿hay algo nuevo de mamá?', hora: '08:47' })
+      + entendi('Tres cosas: Marce revisa el contrato · recordatorio el viernes · novedades de mamá.')
+      + tarjeta('deleg', 'Le pasé a Marce', 'Trabajando · 2 min',
+        `<div class="t-titulo">Revisar el contrato de Nicolás</div><div class="porque">Consigna: «Revisá el contrato de servicios que preparó Nicolás (archivos/contratos/…). Marcá cláusulas de plazo, penalidades y renovación, y dejá tus comentarios en una entrega.»</div>`,
+        [['Ver', ''], ['Cancelar', 'fantasma']])
+      + tarjeta('cal', 'Propuesta · Calendario', 'Te espera',
+        `<div class="t-titulo">Llamar al contador (Rubén)</div>${datos([['Cuándo', 'vie 28/11 · 10:00'], ['Teléfono', '11 5555-0101', 'su ficha']])}`,
+        [['Descartar', 'fantasma'], ['Editar', ''], ['Agregar', 'primario']])
+      + tarjeta('resp', 'Respuesta', '',
+        `<div>Nada nuevo de mamá desde ayer a las 21:10.</div>`),
+    dentro: [
+      { paso: 'Separa el recado en partes', det: 'Cada parte termina en una tarjeta. El «Entendí» las enumera.' },
+      { paso: '«Revisá el contrato» no es un flujo', det: 'Ningún flujo del catálogo encaja → delegación suelta. Lo pediste explícito («decile a Marce») → va directo.', code: `delegar({ agente: "marce", nombre: "Revisar el contrato de Nicolás",
+  consigna: "Revisá el contrato de servicios…" })` },
+      { paso: '«El contador» sale de su memoria', det: 'Ficha «Rubén (contador)» con el teléfono → la propuesta de evento lo trae. Recordatorios con fecha = eventos del calendario, como ya decide la memoria de la secretaría.' },
+      { paso: '«¿Algo nuevo de mamá?»', det: 'whatsapp_leer desde el último mensaje que te contó → nada. Respuesta corta, sin tarjeta de cita porque no hay mensajes.' },
+      { paso: 'Al terminar Marce', regla: true, det: 'alTerminar con origen.recado → «Marce terminó de revisar el contrato → ver» en el hilo y como notificación. La tarjeta de delegación pasa a «Hecha».' },
+    ],
+    clave: 'Un recado puede dar <b>varias tarjetas de tipos distintos</b>. Flujo cuando hay uno que encaja; delegación suelta cuando no.',
+  },
+]
+
+const sel = document.getElementById('selector')
+const hilo = document.getElementById('hilo')
+const dentro = document.getElementById('dentro')
+const previos = `<div class="dia">Ayer</div><div class="anterior"><div class="avatar chico m">M</div><span>Presupuesto Prospera · enviado por Betty</span><span class="est" style="color:var(--ok)">Hecho</span></div><div class="dia">Hoy</div>`
+
+function mostrar(id) {
+  const e = ejemplos.find((x) => x.id === id) || ejemplos[0]
+  for (const b of sel.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.id === e.id))
+  hilo.innerHTML = previos + e.hilo()
+  hilo.scrollTop = hilo.scrollHeight
+  dentro.innerHTML = `<h2>${e.titulo}</h2><p class="que">${e.que}</p><ol class="linea-t">${e.dentro.map((d) => `<li class="${d.regla ? 'regla' : ''}"><div class="paso">${d.paso}</div>${d.det ? `<div class="det">${d.det}</div>` : ''}${d.code ? `<pre>${d.code}</pre>` : ''}</li>`).join('')}</ol><div class="clave">${e.clave}</div>`
+  try { localStorage.setItem('recados-ejemplo', e.id) } catch {}
+}
+for (const e of ejemplos) {
+  const b = document.createElement('button')
+  b.textContent = e.boton
+  b.dataset.id = e.id
+  b.addEventListener('click', () => mostrar(e.id))
+  sel.appendChild(b)
+}
+let inicial = 'flujo'
+try { inicial = localStorage.getItem('recados-ejemplo') || inicial } catch {}
+mostrar(inicial)
+</script>
+</body>
+</html>

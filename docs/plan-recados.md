@@ -163,6 +163,37 @@ la pantalla (`MotorFlujos.iniciar(flujo, nombre, contexto, adjuntos)`) y ningún
    después Betty lo revise»), te sugiere guardarla como flujo, con un borrador armado como el de las esperas
    (`/api/esperas/flujo`).
 
+## Cómo decide, y la vista de recados
+Ejemplos navegables en [bocetos/secretaria/recados.html](../bocetos/secretaria/recados.html): arranca un flujo, duda entre
+flujo o no, busca en WhatsApp, pasa datos de WhatsApp a un flujo, aprobás un paso, varias cosas en un audio.
+
+**Cómo se da cuenta de que es un flujo.** No queda librado al modelo:
+1. **Catálogo en la consigna.** Cada flujo suma dos campos opcionales a `FlujoDef`: `disparadores` (frases que lo nombran:
+   «presupuesto», «cotización») y `datos` (lo que necesita para arrancar, con obligatorios: `cliente*`, `pedido*`, `plazo`).
+   El editor de flujos los pide; el Creador los propone al armar la oficina.
+2. **`arrancar_flujo({flujo, modo, por_que, datos, citas?})`.** `modo: "directo"` solo lo acepta el backend si el texto del
+   recado nombra el flujo o usa uno de sus disparadores; si no, la tarjeta sale como propuesta. Si falta un dato
+   obligatorio, no arranca y le devuelve el error para que te lo pregunte.
+3. **Ventana para deshacer.** Lo directo (flujo o delegación) espera 45 s antes de empezar; la tarjeta muestra la cuenta y
+   «Deshacer».
+4. **`preguntar({texto, opciones})`.** Cada opción lleva la acción que haría (arrancar tal flujo, delegar a tal agente,
+   anotar). Tocar una la ejecuta tal cual; contestar con palabras se lee como respuesta.
+
+**Datos de WhatsApp y de su memoria.**
+- **Citas verificables:** en sus respuestas escribe referencias (`[wa:8812]`) y el backend las cambia por la cita con el
+  mensaje guardado. Lo citado es el mensaje real, no su versión.
+- **Compartir lo mínimo:** los demás agentes no leen WhatsApp ni su memoria. `delegar` y `arrancar_flujo` reciben
+  `citas` aparte; en la consigna o el contexto va copiado solo ese fragmento, y la tarjeta muestra con un candado
+  exactamente qué se compartió.
+
+**La vista propia.** Los recados no se ven como una charla común sino como un hilo de **tarjetas**: tu recado (con la
+transcripción), una línea «Entendí: …» y una tarjeta por resultado: flujo (pasos, datos con su origen, por qué ese flujo),
+consulta (respuesta con citas), delegación (a quién, consigna, estado, qué se compartió), propuesta (evento o mail,
+como en la bandeja), pregunta (opciones) y aviso de un flujo (aprobar, pedir cambios, hecho). Arriba, filtros **Todo · Te
+esperan · En curso · Hechos**; «Te esperan» junta preguntas, propuestas y pasos para aprobar de todos los recados. Es la
+misma vista en la app (Equipo › la secretaría › Recados), en la página del celular y, resumida, en Telegram. Para eso cada
+resultado se guarda estructurado (`sec_recado_resultados(recado, tipo, datos, estado)`), no solo como texto de la charla.
+
 ## Acceso desde el celular
 El backend hoy solo escucha dentro de la app (protocolo `hq://`) o en `127.0.0.1` en modo desarrollo: el celular no llega.
 Tres caminos, de menos a más trabajo y riesgo:
