@@ -5,7 +5,9 @@
 #   Si la release ya existe (notas escritas a mano), solo sube o reemplaza el instalador, sin tocar las notas.
 #   Si no existe, la crea como borrador con las notas de docs/releases/vX.Y.Z.md (o un texto para completar a mano) y
 #   queda para revisarla y publicarla.
-# - A mano (Actions → Release → Run workflow): arma los instaladores y los deja como artefactos del run, sin release.
+# - A mano (Actions → Release → Run workflow): arma los instaladores y los deja como artefactos del run. Si se le pone
+#   una etiqueta (v1.14.0), además crea la release en borrador sobre ese commit, como si se hubiera subido la etiqueta;
+#   la etiqueta la crea GitHub al publicar la release.
 #
 # Las dos plataformas salen de la carcasa Electron (desktop/) con el backend TypeScript (backend/).
 # La versión sale de desktop/package.json.
@@ -22,6 +24,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      etiqueta:
+        description: "Etiqueta de la release (ej. v1.14.0). Vacío: solo arma los instaladores como artefactos. Con etiqueta: crea la release en borrador sobre este commit y la etiqueta se crea al publicarla."
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -47,11 +54,13 @@ jobs:
 
       - name: Versión
         id: version
+        env:
+          ETIQUETA: ${{ inputs.etiqueta || (github.ref_type == 'tag' && github.ref_name || '') }}
         run: |
           VERSION="$(node -p "require('./desktop/package.json').version")"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
-            echo "::error::La etiqueta $GITHUB_REF_NAME no coincide con la versión de desktop/package.json ($VERSION)."
+          if [ -n "$ETIQUETA" ] && [ "$ETIQUETA" != "v$VERSION" ]; then
+            echo "::error::La etiqueta $ETIQUETA no coincide con la versión de desktop/package.json ($VERSION)."
             exit 1
           fi
           # CFBundleVersion entero y creciente (1.2.3 -> 10203): Sparkle en la 1.0 Swift (build 10) lo compara con el suyo
@@ -111,11 +120,12 @@ jobs:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
           VERSION: ${{ steps.version.outputs.version }}
           BUILD: ${{ steps.version.outputs.build }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.etiqueta || github.ref_name }}
           REPO: ${{ github.repository }}
+          ETIQUETA: ${{ inputs.etiqueta || (github.ref_type == 'tag' && github.ref_name || '') }}
         run: |
           if [ -z "$SPARKLE_PRIVATE_KEY" ]; then
-            if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            if [ -n "$ETIQUETA" ]; then
               echo "::error::Falta el secret SPARKLE_PRIVATE_KEY: sin él la release no le llega a las Mac por actualización automática."
               exit 1
             fi
@@ -166,10 +176,10 @@ jobs:
           retention-days: 14
 
       - name: Adjuntar a la release
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' || inputs.etiqueta != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.etiqueta || github.ref_name }}
           VERSION: ${{ steps.version.outputs.version }}
           FILE: desktop/release/${{ steps.dmg.outputs.name }}
           ZIP: desktop/release/${{ steps.zip.outputs.zip }}
@@ -179,9 +189,9 @@ jobs:
             # las notas salen de docs/releases/<etiqueta>.md si existe; si no, un texto para completar a mano
             NOTAS="docs/releases/$TAG.md"
             if [ -f "$NOTAS" ]; then
-              gh release create "$TAG" --draft --title "Oficina $VERSION" --notes-file "$NOTAS" || true
+              gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Oficina $VERSION" --notes-file "$NOTAS" || true
             else
-              gh release create "$TAG" --draft --title "Oficina $VERSION" \
+              gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Oficina $VERSION" \
                 --notes "Borrador generado por el build automático. Completar las notas antes de publicar." || true
             fi
           fi
@@ -199,11 +209,13 @@ jobs:
 
       - name: Versión
         id: version
+        env:
+          ETIQUETA: ${{ inputs.etiqueta || (github.ref_type == 'tag' && github.ref_name || '') }}
         run: |
           VERSION="$(node -p "require('./desktop/package.json').version")"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
-            echo "::error::La etiqueta $GITHUB_REF_NAME no coincide con la versión de desktop/package.json ($VERSION)."
+          if [ -n "$ETIQUETA" ] && [ "$ETIQUETA" != "v$VERSION" ]; then
+            echo "::error::La etiqueta $ETIQUETA no coincide con la versión de desktop/package.json ($VERSION)."
             exit 1
           fi
 
@@ -260,10 +272,10 @@ jobs:
           retention-days: 14
 
       - name: Adjuntar a la release
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' || inputs.etiqueta != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.etiqueta || github.ref_name }}
           VERSION: ${{ steps.version.outputs.version }}
           FILE: desktop/release/${{ steps.exe.outputs.name }}
         run: |
@@ -271,9 +283,9 @@ jobs:
             # las notas salen de docs/releases/<etiqueta>.md si existe; si no, un texto para completar a mano
             NOTAS="docs/releases/$TAG.md"
             if [ -f "$NOTAS" ]; then
-              gh release create "$TAG" --draft --title "Oficina $VERSION" --notes-file "$NOTAS" || true
+              gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Oficina $VERSION" --notes-file "$NOTAS" || true
             else
-              gh release create "$TAG" --draft --title "Oficina $VERSION" \
+              gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Oficina $VERSION" \
                 --notes "Borrador generado por el build automático. Completar las notas antes de publicar." || true
             fi
           fi
@@ -315,10 +327,10 @@ jobs:
           retention-days: 14
 
       - name: Adjuntar a la release
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' || inputs.etiqueta != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.etiqueta || github.ref_name }}
           VERSION: ${{ steps.version.outputs.version }}
           FILE: ${{ steps.version.outputs.name }}
         run: |
@@ -326,9 +338,9 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             NOTAS="docs/releases/$TAG.md"
             if [ -f "$NOTAS" ]; then
-              gh release create "$TAG" --draft --title "Oficina $VERSION" --notes-file "$NOTAS" || true
+              gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Oficina $VERSION" --notes-file "$NOTAS" || true
             else
-              gh release create "$TAG" --draft --title "Oficina $VERSION" \
+              gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Oficina $VERSION" \
                 --notes "Borrador generado por el build automático. Completar las notas antes de publicar." || true
             fi
           fi
