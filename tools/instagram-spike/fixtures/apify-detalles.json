@@ -1,0 +1,29 @@
+[
+  {
+    "inputUrl": "https://www.instagram.com/cafeteria.ejemplo/",
+    "username": "cafeteria.ejemplo",
+    "fullName": "Cafetería Ejemplo",
+    "biography": "Café de especialidad",
+    "externalUrl": "https://ejemplo.com",
+    "followersCount": 10000,
+    "followsCount": 150,
+    "postsCount": 320,
+    "isBusinessAccount": true,
+    "businessCategoryName": "Cafetería",
+    "private": false,
+    "verified": false,
+    "latestPosts": [
+      { "type": "Video", "productType": "clips", "shortCode": "AAA", "url": "https://www.instagram.com/p/AAA/",
+        "caption": "Latte art en 15 segundos #cafe #latteart @barista.uno", "hashtags": ["cafe", "latteart"], "mentions": ["barista.uno"],
+        "likesCount": 900, "commentsCount": 100, "videoPlayCount": 50000, "videoViewCount": null, "videoDuration": 14.5,
+        "timestamp": "2025-11-24T16:00:00.000Z", "isPinned": false,
+        "musicInfo": { "song_name": "Canción", "artist_name": "Artista" },
+        "latestComments": [ { "ownerUsername": "fan1", "text": "¡Qué lindo!" } ] },
+      { "type": "Sidecar", "productType": "feed", "shortCode": "BBB", "caption": "Menú nuevo #Cafe", "hashtags": ["Cafe"],
+        "likesCount": 300, "commentsCount": 0, "timestamp": "2025-11-17T16:00:00.000Z",
+        "childPosts": [ {}, {}, {} ] },
+      { "type": "Image", "productType": "feed", "shortCode": "CCC", "caption": null, "likesCount": -1, "commentsCount": 5,
+        "timestamp": "2023-11-14T22:13:20.000Z", "isPinned": true }
+    ]
+  }
+]

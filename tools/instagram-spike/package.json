@@ -14,7 +14,8 @@
     "resumen": "node resumen.mjs",
     "test": "node --test mapeo.test.mjs",
     "borrar": "node -e \"require('node:fs').rmSync('datos',{recursive:true,force:true});console.log('datos/ borrado')\"",
-    "diagnostico:navegador": "node diagnostico-navegador.mjs"
+    "diagnostico:navegador": "node diagnostico-navegador.mjs",
+    "apify": "node apify.mjs"
   },
   "dependencies": {
     "playwright-core": "^1.50.0"

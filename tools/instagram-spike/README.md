@@ -102,6 +102,41 @@ Se puede correr una sola variante nombrándola: `npm run diagnostico -- natgeo p
 `datos/diagnostico/` y un renglón por variante en `datos/diagnostico.jsonl`. Si recién te bloquearon, esperá una hora
 antes de diagnosticar: si no, todo va a dar 429 por el bloqueo anterior.
 
+## Por Apify (si Instagram no deja leer desde tu casa)
+[Apify](https://apify.com) lee Instagram desde sus servidores con su scraper `apify/instagram-scraper` y nosotros le
+pedimos el resultado a su API. No hace falta navegador ni registrar nada en Meta: solo la clave de tu cuenta de Apify.
+Anda igual en la Raspberry, porque es un pedido común.
+
+**Costo:** se paga por resultado (en el plan gratuito, unos USD 0,0027 cada uno, a noviembre de 2026). Los datos de
+un perfil son **1 resultado** e incluyen sus últimas publicaciones, así que cada lectura sale menos de un centavo.
+`--publicaciones 30` suma una corrida con las últimas 30 (30 resultados más, unos 8 centavos). Cada corrida tiene un
+tope de gasto (`--tope`, por defecto USD 0,10).
+
+Guardá la clave una vez (Apify › Settings › API & Integrations › Personal API token). Pegala y Enter: no se ve en
+pantalla y queda solo en `datos/.apify-token`, que no se sube a git:
+
+```bash
+mkdir -p datos && read -rs APIFY_TOKEN && printf %s "$APIFY_TOKEN" > datos/.apify-token && chmod 600 datos/.apify-token
+```
+
+```bash
+npm run apify -- natgeo
+```
+
+Con más publicaciones, o varias cuentas en la misma corrida:
+
+```bash
+npm run apify -- natgeo otra.cuenta --publicaciones 30
+```
+
+Deja los datos en el mismo formato que la lectura directa (`datos/<cuenta>/ultimo.json`, así que `npm run resumen`
+también sirve), más tres cosas que la lectura directa no trae: `musica` (el audio del reel), `colaboracionPaga` y
+`ultimosComentarios`. Lo que devolvió Apify tal cual queda en `datos/<cuenta>/<hora>.apify.crudo.json`.
+
+Ya se verificó (en el contenedor, sin gastar): el formato de Apify se pasa bien al del spike (`npm test`, con una
+respuesta de prueba armada según el esquema publicado del actor) y la API responde y se informa bien un error de clave.
+Falta una corrida real con tu clave.
+
 ## Qué deja en `datos/`
 | Archivo | Qué tiene |
 |---|---|

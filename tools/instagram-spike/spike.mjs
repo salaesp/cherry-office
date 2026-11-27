@@ -12,7 +12,8 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
-import { clasificar, limpiarCuenta, mapearPerfil, resumir } from './mapeo.mjs'
+import { clasificar, limpiarCuenta, mapearPerfil } from './mapeo.mjs'
+import { mostrar } from './mostrar.mjs'
 
 // El id que manda la web de Instagram en `x-ig-app-id`. No es una app nuestra ni hace falta registrarlo.
 const APP_ID_WEB = '936619743392459'
@@ -84,19 +85,6 @@ async function leer(cuenta) {
   }
   anexar(registro)
   return resultado
-}
-
-function mostrar(perfil) {
-  console.log(`\n@${perfil.cuenta} · ${perfil.nombre} · ${perfil.seguidores ?? '?'} seguidores · ${perfil.publicacionesTotal ?? '?'} publicaciones${perfil.privada ? ' · PRIVADA' : ''}`)
-  if (perfil.privada) return
-  for (const p of perfil.publicaciones) {
-    const fecha = p.fecha?.slice(0, 10) ?? '?'
-    const vistas = p.reproducciones !== null ? ` · ${p.reproducciones} repr.` : ''
-    const texto = p.texto.replace(/\s+/g, ' ').slice(0, 70)
-    console.log(`  ${fecha} ${p.tipo.padEnd(8)} ${String(p.likes ?? '–').padStart(7)} ♥ ${String(p.comentarios ?? '–').padStart(5)} 💬${vistas}${p.fijada ? ' 📌' : ''}  ${texto}`)
-  }
-  const r = resumir(perfil)
-  console.log(`  ${r.leidas} leídas · ${r.porSemana ?? '?'} por semana · ${Object.entries(r.tipos).map(([t, x]) => `${t}: ${x.cantidad} (${x.interaccionPct ?? '?'} % interacción)`).join(' · ')}`)
 }
 
 async function ronda() {

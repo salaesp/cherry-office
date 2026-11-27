@@ -119,3 +119,66 @@ export function resumir(perfil) {
     mejor: mejor ? { url: mejor.url, tipo: mejor.tipo, likes: mejor.likes, comentarios: mejor.comentarios } : null,
   }
 }
+
+// MARK: - Apify (apify/instagram-scraper)
+
+const sinNegativo = (x) => (typeof x === 'number' && x >= 0 ? x : null)
+
+/** Tipo de una publicación de Apify (`type`: Image | Video | Sidecar; `productType`: feed | clips | igtv). */
+export function tipoApify(p) {
+  if (p.productType === 'clips') return 'reel'
+  if (p.type === 'Sidecar') return 'carrusel'
+  if (p.type === 'Video') return 'video'
+  return 'foto'
+}
+
+/** Una publicación de Apify en el formato del spike. */
+export function mapearPublicacionApify(p) {
+  const texto = p.caption ?? ''
+  const conPrefijo = (xs, c) => [...new Set((xs ?? []).map((x) => (x.startsWith(c) ? x : c + x)))]
+  return {
+    codigo: p.shortCode ?? null,
+    url: p.url ?? (p.shortCode ? `https://www.instagram.com/p/${p.shortCode}/` : null),
+    tipo: tipoApify(p),
+    fecha: p.timestamp ?? null,
+    texto,
+    hashtags: conPrefijo(p.hashtags, '#'),
+    menciones: conPrefijo(p.mentions, '@'),
+    likes: sinNegativo(p.likesCount),
+    comentarios: sinNegativo(p.commentsCount),
+    reproducciones: sinNegativo(p.videoPlayCount) ?? sinNegativo(p.igPlayCount) ?? sinNegativo(p.videoViewCount),
+    duracion: sinNegativo(p.videoDuration),
+    piezas: Array.isArray(p.childPosts) && p.childPosts.length ? p.childPosts.length : null,
+    fijada: !!p.isPinned,
+    descripcionAuto: p.alt ?? null,
+    lugar: p.locationName ?? null,
+    miniatura: p.displayUrl ?? null,
+    video: p.videoUrl ?? null,
+    // Lo que solo trae Apify.
+    musica: p.musicInfo ? [p.musicInfo.song_name, p.musicInfo.artist_name].filter(Boolean).join(' — ') || null : null,
+    colaboracionPaga: !!p.paidPartnership,
+    ultimosComentarios: (p.latestComments ?? []).slice(0, 5).map((c) => ({ de: c.ownerUsername ?? null, texto: c.text ?? '' })),
+  }
+}
+
+/** Los datos de perfil de Apify (`resultsType: "details"`) en el formato del spike. Si vienen `posts` (de otra corrida
+ *  con `resultsType: "posts"`), reemplazan a las `latestPosts` del perfil. */
+export function mapearPerfilApify(d, posts) {
+  if (!d || d.error) return undefined
+  const lista = posts?.length ? posts.filter((p) => !p.error) : d.latestPosts ?? []
+  return {
+    cuenta: d.username,
+    nombre: d.fullName ?? '',
+    bio: d.biography ?? '',
+    enlace: d.externalUrl ?? null,
+    categoria: d.businessCategoryName ?? null,
+    verificada: !!d.verified,
+    profesional: !!d.isBusinessAccount,
+    privada: !!d.private,
+    seguidores: sinNegativo(d.followersCount),
+    seguidos: sinNegativo(d.followsCount),
+    publicacionesTotal: sinNegativo(d.postsCount),
+    publicaciones: lista.map(mapearPublicacionApify),
+    hayMas: (sinNegativo(d.postsCount) ?? 0) > lista.length,
+  }
+}
