@@ -48,6 +48,7 @@ test('resumir: interacción por tipo, frecuencia sin fijadas, hashtags sin disti
   const r = resumir(mapearPerfil(JSON.parse(crudo)))
   assert.equal(r.tipos.reel.interaccionPct, 10)
   assert.equal(r.tipos.carrusel.interaccionPct, 3)
+  assert.equal(resumir({ ...mapearPerfil(JSON.parse(crudo)), seguidores: 267184958 }).tipos.reel.interaccionPct, 0.00037)
   assert.equal(r.porSemana, 1) // 2 no fijadas separadas 7 días
   assert.deepEqual(r.hashtags[0], { h: '#cafe', n: 2 })
   assert.equal(r.mejor.url, 'https://www.instagram.com/p/AAA/')

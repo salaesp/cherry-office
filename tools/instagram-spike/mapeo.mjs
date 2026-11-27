@@ -86,6 +86,8 @@ export function mapearPerfil(json) {
   }
 }
 
+// Dos decimales, o dos cifras significativas si es menos de 1 % (en cuentas enormes la interacción es diminuta).
+const pct = (x) => (x >= 1 ? +x.toFixed(2) : +x.toPrecision(2))
 const promedio = (xs) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null)
 
 /** Lo que le serviría a un agente: promedios por tipo, interacción sobre seguidores y frecuencia. */
@@ -100,7 +102,7 @@ export function resumir(perfil) {
       likes: promedio(ps.map((p) => p.likes).filter((x) => x !== null)),
       comentarios: promedio(ps.map((p) => p.comentarios).filter((x) => x !== null)),
       reproducciones: promedio(ps.map((p) => p.reproducciones).filter((x) => x !== null)),
-      interaccionPct: perfil.seguidores ? +(100 * promedio(inter) / perfil.seguidores).toFixed(2) : null,
+      interaccionPct: perfil.seguidores ? pct(100 * promedio(inter) / perfil.seguidores) : null,
     }]
   }))
   // Las fijadas pueden ser viejas: no cuentan para la frecuencia.
