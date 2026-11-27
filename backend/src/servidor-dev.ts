@@ -15,9 +15,9 @@ const comunes = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosnif
 
 export type OpcionesServidor = {
   router: APIHandler
-  /** La carpeta `oficina/` (index.html, ui/, ldraw/). */
+  /** La carpeta `oficina/` (index.html, ui/). */
   raizUI: string
-  /** `oficina/vendor` (three.js, fuentes). */
+  /** `oficina/vendor` (fuentes). */
   raizVendor: string
   puerto: number
 }
@@ -97,12 +97,12 @@ export class ServidorDev {
     return { status: 200, tipo: mime(f!), cuerpo: metodo === 'HEAD' ? Buffer.alloc(0) : datos }
   }
 
-  /** Archivo a servir para una ruta, solo de la lista blanca (index, logo, ui/, ldraw/, vendor/). undefined = 404. */
+  /** Archivo a servir para una ruta, solo de la lista blanca (index, logo, ui/, vendor/). undefined = 404. */
   archivo(ruta: string): string | undefined {
     let rel = ruta === '/' ? 'index.html' : ruta.slice(1)
     if (!ruta.startsWith('/') || rel.includes('\0') || rel.includes('\\') || rel.split('/').includes('..')) return undefined
     let base: string
-    if (estaticos.has(rel) || rel.startsWith('ui/') || rel.startsWith('ldraw/')) base = this.op.raizUI
+    if (estaticos.has(rel) || rel.startsWith('ui/')) base = this.op.raizUI
     else if (rel.startsWith('vendor/')) {
       base = this.op.raizVendor
       rel = rel.slice('vendor/'.length)

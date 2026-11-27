@@ -111,7 +111,7 @@ App.Nav = (function () {
     app.classList.toggle('en-seccion', sec !== 'oficina');
     app.setAttribute('data-seccion', sec);
     /* la oficina sigue viva detrás de las secciones; solo en el celular (donde el panel la tapa entera) se pausa */
-    if (App.Oficina3D && App.Oficina3D.pausar) App.Oficina3D.pausar(sec !== 'oficina' && esMovil());
+    if (App.Oficina && App.Oficina.pausar) App.Oficina.pausar(sec !== 'oficina' && esMovil());
     Object.keys(dom.items || {}).forEach(function (k) {
       dom.items[k].classList.toggle('activo', k === sec);
       if (k === sec) dom.items[k].setAttribute('aria-current', 'page'); else dom.items[k].removeAttribute('aria-current');
@@ -141,7 +141,7 @@ App.Nav = (function () {
       app.classList.toggle('lista-plegada', plegar);
       app.classList.toggle('lista-ver', plegar && lista);
       app.classList.toggle('panel-flotante', flota);
-      if (App.Oficina3D && App.Oficina3D.margen) App.Oficina3D.margen(enSec ? ven.offsetLeft + ven.offsetWidth : 0);
+      if (App.Oficina && App.Oficina.margen) App.Oficina.margen(enSec ? ven.offsetLeft + ven.offsetWidth : 0);
     });
   }
   window.addEventListener('resize', function () { if (App.dom && App.dom.app) acomodar(); });

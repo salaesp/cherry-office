@@ -1,4 +1,4 @@
-/* Actividad en vivo: sondea /api/actividad (cada 1 s si alguien trabaja, cada 4 s si no) y la reparte al 3D
+/* Actividad en vivo: sondea /api/actividad (cada 1 s si alguien trabaja, cada 4 s si no) y la reparte a la oficina
    (pose, pantalla y cartel de tarea) y a la barra lateral (rol -> qué está haciendo). */
 window.App = window.App || {};
 App.Actividad = (function () {
@@ -21,7 +21,7 @@ App.Actividad = (function () {
   function aplicar(r) {
     datos = r;
     App.E.actividad = r.agentes || {};
-    if (App.Oficina3D) App.Oficina3D.actividad(App.E.actividad);
+    if (App.Oficina) App.Oficina.actividad(App.E.actividad);
     pintarLateral();
     if (App.marcarEstados) App.marcarEstados();
     if (App.emit) App.emit('actividad', r);

@@ -108,6 +108,15 @@ describe('secretaría', () => {
     expect(chats).not.toContain('Familia')
     expect((await t.llamar('whatsapp_leer', { chat: 'Familia' }))!.esError).toBe(true)
 
+    // «todos»: revisa todos los chats que se leen (para un negocio con «leer todos los chats individuales»)
+    const rt = await llamar(b, 'PUT', '/api/secretaria', { fuentes: [{ id: 'whatsapp', cada: { valor: 30, unidad: 'minutos' }, chats: [MAMA], todos: true }] })
+    expect(rt.obj.config.fuentes[0]).toMatchObject({ todos: true })
+    expect(rt.obj.whatsappLeerTodos).toBe(false)
+    expect(rt.obj.fuentes[0].problema).toBeNull()
+    const t2 = mcp.consultas.herramientas(mcp.tokens.emitir(id), id)
+    expect((await t2.llamar('whatsapp_chats', {}))!.texto).toContain('Familia')
+    await llamar(b, 'PUT', '/api/secretaria', { fuentes: [{ id: 'whatsapp', cada: { valor: 30, unidad: 'minutos' }, chats: [MAMA] }] })
+
     // sacarla
     expect((await llamar(b, 'PUT', '/api/secretaria', { agente: null })).obj.config).toBeNull()
     expect(HerramientasMCPAgente.lista(b.servicios.oficinas.activa()!.oficina, sofia)).not.toContain('mcp__hq__whatsapp_leer')

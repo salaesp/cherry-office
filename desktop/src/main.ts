@@ -272,10 +272,7 @@ function acercaDe() {
   const creditos = [
     'Tu oficina de agentes de Claude.',
     '',
-    'Piezas LDraw: CC BY 4.0 (ldraw.org).',
-    'three.js: licencia MIT.',
     'Poppins: SIL Open Font License 1.1.',
-    'LEGO® es una marca registrada del Grupo LEGO; este proyecto no está afiliado ni respaldado por él.',
   ].join('\n')
   if (esMac) {
     app.setAboutPanelOptions({ applicationName: 'Oficina', applicationVersion: app.getVersion(), version: '', credits: creditos })

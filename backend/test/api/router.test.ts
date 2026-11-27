@@ -34,7 +34,7 @@ describe('Router', () => {
     const b = await sb.backend()
     const r = await llamar(b, 'GET', '/api/estado')
     expect(r.status).toBe(200)
-    expect(Object.keys(r.obj).sort()).toEqual(['agentes', 'app', 'auth', 'claude', 'claudePath', 'conectores_agentes', 'estilo_oficina', 'ia', 'modelos', 'modo_permisos', 'oficina', 'perfil', 'version'])
+    expect(Object.keys(r.obj).sort()).toEqual(['agentes', 'app', 'auth', 'claude', 'claudePath', 'conectores_agentes', 'ia', 'modelos', 'modo_permisos', 'oficina', 'perfil', 'version'])
     expect(r.obj.app).toBe('prospera-hq')
     expect(r.obj.version).toBe('1.0.0')
     expect(r.obj.claude).toBe(true)

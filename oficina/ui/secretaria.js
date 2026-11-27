@@ -1,4 +1,4 @@
-/* Secretaría (docs/plan-secretaria.md): Ajustes › Secretaría. Se contrata en un paso (queda en la recepción, ya
+/* Secretaría (docs/plan-secretaria.md): Ajustes › Secretaría. Se contrata en un paso (tiene su despacho al lado del tuyo, ya
    configurada con los chats elegidos de WhatsApp y, si están conectados, Gmail y el calendario) y se configura todo acá:
    qué chats revisa (de la lista completa: elegir uno acá lo elige también en Ajustes › WhatsApp), cada cuánto, Gmail y
    Calendario (prenderlos le asigna el conector), la franja horaria y «Revisar ahora». En la ficha del agente queda un
@@ -40,7 +40,7 @@
 
     /* ---- sin secretaría: contratar en un paso ---- */
     function dibujarContratar() {
-      var nombre = h('input.campo', { placeholder: 'Por ejemplo, Sofía', style: { maxWidth: '260px' } });
+      var nombre = h('input.campo', { placeholder: 'Por ejemplo, Alex', style: { maxWidth: '260px' } });
       var gm = fuente('gmail'), cal = fuente('calendario');
       var wa = datos.whatsapp && datos.whatsapp !== 'apagado';
       var elegidos = (datos.chatsWhatsApp || []).filter(function (c) { return c.elegido; }).length;
@@ -50,20 +50,20 @@
         btn.disabled = true; err.textContent = '';
         api().post('/api/secretaria/contratar', { nombre: nombre.value }).then(function (r) {
           datos = r; dibujar();
-          App.guardado((r.agente ? r.agente.nombre : 'La secretaría') + ' ya está en la recepción.');
+          App.guardado((r.agente ? r.agente.nombre : 'La secretaría') + ' ya está en la secretaría, al lado de tu despacho.');
           if (App.recargarOficina) App.recargarOficina();
         }).catch(function (e) { err.textContent = e.message; btn.disabled = false; });
       } }, 'Contratar');
       App.add(caja,
         h('div.ayuda', { style: { marginTop: 0, marginBottom: '12px' } },
-          'Alguien en la recepción que está al tanto de lo que te llega y te deja un reporte en la bandeja, con sugerencias que vos aprobás: por ejemplo, si tu mamá te avisa que tiene turno con el médico, te propone agendarlo.'),
+          'Alguien en la secretaría, al lado de tu despacho, que está al tanto de lo que te llega y te deja un reporte en la bandeja, con sugerencias que vos aprobás: por ejemplo, si tu mamá te avisa que tiene turno con el médico, te propone agendarlo.'),
         App.seccion('Va a revisar', h('ul', { style: { margin: '0 0 4px', paddingLeft: '18px', lineHeight: '1.7' } },
           item(wa, wa ? 'WhatsApp: ' + (elegidos ? elegidos + (elegidos === 1 ? ' chat elegido' : ' chats elegidos') + ' (después elegís cuáles)' : 'los chats que elijas') : 'WhatsApp, cuando lo vincules en Ajustes › WhatsApp'),
           item(gm && gm.disponible, gm && gm.disponible ? 'Gmail: los mails importantes' : 'Gmail, si lo conectás en claude.ai'),
           item(cal && cal.disponible, cal && cal.disponible ? 'Calendario: tu agenda, y puede proponerte eventos' : 'Calendario, si lo conectás en claude.ai'))),
         h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginTop: '12px', flexWrap: 'wrap' } }, h('span', 'Nombre'), nombre, btn),
         err,
-        h('div.ajuste-ayuda', { style: { marginTop: '8px' } }, 'Se sienta en la recepción. Solo lee: nunca manda mensajes ni hace nada sin que lo apruebes.'),
+        h('div.ajuste-ayuda', { style: { marginTop: '8px' } }, 'Tiene su escritorio al lado de tu despacho. Solo lee: nunca manda mensajes ni hace nada sin que lo apruebes.'),
         App.SecretariaMemoria ? App.SecretariaMemoria.bloque(false) : null);
     }
 
@@ -76,12 +76,12 @@
       /* quién, y si revisa sola */
       var activa = h('input', { type: 'checkbox', checked: cfg.activa });
       activa.addEventListener('change', function () { guardar({ activa: activa.checked }, activa.checked ? 'La secretaría vuelve a revisar.' : 'La secretaría queda en pausa.'); });
-      caja.appendChild(App.ajuste(ag.nombre + ' atiende la secretaría', 'Desde la recepción revisa lo que llega y te deja un reporte en la bandeja. Lo que propone (por ejemplo, un evento en el calendario) no se hace hasta que lo aprobás.',
+      caja.appendChild(App.ajuste(ag.nombre + ' atiende la secretaría', 'Desde la secretaría revisa lo que llega y te deja un reporte en la bandeja. Lo que propone (por ejemplo, un evento en el calendario) no se hace hasta que lo aprobás.',
         h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' } },
           h('label.ajuste-check', activa, h('span', 'Revisa sola')),
           h('button.btn.chico', { onclick: function () { if (App.Agente) App.Agente.abrir(ag.id, 'chat'); } }, App.icono('charla'), 'Charlar'))));
 
-      /* una secretaría armada antes de que existiera la recepción: ofrecer pasarla, y sacarle el permiso que ya no usa */
+      /* una secretaría armada antes de que existiera su despacho: ofrecer pasarla, y sacarle el permiso que ya no usa */
       if (ag.departamento !== 'recepcion' || (ag.permisos || []).indexOf('whatsapp') >= 0) {
         var acomodar = h('button.btn', { onclick: function () {
           acomodar.disabled = true;
@@ -89,14 +89,14 @@
           if ((ag.permisos || []).indexOf('whatsapp') >= 0) cambios.permisos = ag.permisos.filter(function (x) { return x !== 'whatsapp'; });
           api().patch('/api/agentes/' + encodeURIComponent(ag.id), cambios).then(function (r) {
             if (r.oficina && App.actualizar) App.actualizar(r.oficina);
-            App.guardado(ag.nombre + ' ya está en la recepción.');
+            App.guardado(ag.nombre + ' ya está en la secretaría, al lado de tu despacho.');
             return cargar();
           }).catch(function (e) { App.fallo(e); acomodar.disabled = false; });
-        } }, 'Pasar a la recepción');
+        } }, 'Pasar a la secretaría');
         var por = [];
-        if (ag.departamento !== 'recepcion') por.push('se sienta en la recepción, al lado del mostrador');
+        if (ag.departamento !== 'recepcion') por.push('se sienta en la secretaría, al lado de tu despacho');
         if ((ag.permisos || []).indexOf('whatsapp') >= 0) por.push('le saca «Puede leer WhatsApp», que ya no hace falta (lee los chats que elijas acá)');
-        caja.appendChild(App.ajuste('Acomodar a ' + ag.nombre, 'La secretaría ahora vive en la recepción. Con esto ' + por.join(' y ') + '.', acomodar));
+        caja.appendChild(App.ajuste('Acomodar a ' + ag.nombre, 'La secretaría ahora tiene su despacho al lado del tuyo. Con esto ' + por.join(' y ') + '.', acomodar));
       }
 
       /* WhatsApp: elegir chats de la lista completa y cada cuánto */
@@ -133,6 +133,18 @@
           if (q && !otros.length) lista.appendChild(h('div.ajuste-ayuda', 'Nada con «' + filtro + '».'));
         }
         llenar();
+        /* revisar todos los chats que se leen (para un negocio: con «leer todos los chats individuales», también los que entran solos) */
+        var todosWa = !!(fWa && fWa.todos);
+        var ckTodos = h('input', { type: 'checkbox', checked: todosWa });
+        ckTodos.addEventListener('change', function () {
+          guardarWa({ todos: ckTodos.checked }, ckTodos.checked ? 'Revisa todos los chats que se leen.' : 'Revisa solo los chats que marques.');
+        });
+        var lineaTodos = h('div', { style: { margin: '2px 0 8px' } },
+          h('label.ajuste-check', { style: { display: 'flex' } }, ckTodos, h('span', 'Revisar todos los chats que se leen')),
+          h('div.ajuste-ayuda', datos.whatsappLeerTodos
+            ? 'Incluye los que entran solos porque en Ajustes › WhatsApp está prendido «Leer todos los chats individuales» (por ejemplo, clientes que no tenés agendados).'
+            : 'Todos los elegidos en Ajustes › WhatsApp. Si te escriben números que no tenés agendados (por ejemplo, clientes de un negocio), prendé «Leer todos los chats individuales» allá.'));
+        if (todosWa) { buscar.style.display = 'none'; lista.style.display = 'none'; }
         var cada = (fWa && fWa.cada) || { valor: 1, unidad: 'horas' };
         var valor = h('input.campo', { type: 'number', min: 1, value: cada.valor, style: { width: '70px' } });
         var unidad = h('select.campo', { style: { width: 'auto' } }, h('option', { value: 'minutos', selected: cada.unidad === 'minutos' }, 'minutos'), h('option', { value: 'horas', selected: cada.unidad === 'horas' }, 'horas'));
@@ -144,10 +156,10 @@
         valor.addEventListener('change', cambiarCada); unidad.addEventListener('change', cambiarCada);
         App.add(bloqueWa,
           h('div.ajuste-ayuda', { style: { marginBottom: '6px' } }, 'Qué chats revisa. Se leen desde que los marcás; nunca manda mensajes.'),
-          buscar, lista,
+          lineaTodos, buscar, lista,
           h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', flexWrap: 'wrap' } }, h('span', 'Revisar cada'), valor, unidad,
             h('span.ajuste-ayuda', '(si no llegó nada nuevo, no gasta)')),
-          estadoWa.problema && marcados.length ? h('div.ajuste-ayuda', { style: { color: 'var(--peligro)', marginTop: '6px' } }, estadoWa.problema) : null);
+          estadoWa.problema && (marcados.length || todosWa) ? h('div.ajuste-ayuda', { style: { color: 'var(--peligro)', marginTop: '6px' } }, estadoWa.problema) : null);
       }
       caja.appendChild(bloqueWa);
 

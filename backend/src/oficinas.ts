@@ -3,7 +3,7 @@
 // en el actor. Si un método necesita esperar algo en el medio (claude), tiene que releer la oficina después.
 import fs from 'node:fs'
 import path from 'node:path'
-import { Config, type ClaveModelo, type PreferenciasIA, type ConectoresAgentes, type EstiloOficina, type ModoPermisos } from './config.js'
+import { Config, type ClaveModelo, type PreferenciasIA, type ConectoresAgentes, type ModoPermisos } from './config.js'
 import { ErrorAPI } from './errores.js'
 import { esObjeto, type Obj } from './json.js'
 import { jsonSwift } from './json-swift.js'
@@ -302,13 +302,6 @@ export class Oficinas {
     this.log.info(`conectores de los agentes: ${modo}`)
   }
 
-  /** Guarda en config.json cómo se dibuja la oficina (pixel o la maqueta LEGO). */
-  guardarEstiloOficina(estilo: EstiloOficina) {
-    this.config.estiloOficina = estilo
-    this.guardarEstado()
-    this.log.info(`estilo de la oficina: ${estilo}`)
-  }
-
   /** Guarda en config.json los modelos de los procesos internos que cambian (validados). Vale desde la próxima corrida. */
   guardarModelos(m: Partial<Record<ClaveModelo, string>>) {
     Object.assign(this.config.modelos, m)
@@ -338,7 +331,6 @@ export class Oficinas {
     o.oficina_activa = this.activaCarpeta ?? null
     if (this.config.modoPermisos !== undefined) o.modo_permisos = this.config.modoPermisos
     if (this.config.conectoresAgentes !== undefined) o.conectores_agentes = this.config.conectoresAgentes
-    if (this.config.estiloOficina !== undefined) o.estilo_oficina = this.config.estiloOficina
     if (Object.keys(this.config.modelos).length) o.modelos = { ...this.config.modelos }
     if (Object.keys(this.config.ia).length) o.ia = { ...this.config.ia }
     o.oficinas_recientes = this.recientes.map((r) => ({ carpeta: r.carpeta, nombre: r.nombre, abierta: r.abierta }))

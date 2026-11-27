@@ -10,7 +10,6 @@
   function arrancar() {
     api.get('/api/estado').then(function (st) {
       E.estado = st;
-      if (App.aplicarEstilo) App.aplicarEstilo(st.estilo_oficina);
       // primera vez que se abre la app: elegir cómo piden permiso los agentes (se ve encima de lo que se monte)
       if (st.modo_permisos === null && !arrancar.modoPreguntado) { arrancar.modoPreguntado = true; App.Permisos.elegirModo(null, true); }
       if (st.oficina) return api.get('/api/oficina').then(function (r) { montar(r.carpeta, r.oficina); });
@@ -33,7 +32,7 @@
   }
 
   function inicio() {
-    App.Oficina3D.finReunion && E.oficina && App.Oficina3D.finReunion();
+    App.Oficina.finReunion && E.oficina && App.Oficina.finReunion();
     E.oficina = null; E.carpeta = null;
     var recientes = h('div.recientes');
     var foto = h('div.inicio-foto', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr' } });
@@ -290,7 +289,7 @@
       dom.navFlu = h('span.insignia.info.oculto');
       dom.navCon = h('span.insignia.oculto');
       dom.lienzo = h('div.lienzo');
-      dom.carga = h('div.carga3d', h('span.giro'), 'Armando la oficina…');
+      dom.carga = h('div.carga-oficina', h('span.giro'), 'Armando la oficina…');
       dom.avisoReu = h('div.aviso-reunion.oculto');
       dom.derecho = h('aside.derecho');
       dom.lista = h('aside.lista-col');
@@ -320,24 +319,23 @@
       dom.app = h('div.app.en-oficina', riel,
         /* llamar a reunión: en Equipo › Reuniones y en el «+» del riel (ya no flota un botón sobre la oficina) */
         h('main.vista', dom.lienzo, dom.carga, dom.avisoReu, dom.marca,
-          h('div.pista', App.Paleta ? App.Paleta.BASE : 'Arrastrá para girar · dos dedos para moverte · pellizcá para acercarte'),
+          h('div.pista', App.Paleta ? App.Paleta.BASE : 'Rueda o pellizco para acercarte · arrastrá para moverte'),
           dom.ventana));
       App.vaciar(raiz).appendChild(dom.app);
       App.dom = dom;
-      if (!App.Oficina3D.iniciar(dom.lienzo)) dom.carga.textContent = App.Oficina3D.sinMotor
-        ? 'No llegó el motor 3D (vendor/three.min.js): revisá que esté en la carpeta oficina/vendor del servidor. El resto funciona igual.'
-        : 'Esta compu no puede mostrar la oficina en 3D. El resto funciona igual.';
-      App.Oficina3D.alElegirAgente(function (id) { App.Agente.abrir(id); });
-      App.Oficina3D.alElegirLugar(function (t, id) {
+      App.Oficina.iniciar(dom.lienzo);
+      App.Oficina.alElegirAgente(function (id) { App.Agente.abrir(id); });
+      App.Oficina.alElegirLugar(function (t, id) {
         if (t === 'reunion') App.Reunion.abrir();
         else if (t === 'biblioteca') App.Biblioteca.abrir();
         else if (t === 'entregables' || t === 'direccion') App.Entregables.abrir();
         else if (t === 'yo') App.Yo.abrir();
         else if (t === 'entrega') App.Entregables.abrir(id);
         else if (t === 'creador') App.Creador.abrir();
+        else if (t === 'secretaria' && App.Ajustes) App.Ajustes.abrir('secretaria');
         else if (t === 'flujos') App.Flujos.abrir();
       });
-      if (App.Oficina3D.alPasar && App.Paleta) App.Oficina3D.alPasar(App.Paleta.pista);
+      if (App.Oficina.alPasar && App.Paleta) App.Oficina.alPasar(App.Paleta.pista);
     }
     pintarTodo();
     if (App.Entregables) App.Entregables.refrescar();
@@ -364,15 +362,15 @@
     dom.nombre.textContent = o.nombre;
     dom.sub.textContent = o.duenio ? 'de ' + o.duenio + ' · ' + o.agentes.length + ' ' + (o.agentes.length === 1 ? 'agente' : 'agentes') : o.agentes.length + ' agentes';
     pintarEquipo();
-    if (App.Oficina3D.sinMotor) return;           // sin three.js queda a la vista el aviso de montar()
     var t0 = performance.now();
     dom.carga.classList.remove('oculto');
-    App.Oficina3D.construir(o, App.Yo.perfil()).then(function () { dom.carga.classList.add('oculto'); if (App.Agente.actual()) App.Oficina3D.elegir(App.Agente.actual()); })
-      .catch(function (e) { dom.carga.textContent = 'No pude armar la oficina en 3D: ' + e.message; console.error(e); });
+    App.Oficina.construir(o, App.Yo.perfil()).then(function () { dom.carga.classList.add('oculto'); if (App.Agente.actual()) App.Oficina.elegir(App.Agente.actual()); })
+      .catch(function (e) { dom.carga.textContent = 'No pude dibujar la oficina: ' + e.message; console.error(e); });
   }
 
-  /* la recepción no es un departamento de la oficina: ahí se sienta quien atiende la secretaría (en el mostrador) */
-  App.RECEPCION = { id: 'recepcion', nombre: 'Recepción', color: '#b9a27a' };
+  /* «recepcion» no es un departamento de la oficina: es el id (de antes) de quien atiende la secretaría, que tiene su
+     despacho al lado del tuyo. Se muestra como «Secretaría» */
+  App.RECEPCION = { id: 'recepcion', nombre: 'Secretaría', color: '#b9a27a' };
   App.depto = function (id) { return (E.oficina.departamentos || []).filter(function (d) { return d.id === id; })[0] || (id === 'recepcion' ? App.RECEPCION : null); };
   App.agente = function (id) { return (E.oficina.agentes || []).filter(function (a) { return a.id === id; })[0] || null; };
 

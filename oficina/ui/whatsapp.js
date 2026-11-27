@@ -2,14 +2,16 @@
    La conexión es de toda la app (hay un solo WhatsApp). Qué agente lee estos chats se decide en su ficha
    («Puede leer WhatsApp»). API: GET /api/whatsapp, GET /api/whatsapp/qr, POST /api/whatsapp/vincular,
    POST /api/whatsapp/desvincular, PUT /api/whatsapp/ajustes (transcripción: modelo e idioma), POST /api/whatsapp/chats,
-   PUT /api/whatsapp/chats/:jid (en un grupo, `solo`: a quiénes se lee). */
+   PUT /api/whatsapp/chats/:jid (en un grupo, `solo`: a quiénes se lee). «Leer todos los chats individuales» (`leerTodos` en
+   PUT /api/whatsapp/ajustes): para un negocio que no tiene agendados a quienes le escriben; cada chat individual nuevo se
+   elige solo (`auto`) desde su primer mensaje. */
 (function () {
   var h = App.h;
   var api = function () { return App.api; };
 
   var RIESGOS = [
     ['Va contra las reglas de WhatsApp.', 'La oficina se conecta como un dispositivo vinculado no oficial. Aunque solo lee (nunca manda mensajes ni marca como leído), WhatsApp puede bloquear el número, y se pierde entero. Conviene probar primero con un número que no sea el principal.'],
-    ['Lo que te escriben otras personas pasa por Claude.', 'Solo se guardan los chats que elijas, desde el momento en que los elegís. De los demás se ve el nombre y cuándo escribieron, nunca el texto.'],
+    ['Lo que te escriben otras personas pasa por Claude.', 'Solo se guardan los chats que elijas, desde el momento en que los elegís (o, si después prendés «Leer todos los chats individuales», los de cualquiera que te escriba). De los demás se ve el nombre y cuándo escribieron, nunca el texto.'],
     ['La sesión vale como tu cuenta.', 'Se guarda en tu compu, cifrada con el llavero del sistema cuando se puede. «Desvincular» la borra junto con todos los mensajes.'],
     ['En un grupo, lee a todos.', 'Si elegís un grupo, cualquiera que escriba ahí le está escribiendo a tus agentes. Los agentes lo toman como información, no como órdenes. Después podés elegir que solo se lea a algunas personas del grupo.']
   ];
@@ -67,7 +69,7 @@
       ck.addEventListener('change', function () { vincular.disabled = !ck.checked; });
       App.add(cont,
         h('div.ayuda', { style: { marginTop: 0, marginBottom: '12px' } },
-          'Conectá tu WhatsApp para que los agentes que elijas puedan leer algunos chats: por ejemplo, que el secretario vea que tu mamá tiene turno con el médico y te sugiera agendarlo. La oficina solo lee: no manda mensajes ni marca nada como leído.'),
+          'Conectá tu WhatsApp para que los agentes que elijas puedan leer algunos chats: por ejemplo, que la secretaría vea que tu mamá tiene turno con el médico y te sugiera agendarlo. La oficina solo lee: no manda mensajes ni marca nada como leído.'),
         App.seccion('Antes de vincular', RIESGOS.map(function (r) {
           return h('div.ajuste', { style: { display: 'block' } }, h('div.ajuste-tit', r[0]), h('div.ajuste-ayuda', r[1]));
         })),
@@ -108,7 +110,8 @@
 
     /* ---- conectado ---- */
     function dibujarConectado() {
-      var elegidos = datos.chats.filter(function (c) { return c.elegido; });
+      var elegidos = datos.chats.filter(function (c) { return c.elegido && !c.auto; });
+      var autos = datos.chats.filter(function (c) { return c.elegido && c.auto; });
       var estado = datos.estado === 'conectado' ? 'Conectado' : 'Reconectando…';
       App.add(cont,
         h('div.ajuste', h('div', h('div.ajuste-tit', estado + (datos.numero ? ' con ' + datos.numero : '')),
@@ -118,8 +121,9 @@
           h('div.ajuste-control', h('span.insignia' + (datos.estado === 'conectado' ? '.ok' : ''), datos.estado === 'conectado' ? 'En línea' : 'Esperando'))),
         datos.cifrado ? null : h('div.ayuda', { style: { color: 'var(--peligro)' } }, 'Ojo: en esta compu la sesión se guarda sin cifrar.'),
         lineaTelefono(),
-        App.seccion('Chats que se leen', elegidos.length ? elegidos.map(filaElegido) : h('div.ajuste-ayuda', 'Todavía no elegiste ninguno. Elegilos de la lista de abajo o agregá uno por número.'),
+        App.seccion('Chats que se leen', elegidos.length ? elegidos.map(filaElegido) : h('div.ajuste-ayuda', datos.leerTodos ? 'No elegiste ninguno a mano: se leen los que entran solos (abajo).' : 'Todavía no elegiste ninguno. Elegilos de la lista de abajo o agregá uno por número.'),
           { cuenta: elegidos.length ? String(elegidos.length) : '', ayuda: 'Para que un agente los lea, activá «Puede leer WhatsApp» en su ficha.' }),
+        App.seccion('Todos los mensajes que llegan', leerTodos(autos), { cuenta: autos.length ? String(autos.length) : '' }),
         App.seccion('Notas de voz e imágenes', notasDeVoz()),
         App.seccion('Agregar por número', formNumero()),
         App.seccion('Elegir de tus chats', listaChats()),
@@ -146,6 +150,51 @@
           h('button.btn.chico', { onclick: function () { editar(c); } }, App.icono('lapiz'), 'Editar'),
           h('button.btn.chico.fantasma', { title: 'Dejar de leer', onclick: function () { quitar(c); } }, App.icono('papelera'))),
         c.nota ? h('div.ajuste-ayuda', { style: { marginTop: '4px', fontStyle: 'italic' } }, 'Nota: ' + c.nota) : null);
+    }
+
+    /* «Leer todos los chats individuales»: para un negocio (WhatsApp Business o no) al que le escriben números que no tiene
+       agendados. Cada chat individual se elige solo con el primer mensaje que llega; los grupos se siguen eligiendo a mano. */
+    var filtroAuto = '';
+    function leerTodos(autos) {
+      var ck = h('input', { type: 'checkbox', checked: !!datos.leerTodos });
+      var poner = function (si) {
+        api().put('/api/whatsapp/ajustes', { leerTodos: si }).then(function (r) {
+          datos = r; redibujar();
+          App.guardado(si ? 'Desde ahora se lee cualquier chat individual que te escriba.' : 'Ya no se leen todos los chats: quedan los que elegiste.');
+        }).catch(function (e) { err.textContent = e.message; ck.checked = !si; });
+      };
+      ck.addEventListener('change', function () {
+        if (ck.checked) return poner(true);
+        if (!autos.length) return poner(false);
+        App.confirmar('¿Dejar de leer todos los chats?', 'Se dejan de leer los ' + autos.length + ' chats que entraron solos y se borran sus mensajes. Los que elegiste o editaste se quedan.', 'Dejar de leer', true)
+          .then(function (si) { if (si) poner(false); else ck.checked = true; });
+      });
+      var partes = [
+        App.ajuste('Leer todos los chats individuales',
+          'Para un negocio al que le escriben números que no tenés agendados (por ejemplo, clientes por WhatsApp Business). Cada chat individual se empieza a leer solo desde el primer mensaje que te mandan; no se leen los mensajes de antes. Los grupos se siguen eligiendo a mano.',
+          h('label.ajuste-check', ck, h('span', 'Leer todos')))
+      ];
+      if (datos.leerTodos) {
+        partes.push(h('div.ajuste-ayuda', { style: { margin: '-4px 0 8px' } },
+          'Ojo: así todo lo que te escriba cualquiera pasa por Claude. Si sacás un chat de esta lista, no se vuelve a leer solo. Para darle nombre o una nota, tocá «Editar»: pasa a la lista de arriba.'));
+        if (!autos.length) partes.push(h('div.ajuste-ayuda', 'Todavía no entró ninguno: aparecen acá a medida que te escriben.'));
+        else {
+          var caja = h('div');
+          var buscar = autos.length > 8 ? h('input.campo', { placeholder: 'Buscar por nombre o número', value: filtroAuto, style: { width: '100%', marginBottom: '8px' } }) : null;
+          var llenar = function () {
+            App.vaciar(caja);
+            var q = filtroAuto.trim().toLowerCase();
+            var vistos = autos.filter(function (c) { return !q || [c.nombre, c.agenda, c.pista, c.numero].some(function (x) { return x && String(x).toLowerCase().indexOf(q) >= 0; }); });
+            vistos.slice(0, 30).forEach(function (c) { caja.appendChild(filaElegido(c)); });
+            if (vistos.length > 30) caja.appendChild(h('div.ajuste-ayuda', 'Y ' + (vistos.length - 30) + ' más: buscá para encontrarlos.'));
+            if (q && !vistos.length) caja.appendChild(h('div.ajuste-ayuda', 'Nada con «' + filtroAuto + '».'));
+          };
+          if (buscar) buscar.addEventListener('input', function () { filtroAuto = buscar.value; llenar(); });
+          llenar();
+          partes.push(buscar, caja);
+        }
+      }
+      return h('div', partes);
     }
 
     /* transcribir las notas de voz en esta compu (Whisper, sin mandar el audio a ningún lado) */
@@ -325,7 +374,8 @@
       });
     }
     function quitar(c) {
-      App.confirmar('¿Dejar de leer «' + c.nombre + '»?', 'Se borran los mensajes guardados de este chat. Si lo volvés a elegir, se lee desde ese momento.', 'Dejar de leer', true).then(function (si) {
+      var extra = datos.leerTodos && !c.grupo ? ' Aunque esté prendido «Leer todos», no se vuelve a leer solo.' : '';
+      App.confirmar('¿Dejar de leer «' + c.nombre + '»?', 'Se borran los mensajes guardados de este chat. Si lo volvés a elegir, se lee desde ese momento.' + extra, 'Dejar de leer', true).then(function (si) {
         if (!si) return;
         api().put(ruta(c), { elegido: false }).then(function () { App.guardado('Ya no se lee ' + c.nombre + '.'); return cargar(); }).catch(App.fallo);
       });
