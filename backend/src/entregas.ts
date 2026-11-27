@@ -82,6 +82,8 @@ export function entregaJSON(e: Entrega): Obj {
     sid: e.sid, archivos: e.archivos, creada: iso(e.creada), estado: e.estado,
     revisada: e.revisada === undefined ? null : iso(e.revisada), padre: e.padre ?? null, costo: e.costo ?? null,
     notas: e.notas ?? [], retoques: (e.retoques ?? []).map((r) => ({ archivo: r.archivo, ts: iso(r.ts) })),
+    // los reportes de la secretaría y las importaciones tienen formato fijo: la lista arma su tarjeta con el principio
+    ...(e.origen === 'secretaria' || e.origen === 'importacion' ? { adelanto: largo(e.texto) > 3000 ? prefijo(e.texto, 3000) : e.texto } : {}),
   }
 }
 export const entregaJSONCompleto = (e: Entrega): Obj => ({ ...entregaJSON(e), texto: e.texto })

@@ -346,6 +346,76 @@ App.Propuestas = (function () {
     return caja;
   }
 
+  /* ---------------- tarjetas de la lista de la bandeja ---------------- */
+  /* Una entrega como tarjeta chica con un adelanto de su forma: el ticket de un evento, para quién va un mail, los chips de
+     un reporte, las cifras de una importación o las primeras líneas. op: {titulo, sub, cuando, retrato (elemento), accion,
+     abrir(), aprobar(boton), descartar(boton)}. Una propuesta pendiente trae sus botones para decidir desde la lista. */
+  function tarjetaLista(e, op) {
+    var ac = op.accion, nueva = e.estado === 'sin_revisar';
+    var urgente = e.origen === 'secretaria' && /^Urgente:/.test(e.titulo || '');
+    var cuerpo = [], pie = null, estado = null;
+    if (e.origen === 'propuesta' && ac) {
+      var t = tipo(ac), d = ac.detalle || {};
+      if (t === 'evento') {
+        var ini = fechaEvento(primero(d, ['start', 'startTime', 'when', 'date']));
+        var fin = fechaEvento(primero(d, ['end', 'endTime']));
+        if (ini) {
+          var cuando = ini.dia ? 'todo el día' : horaTxt(ini.d) + (fin && !fin.dia && mismoDia(ini.d, fin.d) ? ' a ' + horaTxt(fin.d) : '');
+          cuerpo.push(h('div.tl-ticket',
+            h('div.tl-dia', h('span.m', ini.d.toLocaleDateString('es', { month: 'short' }).replace('.', '')), h('span.n', String(ini.d.getDate()))),
+            h('div.tl-info', h('b', valorHumano(primero(d, ['summary', 'title'])) || 'Evento'),
+              h('span', [ini.d.toLocaleDateString('es', { weekday: 'long' }), cuando, valorHumano(d.location)].filter(Boolean).join(' · ')))));
+        }
+      } else if (t === 'mail') {
+        cuerpo.push(h('div.tl-mail', App.icono('mail'), h('div', h('b', valorHumano(d.subject) || '(sin asunto)'), h('span', 'Para ' + (valorHumano(d.to) || '…')))));
+      }
+      if (!cuerpo.length && e.resumen) cuerpo.push(h('div.tl-txt', e.resumen));
+      if (ac.estado === 'pendiente' && op.aprobar) {
+        var ok = h('button.btn.chico.primario', { onclick: function (ev) { ev.stopPropagation(); op.aprobar(ok); } }, textoAprobar(ac));
+        var no = h('button.btn.chico.fantasma', { onclick: function (ev) { ev.stopPropagation(); op.descartar(no); } }, 'Descartar');
+        pie = h('div.tl-pie', no, ok);
+      } else {
+        estado = { ejecutando: h('span.insignia.aviso', 'Ejecutando…'), hecha: h('span.insignia.ok', 'Hecha'), error: h('span.insignia.error', 'Con error'), descartada: h('span.insignia', 'Descartada') }[ac.estado] || null;
+      }
+    } else if (e.origen === 'secretaria' && e.adelanto) {
+      var r = parsear(e.adelanto);
+      if (urgente) {
+        var it = r && r.secciones.filter(function (x) { return x.clave === 'saber'; })[0];
+        var x = it && itemSaber(it.items[0] || '');
+        cuerpo.push(h('div.tl-txt', x ? (x.quien + ': ' + x.que.replace(/\*\*/g, '')) : (e.resumen || '')));
+      } else if (r) {
+        if (r.resumen.length) cuerpo.push(h('div.tl-txt', r.resumen.join(' ').replace(/\*\*/g, '')));
+        var cuenta = { wa: 0, mail: 0 }, por = {};
+        r.secciones.forEach(function (s2) { if (s2.clave) por[s2.clave] = s2.items.length; });
+        r.secciones.filter(function (s2) { return s2.clave === 'saber'; }).forEach(function (s2) {
+          s2.items.forEach(function (i) { var y = itemSaber(i); var c = y && claseFuente(y.fuente); if (c === 'wa' || c === 'mail') cuenta[c]++; });
+        });
+        var chips = [];
+        if (r.urgente.length) chips.push(h('span.prop-tag.urg', App.icono('alerta'), 'Urgente'));
+        if (por.hacer) chips.push(h('span.prop-tag', App.icono('flecha'), 'Para hacer · ' + por.hacer));
+        if (cuenta.wa) chips.push(h('span.prop-tag.wa', App.icono('charla'), 'WhatsApp · ' + cuenta.wa));
+        if (cuenta.mail) chips.push(h('span.prop-tag.mail', App.icono('mail'), 'Mails · ' + cuenta.mail));
+        if (por.seguimiento) chips.push(h('span.prop-tag', App.icono('reloj'), 'Seguimiento · ' + por.seguimiento));
+        if (por.agenda) chips.push(h('span.prop-tag.evento', App.icono('calendario'), 'Agenda · ' + por.agenda));
+        if (chips.length) cuerpo.push(h('div.tl-chips', chips));
+      } else if (e.resumen) cuerpo.push(h('div.tl-txt', e.resumen));
+    } else if (e.origen === 'importacion' && e.adelanto) {
+      var im = parsearImportacion(e.adelanto);
+      if (im) {
+        var c2 = im.cifras, cif = function (n, txt) { return h('div', h('b', (n || 0).toLocaleString('es-AR')), h('span', txt)); };
+        cuerpo.push(h('div.tl-cifras', cif(c2.archivos, 'archivos'), cif(c2.temasNuevos, 'temas'), cif(c2.fichasNuevas, 'fichas'), cif(c2.dias, 'días')));
+      } else if (e.resumen) cuerpo.push(h('div.tl-txt', e.resumen));
+    } else if (e.resumen) {
+      cuerpo.push(h('div.tl-txt', e.resumen));
+    }
+    if (e.archivos && e.archivos.length) cuerpo.push(h('div.tl-chips', h('span.prop-tag', App.icono('clip'), e.archivos.length === 1 ? '1 archivo' : e.archivos.length + ' archivos')));
+    if (e.estado === 'cambios') estado = h('span.insignia', 'Reemplazada');
+    return h('div.tl' + (nueva ? '.nueva' : '.vista') + (urgente ? '.urg' : ''), { role: 'button', tabindex: '0', title: 'Abrir', onclick: op.abrir,
+      onkeydown: function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); op.abrir(); } } },
+      h('div.tl-cab', op.retrato, h('div.tl-tit', h('div.t', op.titulo), op.sub ? h('div.s', op.sub) : null), estado, h('span.tl-cuando', op.cuando)),
+      cuerpo, pie);
+  }
+
   return { tipo: tipo, etiqueta: etiqueta, tarjeta: tarjeta, tabla: tabla, textoAprobar: textoAprobar, reporte: reporte, parsear: parsear,
-    itemSaber: itemSaber, tituloReporte: tituloReporte, importacion: importacion, parsearImportacion: parsearImportacion };
+    itemSaber: itemSaber, tituloReporte: tituloReporte, importacion: importacion, parsearImportacion: parsearImportacion, tarjetaLista: tarjetaLista };
 })();

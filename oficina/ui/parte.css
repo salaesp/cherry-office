@@ -161,6 +161,45 @@
 .entrega-doc.md hr { border: 0; border-top: 1px solid var(--linea); margin: 14px 0; }
 .entrega-doc.md strong { font-weight: 600; }
 
+/* tarjetas de la lista de la bandeja (propuestas.js › tarjetaLista) */
+.entregas.tarjetas { gap: 8px; padding: 6px 10px 14px; }
+.tl { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--panel); cursor: pointer; text-align: left; transition: border-color .12s, box-shadow .12s; }
+.tl:hover { border-color: var(--linea-fuerte); box-shadow: 0 1px 2px rgba(20, 18, 15, .06), 0 4px 12px rgba(20, 18, 15, .06); }
+.tl:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.tl.vista { background: var(--panel-2); }
+.tl.vista .tl-tit .t { font-weight: 500; color: var(--suave); }
+.tl.urg { border-color: color-mix(in srgb, var(--peligro) 40%, var(--linea)); background: var(--urg-suave); }
+.tl.urg .tl-tit .t { color: var(--peligro); }
+.tl-cab { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.tl-cab .retrato { width: 26px; height: 26px; border-radius: 7px; flex: none; }
+.tl-tit { flex: 1; min-width: 0; }
+.tl-tit .t { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl.nueva .tl-tit .t::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--aviso); margin-right: 6px; vertical-align: 1px; }
+.tl.urg .tl-tit .t::before { background: var(--peligro); }
+.tl-tit .s { font-size: 11.5px; color: var(--tenue); }
+.tl-cuando { font-size: 11.5px; color: var(--tenue); white-space: nowrap; font-variant-numeric: tabular-nums; align-self: flex-start; padding-top: 2px; }
+.tl-txt { font-size: 12.5px; color: var(--suave); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tl-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.tl-chips .prop-tag { height: 20px; font-size: 10.5px; padding: 0 7px; }
+.prop-tag.urg { color: var(--peligro); background: var(--urg-suave); }
+.tl-ticket { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.tl-dia { width: 44px; flex: none; border-radius: 7px; overflow: hidden; text-align: center; border: 1px solid var(--linea); background: var(--panel); }
+.tl-dia .m { display: block; background: var(--cal); color: #fff; font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; padding: 1px 0; }
+@media (prefers-color-scheme: dark) { .tl-dia .m { color: #10161f; } }
+.tl-dia .n { display: block; font-weight: 700; font-size: 17px; padding: 1px 0 3px; font-variant-numeric: tabular-nums; }
+.tl-info { display: grid; min-width: 0; font-size: 12px; color: var(--suave); }
+.tl-info b { color: var(--texto); font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-info span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-mail { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: var(--suave); min-width: 0; }
+.tl-mail svg { flex: none; color: var(--mail); margin-top: 2px; }
+.tl-mail > div { display: grid; min-width: 0; }
+.tl-mail b { color: var(--texto); font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-cifras { display: flex; gap: 16px; }
+.tl-cifras div { display: grid; }
+.tl-cifras b { font-size: 17px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tl-cifras span { font-size: 11px; color: var(--suave); }
+.tl-pie { display: flex; gap: 6px; justify-content: flex-end; }
+
 /* departamentos: misión bajo cada fila */
 /* departamentos: una tarjeta por sala; nombre y misión se leen como texto y se editan en el lugar */
 .dep-tarjeta { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start; padding: 12px 12px 12px 14px; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--panel); position: relative; overflow: hidden; }

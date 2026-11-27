@@ -105,7 +105,7 @@ App.Entregables = (function () {
           : h('div.vacio', 'Todavía no hay entregas con ese filtro.'));
         return;
       }
-      es.forEach(function (e) { lista.appendChild(fila(e)); });
+      pintarTarjetas(lista, es, pintarLista);
     }).catch(function (e) { App.vaciar(lista).appendChild(h('div.error-txt', e.message)); });
   }
 
@@ -117,16 +117,44 @@ App.Entregables = (function () {
     return a ? App.retratoImg(a, 'retrato', 64) : h('div.retrato', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', background: d ? d.color : '#0a5fb4' } }, App.icono('reunion'));
   }
 
-  function fila(e) {
-    var est = e.estado === 'sin_revisar' ? h('span.insignia.aviso', 'Sin revisar') : e.estado === 'revisada' ? h('span.insignia.ok', 'Revisada') : h('span.insignia', 'Reemplazada');
-    return h('button.entrega-fila' + (e.estado === 'sin_revisar' ? '.nueva' : ''), { onclick: function () { verEntrega(e.id); } },
-      marcaAgente(e),
-      h('div.entrega-txt',
-        h('div.entrega-tit', tituloLista(e)),
-        h('div.entrega-sub', nombreDe(e) + ' · ' + origenTxt(e.origen) + ' · ' + hace(e.creada) +
-          (e.archivos && e.archivos.length ? ' · ' + e.archivos.length + (e.archivos.length === 1 ? ' archivo' : ' archivos') : '')),
-        e.resumen ? h('div.entrega-res', e.resumen) : null),
-      est);
+  /* ---------------- tarjetas (lista y «Hoy») ---------------- */
+  /* las entregas como tarjetas (App.Propuestas.tarjetaLista); las propuestas traen su acción para aprobarla desde acá.
+     `alCambiar`: qué repintar después de aprobar o descartar */
+  function pintarTarjetas(cont, es, alCambiar) {
+    App.vaciar(cont).classList.add('tarjetas');
+    var hayPropuestas = es.some(function (e) { return e.origen === 'propuesta'; });
+    (hayPropuestas ? api().get('/api/acciones').then(function (r) { return r.acciones || []; }).catch(function () { return []; }) : Promise.resolve([])).then(function (acs) {
+      var porEntrega = {};
+      acs.forEach(function (a) { if (a.entrega) porEntrega[a.entrega] = a; });
+      /* primero lo que te pide algo: lo urgente sin ver y las propuestas que esperan tu decisión; después, por fecha */
+      var peso = function (e) {
+        if (e.estado !== 'sin_revisar') return 2;
+        if (e.origen === 'secretaria' && /^Urgente:/.test(e.titulo || '')) return 0;
+        var a = porEntrega[e.id];
+        return a && a.estado === 'pendiente' ? 1 : 2;
+      };
+      var orden = es.map(function (e, i) { return [peso(e), i, e]; }).sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+      App.vaciar(cont);
+      orden.forEach(function (x) { cont.appendChild(tarjeta(x[2], porEntrega[x[2].id], alCambiar)); });
+    });
+  }
+
+  function tarjeta(e, ac, alCambiar) {
+    var propia = e.origen === 'propuesta' || e.origen === 'secretaria' || e.origen === 'importacion';
+    var despues = function (msg) { App.aviso(msg); refrescarUltimas(); if (App.Actividad) App.Actividad.ya(); if (alCambiar) alCambiar(); };
+    return App.Propuestas.tarjetaLista(e, {
+      titulo: tituloLista(e), sub: propia ? nombreDe(e) : nombreDe(e) + ' · ' + origenTxt(e.origen), cuando: App.fecha(e.creada),
+      retrato: marcaAgente(e), accion: ac,
+      abrir: function () { App.Entregables.abrir(e.id); },
+      aprobar: function (b) {
+        b.disabled = true;
+        api().post('/api/entregas/' + e.id + '/ejecutar').then(function () { despues('Aprobado: ya se está ejecutando.'); }).catch(function (x) { App.fallo(x); b.disabled = false; });
+      },
+      descartar: function (b) {
+        b.disabled = true;
+        api().post('/api/entregas/' + e.id + '/descartar-accion').then(function () { despues('Acción descartada.'); }).catch(function (x) { App.fallo(x); b.disabled = false; });
+      }
+    });
   }
 
   /* el título en palabras para la lista: sin «Propuesta:» y con el día del reporte o la carpeta importada */
@@ -573,7 +601,7 @@ App.Entregables = (function () {
   if (App.on) App.on('actividad', alActividad);
 
   return {
-    abrir: abrir, siguiente: siguiente,
+    abrir: abrir, siguiente: siguiente, pintarTarjetas: pintarTarjetas,
     abierta: function () { return abierta; },
     sinRevisar: function () { return sinRevisar; },
     refrescar: refrescarUltimas,
