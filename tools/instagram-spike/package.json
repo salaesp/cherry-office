@@ -1,0 +1,16 @@
+{
+  "name": "instagram-spike",
+  "private": true,
+  "type": "module",
+  "description": "Prueba suelta: leer un perfil público de Instagram sin iniciar sesión ni registrar una app. No es parte de la app.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node spike.mjs",
+    "aguante": "node spike.mjs --cada 30",
+    "resumen": "node resumen.mjs",
+    "test": "node --test mapeo.test.mjs",
+    "borrar": "node -e \"require('node:fs').rmSync('datos',{recursive:true,force:true});console.log('datos/ borrado')\""
+  }
+}

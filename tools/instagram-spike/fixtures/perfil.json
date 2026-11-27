@@ -1,0 +1,37 @@
+{
+  "data": {
+    "user": {
+      "username": "cafeteria.ejemplo",
+      "full_name": "Cafetería Ejemplo",
+      "biography": "Café de especialidad",
+      "external_url": "https://ejemplo.com",
+      "category_name": "Cafetería",
+      "is_verified": false,
+      "is_business_account": true,
+      "is_private": false,
+      "edge_followed_by": { "count": 10000 },
+      "edge_follow": { "count": 150 },
+      "edge_owner_to_timeline_media": {
+        "count": 320,
+        "page_info": { "has_next_page": true },
+        "edges": [
+          { "node": { "__typename": "GraphVideo", "product_type": "clips", "is_video": true, "shortcode": "AAA",
+            "taken_at_timestamp": 1764000000, "video_view_count": 50000, "video_duration": 14.5,
+            "edge_liked_by": { "count": 900 }, "edge_media_to_comment": { "count": 100 },
+            "edge_media_to_caption": { "edges": [ { "node": { "text": "Latte art en 15 segundos #cafe #latteart @barista.uno" } } ] },
+            "display_url": "https://x/a.jpg", "video_url": "https://x/a.mp4" } },
+          { "node": { "__typename": "GraphSidecar", "is_video": false, "shortcode": "BBB",
+            "taken_at_timestamp": 1763395200,
+            "edge_liked_by": { "count": 300 }, "edge_media_to_comment": { "count": 0 },
+            "edge_sidecar_to_children": { "edges": [ {}, {}, {} ] },
+            "edge_media_to_caption": { "edges": [ { "node": { "text": "Menú nuevo #Cafe" } } ] } } },
+          { "node": { "__typename": "GraphImage", "is_video": false, "shortcode": "CCC",
+            "taken_at_timestamp": 1700000000, "pinned_for_users": [ { "id": "1" } ],
+            "edge_media_preview_like": { "count": -1 }, "edge_media_to_comment": { "count": 5 },
+            "edge_media_to_caption": { "edges": [] } } }
+        ]
+      }
+    }
+  },
+  "status": "ok"
+}

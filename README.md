@@ -51,7 +51,7 @@ En los dos casos hace falta **Claude Code** instalado y con la sesión iniciada.
 | `backend/` | El backend en TypeScript (Node): oficinas, agentes, chat, flujos, tareas, biblioteca. La API está en [backend/API.md](backend/API.md). |
 | `desktop/` | La app de escritorio: carcasa Electron alrededor de `backend/` y `oficina/`. De acá salen el `.dmg` y el `.exe` de las releases. Ver [desktop/README.md](desktop/README.md). |
 | `docs/` | Planes de diseño, `aprendizajes.md` (cómo se comporta el `claude` real) y `caso-prospera/` (el texto con el que se prueba armar una oficina con el Creador). |
-| `tools/` | Utilidades sueltas (pruebas de concepto, como `whatsapp-spike/`). |
+| `tools/` | Utilidades sueltas (pruebas de concepto, como `whatsapp-spike/` e `instagram-spike/`). |
 | `bocetos/` | Pruebas de diseño que no forman parte de la app. `bocetos/pixel/` es el boceto del que salió la oficina pixel, con su renderizador de sprites a PNG. Ver [bocetos/pixel/README.md](bocetos/pixel/README.md). |
 
 ## Dónde está qué
