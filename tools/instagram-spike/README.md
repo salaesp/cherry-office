@@ -12,7 +12,8 @@ Instagram lo frene, y decidir con eso si vale la pena una herramienta `instagram
   temporal de tu IP (te pide iniciar sesión por un rato).
 
 ## Correrlo
-Hace falta Node 22 o más nuevo. No tiene dependencias, así que no hay `npm ci`. Correlo **en tu compu**: desde
+Hace falta Node 22 o más nuevo. `npm start` y `npm run diagnostico` no usan dependencias; para el diagnóstico con
+navegador hace falta `npm ci` (instala `playwright-core`, sin navegador). Correlo **en tu compu**: desde
 servidores en la nube Instagram suele frenarlo enseguida, así que esa prueba no sirve.
 
 ```bash
@@ -75,6 +76,28 @@ npm ci --prefix ../../desktop
 npm run diagnostico:electron -- natgeo
 ```
 
+### Sin pantalla (Raspberry o servidor): Chromium headless
+Electron necesita entorno gráfico. En una máquina sin monitor se usa Chromium sin pantalla, que es un navegador de
+verdad: abre el perfil, deja que la página corra su JavaScript, anota qué datos pide y recibe, saca una captura de
+pantalla y después, desde la misma página y con sus cookies anónimas, pide la API como la web. En Raspberry Pi OS
+conviene el Chromium del sistema (el de Playwright no siempre soporta ARM):
+
+```bash
+sudo apt install -y chromium
+```
+
+```bash
+npm ci
+```
+
+```bash
+npm run diagnostico:navegador -- natgeo
+```
+
+Busca solo `/usr/bin/chromium` o `/usr/bin/chromium-browser`; otro se indica con `-- natgeo --chromium /ruta`. Con poca
+RAM (1 GB) puede andar lento. Deja en `datos/diagnostico/` el HTML, la captura `.png` (para ver si apareció el muro de
+login) y la respuesta de la API.
+
 Se puede correr una sola variante nombrándola: `npm run diagnostico -- natgeo pagina`. Lo que devolvió cada una queda en
 `datos/diagnostico/` y un renglón por variante en `datos/diagnostico.jsonl`. Si recién te bloquearon, esperá una hora
 antes de diagnosticar: si no, todo va a dar 429 por el bloqueo anterior.
@@ -117,7 +140,10 @@ se pudo conectar) o `raro` (otra cosa: mirá el `.txt`).
 
 ## Resultados en una compu
 - **Linux, Node, primera lectura de `natgeo`:** `bloqueo` (429) en 109 ms. Fue el primer pedido, así que
-  Instagram rechazó la forma del pedido, no la cantidad. Siguiente paso: el diagnóstico.
+  Instagram rechazó la forma del pedido, no la cantidad.
+- **La misma máquina (una Raspberry en casa, sin monitor), diagnóstico con Node:** las cuatro variantes fallan. Hasta
+  el HTML del perfil y la portada redirigen (302) al login; la portada solo deja la cookie `mid`, sin `csrftoken`.
+  Electron no arranca sin entorno gráfico. Siguiente paso: el diagnóstico con Chromium headless.
 
 ## Qué hay que verificar (y anotar en el informe de abajo)
 1. **¿Anda?** `npm start -- <una cuenta pública que conozcas>`: ¿da `ok`? Si da otra cosa, mirá el `.txt`.
