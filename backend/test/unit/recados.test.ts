@@ -43,8 +43,12 @@ async function preparar({ secretaria = true }: { secretaria?: boolean } = {}) {
     expect(ok, 'el recado termina').toBe(true)
     return uno(id)
   }
-  const prompts = () => sb.prompts.filter((p) => p.includes('<recado>'))
-  return { sb, b, carpeta, rec, mandar, uno, listo, prompts }
+  /** Las corridas de recados: las instrucciones van como mensaje de sistema y el mensaje es solo lo que dijo la persona. */
+  const corridas = () => sb.llamadas.map((a) => ({ i: a.indexOf('--append-system-prompt'), a }))
+    .filter(({ i, a }) => i >= 0 && (a[i + 1] ?? '').includes('# Recados'))
+    .map(({ i, a }) => ({ sistema: a[i + 1]!, mensaje: a[a.length - 1]! }))
+  const prompts = () => corridas().map((c) => c.mensaje)
+  return { sb, b, carpeta, rec, mandar, uno, listo, prompts, corridas }
 }
 
 describe('lógica pura', () => {
@@ -96,8 +100,8 @@ describe('recibir y procesar', () => {
     expect((await p.mandar('x'.repeat(LimitesRecados.maxTexto + 1))).status).toBe(400)
   })
 
-  test('un recado de texto corre en el hilo de la secretaría, con el equipo y el texto adentro de <recado>', async () => {
-    const { b, mandar, listo, prompts, sb, carpeta } = await preparar()
+  test('un recado de texto corre en el hilo de la secretaría: el mensaje es solo el recado y las instrucciones van como sistema', async () => {
+    const { b, mandar, listo, prompts, corridas, sb, carpeta } = await preparar()
     const r = await mandar('¿Qué tengo mañana?')
     expect(r.status).toBe(200)
     expect(r.obj.recado).toMatchObject({ canal: 'app', texto: '¿Qué tengo mañana?' })
@@ -105,9 +109,12 @@ describe('recibir y procesar', () => {
     expect(fin).toMatchObject({ fase: 'listo', estado: 'respondido', respuesta: 'hola sofia' })
     const p = prompts()
     expect(p).toHaveLength(1)
-    expect(p[0]).toContain('<recado>\n¿Qué tengo mañana?\n</recado>')
-    expect(p[0]).toContain('Marce (id marce)')
-    expect(p[0]).toContain('Entendí:')
+    expect(p[0]).toBe('¿Qué tengo mañana?')
+    const sis = corridas()[0]!.sistema
+    expect(sis).toContain('Marce (id marce)')
+    expect(sis).toContain('Entendí:')
+    // las reglas de siempre del agente siguen ahí, antes de las de los recados
+    expect(sis).toMatch(/## Atendés la secretaría[\s\S]*# Recados/)
     // corre como sofia, en su sesión del hilo; el siguiente recado retoma la misma
     expect(sb.llamadas.at(-1)).toContain('sofia')
     const hilo = recadosDe(b.servicios)!.store.hilo(carpeta)!
@@ -178,7 +185,7 @@ describe('delegar', () => {
     expect(fin.resultados[0]).toMatchObject({ tipo: 'delegacion', agente: 'marce', nombre: 'Presupuesto Prospera', consigna })
     expect(fin.resultados[0].entrega).toBeGreaterThan(0)
     // marce recibió la consigna, con quién se la pasa
-    const p = sb.prompts.find((x) => x.includes(consigna) && !x.includes('<recado>'))!
+    const p = sb.prompts.find((x) => x.includes(consigna))!
     expect(p).toContain('Ana le dejó a Sofia (secretaría) en un recado')
   })
 
@@ -194,7 +201,7 @@ describe('delegar', () => {
     expect((await uno(id)).resultados[0].estado).toBe('cancelada')
     expect((await uno(id)).estado).toBe('respondido')
     expect((await llamar(b, 'POST', `/api/recados/${id}/resultados/${d.id}`, { accion: 'cancelar' })).status).toBe(409)
-    expect(sb.prompts.some((x) => x.includes(consigna) && !x.includes('<recado>'))).toBe(false)
+    expect(sb.prompts.some((x) => x.includes(consigna))).toBe(false)
   })
 
   test('«ya» lo lanza sin esperar la ventana', async () => {
@@ -218,7 +225,7 @@ describe('delegar', () => {
     expect(r.estado).toBe('esperando_ok')
     expect(r.resultados[0].estado).toBe('propuesta')
     await new Promise((x) => setTimeout(x, 300))
-    expect(sb.prompts.some((x) => x.includes(consigna) && !x.includes('<recado>'))).toBe(false)
+    expect(sb.prompts.some((x) => x.includes(consigna))).toBe(false)
     expect((await llamar(b, 'POST', `/api/recados/${id}/resultados/${r.resultados[0].id}`, { accion: 'confirmar' })).status).toBe(200)
     expect(await esperar(async () => (await uno(id)).resultados[0].estado === 'hecha', 20)).toBe(true)
     expect((await llamar(b, 'POST', `/api/recados/${id}/resultados/${r.resultados[0].id}`, { accion: 'confirmar' })).status).toBe(409)
@@ -263,7 +270,7 @@ describe('delegar', () => {
 
 describe('preguntar', () => {
   test('la pregunta deja el recado esperando; elegir una opción manda un recado nuevo que la contesta', async () => {
-    const { sb, b, mandar, listo, uno, prompts } = await preparar()
+    const { sb, b, mandar, listo, uno, prompts, corridas } = await preparar()
     sb.llamadasMCP('sofia', [{ name: 'preguntar', arguments: { texto: '¿Presupuesto formal o mail?', opciones: [{ texto: 'Arrancar el presupuesto', detalle: 'Marce lo arma' }, { texto: 'Un mail' }, { texto: '' }] } }])
     const id = (await mandar('MCP_LLAMAR mandale los precios a Prospera')).obj.recado.id
     const r = await listo(id)
@@ -277,7 +284,8 @@ describe('preguntar', () => {
     await listo(nuevo.id)
     expect((await uno(id)).resultados[0].estado).toBe('respondida')
     expect((await uno(id)).estado).toBe('respondido')
-    expect(prompts().at(-1)).toContain('Le habías preguntado: «¿Presupuesto formal o mail?»')
+    expect(prompts().at(-1)).toBe('Elijo: Un mail')
+    expect(corridas().at(-1)!.sistema).toContain('Le habías preguntado: «¿Presupuesto formal o mail?»')
   })
 
   test('una sola pregunta por recado', async () => {

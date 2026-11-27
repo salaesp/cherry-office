@@ -299,10 +299,13 @@ export function partirRespuesta(texto: string): { entendi?: string; respuesta: s
   return { entendi: prefijo(entendi, 300), respuesta: (m[2] ?? '').trim() }
 }
 
-// MARK: - consigna
+// MARK: - instrucciones (mensaje de sistema)
 
-export function consignaRecado(p: {
-  oficina: Oficina; def: AgenteDef; recado: Recado; texto: string; ahora: Date
+/** Lo que la secretaría tiene que saber para atender un recado. Va como mensaje de sistema (`--append-system-prompt`, junto
+ *  con las demás reglas del agente), no adentro del mensaje: así no se acumula en el historial del hilo y el mensaje que
+ *  recibe es solo lo que dijo la persona. */
+export function sistemaRecado(p: {
+  oficina: Oficina; def: AgenteDef; recado: Recado; ahora: Date
   novedades: string[]; preguntaAbierta?: string; puedeActuar: boolean
 }): string {
   const { oficina: o, def } = p
@@ -314,7 +317,8 @@ export function consignaRecado(p: {
   })
   const canal = { app: 'la app', movil: 'el celular', telegram: 'Telegram', whatsapp: 'WhatsApp' }[p.recado.canal]
   const partes = [
-    `Sos ${def.nombre} y atendés la secretaría. ${persona} te deja un recado por ${canal}. Hoy es ${fecha}.`,
+    `# Recados`,
+    `En esta conversación ${persona} te deja recados a vos, ${def.nombre}, que atendés la secretaría. Cada mensaje es un recado suyo; este llegó por ${canal}. Hoy es ${fecha}.`,
     '',
     `El recado lo manda ${persona} en persona: es su pedido. Puede traer varias cosas a la vez. Para cada una elegí qué hacer:`,
     '- Contestar: si pregunta algo («¿qué tengo mañana?», «¿qué dijo mamá?»), buscalo en tu memoria (memoria_*) y en tus fuentes antes de responder.',
@@ -336,7 +340,6 @@ export function consignaRecado(p: {
   ]
   if (p.novedades.length) partes.push('', `Desde el recado anterior terminó esto de lo que delegaste (contalo solo si viene al caso):\n${p.novedades.join('\n')}`)
   if (p.preguntaAbierta) partes.push('', `Le habías preguntado: «${p.preguntaAbierta}». Este recado puede ser la respuesta.`)
-  partes.push('', '<recado>', p.texto, '</recado>')
   return partes.join('\n')
 }
 
@@ -481,7 +484,8 @@ export class Recados {
     const ctx = contexto(act, def, { dirsExtra: config.oficinaDirsExtra, catalogo: this.s.catalogo?.(), config })
     const puedeActuar = AccionesPermisos.actuar(TodosConectores.agente(config, def, this.s.catalogo?.(), act.oficina)).length > 0
     const textoRecado = Recados.textoDe(r)
-    const prompt = consignaRecado({ oficina: act.oficina, def, recado: r, texto: textoRecado, ahora, novedades, ...(abiertas.length ? { preguntaAbierta: String(abiertas[abiertas.length - 1]!.datos.texto) } : {}), puedeActuar })
+    const sistema = sistemaRecado({ oficina: act.oficina, def, recado: r, ahora, novedades, ...(abiertas.length ? { preguntaAbierta: String(abiertas[abiertas.length - 1]!.datos.texto) } : {}), puedeActuar })
+    ctx.instrucciones = ctx.instrucciones ? `${ctx.instrucciones}\n\n${sistema}` : sistema
     const mcp = this.s.mcp?.()
     const mcpUrl = mcp ? await mcp.url() : undefined
     if (mcpUrl !== undefined) ctx.mcpUrl = mcpUrl
@@ -496,7 +500,7 @@ export class Recados {
         store.agregar(sid, 'u', textoRecado)
         const activa = store.estaActiva(sid)
         const t = await runner.actividad.seguir({ oficina: carpeta, agente, origen: 'recado', tarea: 'Recado: ' + prefijo(textoRecado.replace(/\s+/g, ' '), 60), extra: caja.observador() },
-          (obs) => runner.ejecutarChat({ agente, mensaje: prompt, sid, activa, carpeta, obs, envExtra, armar: (x) => argumentos(config, ctx, x) }))
+          (obs) => runner.ejecutarChat({ agente, mensaje: textoRecado, sid, activa, carpeta, obs, envExtra, armar: (x) => argumentos(config, ctx, x) }))
         store.marcarActiva(sid)
         store.agregar(sid, 'a', t === '' ? '(sin respuesta)' : t)
         return { texto: t }
