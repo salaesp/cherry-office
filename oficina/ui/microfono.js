@@ -37,6 +37,7 @@ App.Microfono = (function () {
     if (tostada) raiz.appendChild(tostada);
     if (estado === 'grabando' && franja) { raiz.appendChild(h('div.mic-sec-grabando', cara(a), franja.el)); return; }
     if (!App.Grabadora.puede()) return;
+    if (!a && App.movil) return;   // contratarla es cosa de la compu
     if (!a) {
       raiz.appendChild(h('button.mic-sec-boton', { title: 'Contratá una secretaría para dejarle audios', onclick: function () { App.Ajustes.abrir('secretaria'); } },
         cara(null), h('span.mic-sec-txt', h('b', 'Contratá una secretaría'), h('small', 'para dejarle audios')), h('span.mic-sec-ico.apagado', App.icono('mas'))));

@@ -17,6 +17,8 @@ Sin oficina abierta, `/api/chat`, `/api/historial`, `/api/oficina`, `/api/depart
 |---|---|---|---|
 | GET | `/api/estado` | | `{app, version, claude, agentes:[ids de la oficina activa], auth, claudePath, oficina:{carpeta,nombre}\|null, perfil, modo_permisos: "auto"\|"preguntar"\|null, conectores_agentes: "todos"\|"por_agente"}` (null = la persona todavía no eligió: la app muestra el aviso) |
 | GET | `/api/skills?actualizar=1` | | `{skills:[nombres], mcp:[nombres]}`: las skills instaladas y los servidores MCP del Claude Code de la persona que vio la última corrida (`skills.json` y `mcp-locales.json` en la carpeta de datos; los MCP solo de corridas sin `--strict-mcp-config`, sin los de claude.ai ni `hq`); sin datos o con `actualizar`, corre un claude mínimo (haiku) para averiguarlas |
+| GET | `/api/actualizacion` | | Solo en la versión web (servidor `dev.ts` corriendo desde un clon git con `actualizar.sh`; 404 en la app de escritorio o con `HQ_SIN_ACTUALIZACIONES=1`): `{actual:{commit, version, fecha, rama} (con lo que arrancó este proceso), remoto, nuevos:[{commit, fecha, titulo}], error\|null, cambiosLocales, corriendo, procesosVivos, ultima:{codigo, ok, terminada, salida}\|null}`. Hace `git fetch` de la rama remota (`backend/src/actualizar-web.ts`) |
+| POST | `/api/actualizacion` | | `202 {ok}`: corre `actualizar.sh` desacoplado (con systemd, en una unidad aparte con `systemd-run`), que trae lo último, recompila y reinicia el servidor. La salida queda en `<datos>/actualizar-web.log`. 409 si ya está corriendo |
 | GET | `/api/preferencias` | | `{modo_permisos, conectores_agentes, modelos, ia}` |
 | PUT | `/api/preferencias` | `{modo_permisos?: "auto"\|"preguntar", conectores_agentes?: "todos"\|"por_agente", modelos?, ia?: {esfuerzo?, skills?: "resumidas"\|"completas"\|"agente"\|"ninguna", memoria?: "completa"\|"liviana", colegas?, mcpLocales?}}` (al menos uno) | `{modo_permisos, conectores_agentes, modelos, ia}`; `ia` = consumo por defecto de toda la app (Ajustes › Consumo de IA: esfuerzo; skills — resumidas = `--settings {skillListingMaxDescChars:150}`, agente = `skillOverrides` en `off` para las que el agente no eligió (`skills` en oficina.json), ninguna = sin `Skill`; leer la memoria al empezar; consultar a colegas; mcpLocales=false = `--strict-mcp-config` salvo con conectores de claude.ai), vale en todo lo que corre claude salvo que el agente (esfuerzo) o la charla/reunión lo pisen; se guarda en config.json y vale desde la próxima corrida. `auto` = `--permission-mode auto` en chats, tareas, encargos y reuniones con permiso en vivo. `conectores_agentes: "todos"` = cada agente usa todos los conectores conectados en chats, tareas y encargos (leer libre; actuar por `proponer_accion`), sin asignarlos en la tabla; `por_agente` (por defecto) = solo los asignados. 400 si un valor no es válido |
 | GET | `/api/oficinas` | | `{oficinas:[{carpeta,nombre,activa}], activa: carpeta\|null}` (recientes; salta las que ya no existen) |
@@ -589,3 +591,23 @@ Para no escribir rutas a mano. Código: `backend/src/explorador.ts` (`Explorador
 **Front.** `App.elegirCarpeta(titulo, {oficinas?, crear?}) → Promise<ruta|null>` (`oficina/ui/carpetas.js`): en la app nativa manda `{accion:'elegirCarpeta', titulo, inicio, crear}` al handler `hq` y abre el diálogo del sistema (`desktop/src/main.ts`); en el navegador abre un explorador propio sobre `/api/fs/carpetas` (accesos rápidos, «Nueva carpeta» con `crear`, insignia y prioridad para carpetas de oficina con `oficinas`). Se usa en «Abrir una oficina existente», «Crear mi oficina» («Cambiar…») y «Vincular carpeta». Sin Finder (navegador), «Ver archivos de la oficina» usa `/api/oficina/archivos` y `/api/oficina/archivo`.
 
 **Handler nativo con respuesta.** `AppDelegate` registra `hq` con `addScriptMessageHandler(_:contentWorld:name:)` (`WKScriptMessageHandlerWithReply`, macOS 11+): `postMessage` devuelve una Promise. Las acciones existentes (`abrir`, `revelar`, `acerca`, `open`, `login`, `spike`) siguen igual y contestan `nil`; `elegirCarpeta` contesta la ruta o `null` si se cancela (solo desde páginas `hq://`). El diálogo no se puede automatizar sin clicarlo: probarlo a mano (Crear/Abrir oficina → «Buscar…»).
+
+## Avisos push al celular
+La oficina instalada en el celular (docs/plan-celular.md, fase 3) recibe avisos con el teléfono bloqueado. `backend/src/push.ts`
+cifra cada aviso para la suscripción del navegador (Web Push, RFC 8291 `aes128gcm`) y lo firma con las claves VAPID de esta
+instalación (RFC 8292), que se crean la primera vez en la carpeta de datos (`push.json`; las suscripciones en
+`push-suscripciones.json`). Con alguna suscripción, mira `GET /api/actividad` cada 8 s y manda solo lo nuevo: permisos (con
+`permiso` para contestarlo desde el aviso), preguntas y propuestas que te esperan, «te toca en un flujo», reuniones, entregas
+para revisar, respuestas, errores y tareas terminadas. Las esperas entre agentes no se avisan. Más de 3 juntos van en uno solo.
+Un 404/410 del servicio de push borra la suscripción. `HQ_PUSH_SUJETO` cambia el `sub` del JWT.
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| GET | `/api/push` | | `{clave, suscripciones:[{endpoint, nombre, creada, silencio?:{desde,hasta}}]}`; `clave` es la pública VAPID (base64url) para `pushManager.subscribe` |
+| POST | `/api/push/suscribir` | `{suscripcion: PushSubscription.toJSON(), nombre?}` | `{ok}`. 400 si el endpoint no es https o las claves no son válidas |
+| POST | `/api/push/desuscribir` | `{endpoint}` | `{ok}` |
+| POST | `/api/push/probar` | `{endpoint}` | `{ok}`; manda un aviso de prueba. 404 si no está anotado, 502 si el servicio de push no lo aceptó |
+| PUT | `/api/push/silencio` | `{endpoint, desde:"HH:MM", hasta:"HH:MM"}` o `{endpoint, desde:null}` | `{ok}`; horario de no molestar (puede cruzar la medianoche) |
+
+El aviso que recibe el service worker (`oficina/sw.js`) es JSON: `{titulo, texto, url, tag, permiso?, acciones?}`. Con `acciones`
+muestra «Permitir» / «No», que contestan `POST /api/permisos/<permiso>` sin abrir la app.

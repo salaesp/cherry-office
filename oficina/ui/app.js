@@ -294,6 +294,13 @@
 
   /* «+»: todo lo que empieza algo nuevo, en un solo botón (arriba del riel) */
   function menuNuevo(ancla) {
+    /* en el celular, solo empezar algo: charlar o correr un flujo (armar la oficina es cosa de la compu) */
+    if (App.movil) {
+      App.menu(ancla, [
+        { texto: 'Charlar con alguien…', icono: 'charla', accion: function () { App.Nav.elegirAgente(ancla, function (id) { App.Agente.nueva(id); }, 'Charlar con'); } },
+        { texto: 'Correr un flujo…', icono: 'flujo', accion: function () { App.Nav.ir('#/trabajo/flujos'); App.Flujos.nueva(); } }]);
+      return;
+    }
     App.menu(ancla, [
       { texto: 'Charlar con alguien…', icono: 'charla', accion: function () { App.Nav.elegirAgente(ancla, function (id) { App.Agente.nueva(id); }, 'Charlar con'); } },
       { texto: 'Llamar a reunión…', icono: 'reunion', accion: function () { App.Reunion.nueva(); } },
@@ -382,7 +389,7 @@
     if (App.Conocimiento) App.Conocimiento.vigilarEstado();
     if (App.Tareas) App.Tareas.vigilar();
     /* la ruta (#/charlas/…) decide qué se ve; al cambiar de oficina se vuelve a la maqueta */
-    if (!primera || !/^#\/\w/.test(location.hash)) history.replaceState(null, '', '#/oficina');
+    if (!primera || !/^#\/\w/.test(location.hash)) history.replaceState(null, '', App.movil ? '#/bandeja/hoy' : '#/oficina');
     App.Nav.aplicar();
   }
   App.montar = montar;

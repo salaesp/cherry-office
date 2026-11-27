@@ -195,7 +195,7 @@ App.Tareas = (function () {
       }
     }
 
-    var nueva = h('button.btn.primario', { onclick: function (ev) { elegirAgente(ev.currentTarget); } }, App.icono('mas'), 'Nueva tarea');
+    var nueva = h('button.btn.primario.solo-compu', { onclick: function (ev) { elegirAgente(ev.currentTarget); } }, App.icono('mas'), 'Nueva tarea');
     App.add(pie, App.acciones(null, nueva));
   }
 

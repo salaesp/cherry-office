@@ -297,7 +297,7 @@
       }
       var ocupado = r.estado === 'en_curso' || cerrando;
       App.add(pie, h('div.redactar', txt, mandar), h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px', alignItems: 'center' } },
-        h('span.ayuda', { style: { margin: 0 } }, 'Enter para enviar · Mayús+Enter para otra línea'),
+        h('span.ayuda.solo-compu', { style: { margin: 0 } }, 'Enter para enviar · Mayús+Enter para otra línea'),
         h('span', { style: { flex: 1 } }),
         h('button.btn', { disabled: cerrando || resumiendo === r.id || !r.turnos.some(function (x) { return x.agente !== 'usuario' && !x.error; }),
           title: 'Un resumen de lo dicho hasta ahora, sin cerrar la reunión', onclick: function () { resumir(r); } },

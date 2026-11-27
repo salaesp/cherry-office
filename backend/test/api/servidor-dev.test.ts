@@ -58,6 +58,21 @@ describe('Servidor de desarrollo (oficina-dev)', () => {
     expect(String((await crudo(b, 'GET', '/ui/app.js')).cabeceras['content-type'])).toContain('application/javascript')
   })
 
+  test('instalable en el celular: manifest, service worker e íconos, con su tipo', async () => {
+    const { b, sb } = await servidor()
+    const ui = path.join(sb.proyecto, 'oficina')
+    escribir('{"name":"Oficina"}', path.join(ui, 'manifest.webmanifest'))
+    escribir('self', path.join(ui, 'sw.js'))
+    escribir('png', path.join(ui, 'iconos/icono-192.png'))
+    escribir('no', path.join(ui, 'otro.js'))
+    const tipo = async (ruta: string) => { const r = await crudo(b, 'GET', ruta); return [r.status, String(r.cabeceras['content-type'] ?? '')] as const }
+    expect(await tipo('/manifest.webmanifest')).toEqual([200, 'application/manifest+json; charset=utf-8'])
+    expect((await tipo('/sw.js'))[1]).toContain('application/javascript')
+    expect(await tipo('/iconos/icono-192.png')).toEqual([200, 'image/png'])
+    expect((await tipo('/otro.js'))[0]).toBe(404)
+    expect((await tipo('/iconos/../otro.js'))[0]).toBe(404)
+  })
+
   test('Host de loopback obligatorio (contra DNS rebinding)', async () => {
     const { b } = await servidor()
     expect((await b.pedir('GET', '/', { headers: { Host: 'evil.com' } })).status).toBe(403)

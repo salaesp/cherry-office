@@ -1356,6 +1356,60 @@ button.adjunto:hover { background: var(--panel-2); }
 .skill-aviso .ayuda { margin-top: 4px; }
 textarea.campo.skill-contenido { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; min-height: 260px; }
 
+/* ---------- Ajustes › Celular (ui/celular.js) ---------- */
+.cel-falta { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px 14px; border-radius: var(--radio); background: var(--panel-2); border: 1px solid var(--linea); }
+.cel-falta > svg { width: 18px; height: 18px; flex: none; color: var(--aviso); margin-top: 1px; }
+.cel-falta > .giro { margin-top: 3px; }
+.cel-falta.cel-error > svg { color: var(--peligro); }
+.cel-falta p { margin: 0 0 8px; }
+.cel-acc { display: flex; flex-wrap: wrap; gap: 6px; }
+.cel-acc:empty { display: none; }
+.cel-listo { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; margin-top: 14px; }
+.cel-qr { width: 184px; height: 184px; flex: none; padding: 6px; background: #fff; border-radius: var(--radio); border: 1px solid var(--linea); }
+.cel-qr svg { display: block; width: 100%; height: 100%; }
+.cel-texto { flex: 1; min-width: 220px; }
+.cel-texto p { color: var(--suave); margin: 4px 0 6px; }
+.cel-texto ul { margin: 0 0 12px; padding-left: 18px; color: var(--suave); }
+.cel-texto li b { color: var(--texto); font-weight: 600; }
+.cel-url { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cel-url code { font-size: 12px; padding: 4px 8px; border-radius: var(--radio-chico); background: var(--panel-2); border: 1px solid var(--linea); word-break: break-all; }
+.cel-pasos { margin-top: 16px; color: var(--suave); }
+.cel-pasos b { color: var(--texto); font-weight: 600; }
+.cel-pasos ol { margin: 6px 0 0; padding-left: 18px; }
+.cel-pasos li { margin-bottom: 4px; }
+.cel-pasos a { color: var(--texto); }
+
+/* ---------- modo celular (ui/movil.js, docs/plan-celular.md fase 2) ----------
+   La misma app con menos cosas: sin la oficina pixel y sin lo que es de la compu. */
+.modo-movil .solo-compu, .modo-movil .yo-grupo { display: none !important; }
+.modo-movil .vista > .lienzo, .modo-movil .vista > .marca, .modo-movil .vista > .pista,
+.modo-movil .vista > .carga-oficina, .modo-movil .vista > .aviso-reunion { display: none !important; }
+.modo-movil .vista { background: var(--fondo); }
+/* la Bandeja es Hoy: no hay lista a la que volver */
+.modo-movil .app[data-seccion="bandeja"] .derecho[data-modo="parte"] .cerrar-panel { display: none; }
+@media (max-width: 720px) {
+  .modo-movil .riel { justify-content: space-between; padding-left: 8px; padding-right: 8px; }
+  .modo-movil .riel-item { flex: 1; min-width: 0; }
+}
+/* avisos e instalación en el celular (ui/push.js) */
+.push-tarjeta { margin: 12px 14px 4px; padding: 12px 14px; border-radius: var(--radio); background: var(--panel); border: 1px solid var(--linea); box-shadow: var(--sombra); }
+.push-tarjeta > div > svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--suave); }
+.push-tarjeta p { color: var(--suave); margin: 2px 0 0; }
+.push-tarjeta .acciones { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+.push-instalar p { color: var(--suave); margin: 2px 0 6px; }
+.push-instalar ol { margin: 0; padding-left: 18px; color: var(--suave); }
+.push-instalar li { margin-bottom: 3px; }
+/* compartir hacia la oficina (ui/compartir.js) */
+.comp-vista { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.comp-vista .adjunto { display: flex; align-items: center; gap: 8px; }
+.comp-vista .adjunto img { width: 44px; height: 44px; object-fit: cover; border-radius: var(--radio-chico); }
+.comp-vista .adjunto small { margin-left: auto; color: var(--tenue); }
+.comp-personas { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.comp-persona { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 6px; border-radius: var(--radio); border: 1px solid var(--linea); background: var(--panel); cursor: pointer; font: inherit; color: inherit; text-align: center; }
+.comp-persona:hover { border-color: var(--linea-fuerte); }
+.comp-persona .retrato { width: 40px; height: 40px; border-radius: 10px; }
+.comp-persona small { font-size: 11px; color: var(--suave); line-height: 1.2; }
+
 /* «¿Preferís pedírselo a Sofía?» arriba de lo que se crea a mano (App.pistaSecretaria, docs/plan-secretaria-creadora.md) */
 .pista-sec { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin: 2px 0 14px; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--panel-2); font-size: 13px; color: var(--suave); }
 .pista-sec > span { flex: 1; min-width: 0; }

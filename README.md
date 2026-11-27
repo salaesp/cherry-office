@@ -96,6 +96,18 @@ HQ_HOSTS=alfred.tu-red.ts.net npm run dev --prefix backend   # el nombre que mue
 y se entra por `https://alfred.tu-red.ts.net`. `HQ_HOSTS` (nombres separados por comas) le dice al servidor qué nombres
 aceptar además de localhost; sin eso rechaza los pedidos que llegan por otro nombre.
 
+**Desde el celular con la app de escritorio:** Ajustes › **Celular** hace lo mismo sin terminal. Con Tailscale instalado en
+la compu y en el celular (misma cuenta), la app levanta el servidor local, lo publica con `tailscale serve` y muestra un QR.
+Desde el navegador del celular se instala como app (manifest y service worker en `oficina/`): en el celular
+queda una versión reducida (Bandeja, Charlas, Trabajo), con avisos push y, en Android, «Compartir › Oficina» desde otras apps. La compu tiene que estar
+prendida y con Oficina abierta; mientras el acceso está prendido, no se suspende. Plan completo: [docs/plan-celular.md](docs/plan-celular.md).
+
+**Actualizar la versión web:** `bash actualizar.sh` en la máquina trae lo último de la rama del clon (normalmente `main`),
+recompila y reinicia el servidor (con systemd o sin él). Lo mismo se puede hacer desde el navegador, en Ajustes › Actualizar:
+muestra los commits nuevos y, con «Actualizar ahora», corre `actualizar.sh` y recarga la página cuando el servidor vuelve
+(`backend/src/actualizar-web.ts`). Solo aparece en la versión web; la app de escritorio se actualiza desde las releases.
+`HQ_SIN_ACTUALIZACIONES=1` también lo apaga.
+
 Tests (con un `claude` falso, sin tocar tus datos ni tu cuenta):
 ```bash
 npm test --prefix backend

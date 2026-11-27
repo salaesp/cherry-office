@@ -1,0 +1,31 @@
+{
+  "name": "Oficina",
+  "short_name": "Oficina",
+  "description": "Tu oficina de agentes de Claude, desde el celular.",
+  "lang": "es",
+  "start_url": "/?movil=1#/bandeja",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2f0ec",
+  "theme_color": "#f2f0ec",
+  "icons": [
+    { "src": "iconos/icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "iconos/icono-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "iconos/icono-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "share_target": {
+    "action": "/compartir",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "titulo",
+      "text": "texto",
+      "url": "url",
+      "files": [{ "name": "archivos", "accept": ["image/*", "application/pdf", "text/*", ".pdf", ".doc", ".docx", ".odt", ".rtf", ".md", ".csv", ".tsv", ".json", ".txt"] }]
+    }
+  },
+  "shortcuts": [
+    { "name": "Bandeja", "url": "/?movil=1#/bandeja", "icons": [{ "src": "iconos/icono-192.png", "sizes": "192x192" }] },
+    { "name": "Charlas", "url": "/?movil=1#/equipo", "icons": [{ "src": "iconos/icono-192.png", "sizes": "192x192" }] }
+  ]
+}
