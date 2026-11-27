@@ -77,6 +77,8 @@
     delete vivos[id]; delete cancelando[id]; delete pausadas[id];
     seguirVivo(id);
     (chats[id] = chats[id] || []).push({ r: 'u', t: m.t, adj: m.nombres });
+    // la charla entra a la lista ya, no cuando responda: si te vas a otra antes, sigue ahí
+    if (App.Nav && App.Nav.anotarCharla) { App.Nav.anotarCharla(id, m.sesion, m.t); if (actual === id) repintarLado('charlas'); }
     repintar(id);
     if (App.Actividad) setTimeout(App.Actividad.ya, 300);
     var cuerpo = Object.assign({ agent: id, message: m.t, session: m.sesion }, m.eleccion);
