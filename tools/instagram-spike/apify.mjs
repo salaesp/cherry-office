@@ -6,6 +6,8 @@
 //   node apify.mjs <cuenta> --publicaciones 30           además, las últimas 30 publicaciones (30 resultados más por cuenta)
 //   node apify.mjs <cuenta> --tope 0.20                  tope de gasto por corrida en dólares (por defecto 0.10)
 //
+// Cada corrida se lanza y se consulta cada minuto hasta que termina (máximo 20 minutos), mostrando cómo va.
+//
 // La clave va en la variable APIFY_TOKEN o en el archivo datos/.apify-token. Nunca se muestra ni se guarda en otro lado.
 import fs from 'node:fs'
 import path from 'node:path'
@@ -41,27 +43,47 @@ if (!token) {
   process.exit(2)
 }
 
-/** Corre el actor y espera sus resultados (hasta 5 minutos). */
-async function correr(entrada) {
-  const url = `https://api.apify.com/v2/acts/${ACTOR}/run-sync-get-dataset-items?maxTotalChargeUsd=${tope}`
-  const t0 = Date.now()
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(entrada),
-    signal: AbortSignal.timeout(330000),
+const API = 'https://api.apify.com/v2'
+const esperar = (ms) => new Promise((r) => setTimeout(r, ms))
+
+async function api(metodo, ruta, cuerpo) {
+  const r = await fetch(`${API}${ruta}`, {
+    method: metodo,
+    headers: { 'Authorization': `Bearer ${token}`, ...(cuerpo ? { 'Content-Type': 'application/json' } : {}) },
+    ...(cuerpo ? { body: JSON.stringify(cuerpo) } : {}),
+    signal: AbortSignal.timeout(120000),
   })
-  const cuerpo = await r.text()
+  const texto = await r.text()
   let json
-  try { json = JSON.parse(cuerpo) } catch { /* no es JSON */ }
+  try { json = JSON.parse(texto) } catch { /* no es JSON */ }
   if (!r.ok) {
-    const motivo = json?.error?.message ?? cuerpo.slice(0, 300)
+    const motivo = json?.error?.message ?? texto.slice(0, 300)
     const pista = r.status === 401 ? ' (¿la clave está bien copiada?)'
-      : r.status === 402 || r.status === 403 ? ' (¿te quedaste sin crédito en Apify?)'
-      : r.status === 408 ? ' (la corrida tardó más de 5 minutos; mirala en console.apify.com › Runs)' : ''
+      : r.status === 402 || r.status === 403 ? ' (¿te quedaste sin crédito en Apify?)' : ''
     throw new Error(`Apify respondió ${r.status}: ${motivo}${pista}`)
   }
-  return { items: Array.isArray(json) ? json : [], ms: Date.now() - t0 }
+  return json
+}
+
+const TERMINADA = ['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT']
+const MAX_MIN = 20
+
+/** Lanza el actor, muestra cómo va cada minuto hasta que termina (máximo 20 minutos) y trae sus resultados. */
+async function correr(entrada, que) {
+  const t0 = Date.now()
+  let run = (await api('POST', `/acts/${ACTOR}/runs?maxTotalChargeUsd=${tope}&waitForFinish=30`, entrada)).data
+  console.log(`${que}: corrida ${run.id} lanzada (se ve en console.apify.com › Runs)`)
+  while (!TERMINADA.includes(run.status)) {
+    const min = (Date.now() - t0) / 60000
+    if (min > MAX_MIN) throw new Error(`La corrida ${run.id} lleva más de ${MAX_MIN} minutos; mirala en console.apify.com › Runs`)
+    console.log(`  … ${run.status.toLowerCase()} · ${Math.round(min * 60)} s${run.stats?.resultCount ? ` · ${run.stats.resultCount} resultados` : ''}`)
+    run = (await api('GET', `/actor-runs/${run.id}?waitForFinish=60`)).data
+  }
+  if (run.status !== 'SUCCEEDED') console.log(`  la corrida terminó en ${run.status}${run.statusMessage ? `: ${run.statusMessage}` : ''}; se usa lo que alcanzó a juntar`)
+  const items = await api('GET', `/datasets/${run.defaultDatasetId}/items?clean=true`)
+  const ms = Date.now() - t0
+  console.log(`${que}: ${items.length} resultados en ${Math.round(ms / 1000)} s`)
+  return { items: Array.isArray(items) ? items : [], ms }
 }
 
 const anexar = (o) => fs.appendFileSync(path.join(DATOS, 'pedidos.jsonl'), JSON.stringify(o) + '\n')
@@ -71,15 +93,13 @@ const urls = cuentas.map((c) => `https://www.instagram.com/${c}/`)
 let resultados = 0
 try {
   // Una corrida para todos los perfiles juntos.
-  const det = await correr({ directUrls: urls, resultsType: 'details' })
+  const det = await correr({ directUrls: urls, resultsType: 'details' }, 'Perfiles')
   resultados += det.items.length
-  console.log(`Perfiles: ${det.items.length} resultados en ${Math.round(det.ms / 1000)} s`)
 
   let posts = { items: [], ms: 0 }
   if (nPublicaciones) {
-    posts = await correr({ directUrls: urls, resultsType: 'posts', resultsLimit: nPublicaciones })
+    posts = await correr({ directUrls: urls, resultsType: 'posts', resultsLimit: nPublicaciones }, `Publicaciones (${nPublicaciones} por cuenta)`)
     resultados += posts.items.length
-    console.log(`Publicaciones: ${posts.items.length} resultados en ${Math.round(posts.ms / 1000)} s`)
   }
 
   for (const cuenta of cuentas) {
