@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:icon="@drawable/atajo_hablar"
+        android:shortcutId="hablar"
+        android:shortcutShortLabel="@string/atajo_hablar">
+        <intent
+            android:action="app.oficina.android.AUDIO"
+            android:targetClass="app.oficina.android.MainActivity"
+            android:targetPackage="app.oficina.android" />
+    </shortcut>
+    <shortcut
+        android:icon="@drawable/atajo_escribir"
+        android:shortcutId="escribir"
+        android:shortcutShortLabel="@string/atajo_escribir">
+        <intent
+            android:action="app.oficina.android.ESCRIBIR"
+            android:targetClass="app.oficina.android.MainActivity"
+            android:targetPackage="app.oficina.android" />
+    </shortcut>
+</shortcuts>

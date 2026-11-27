@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="fondo">#19191B</color>
+    <color name="panel">#232326</color>
+    <color name="linea">#333337</color>
+    <color name="texto">#F1F1F2</color>
+    <color name="suave">#A3A3A8</color>
+    <color name="acento">#F1F1F2</color>
+    <color name="sobre_acento">#1B1B1D</color>
+</resources>

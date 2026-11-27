@@ -55,6 +55,7 @@ En los dos casos hace falta **Claude Code** instalado y con la sesión iniciada.
 |---|---|
 | `oficina/` | El front (HTML y JS, con `vendor/` offline): la oficina pixel (`ui/pixel/`) y todas las pantallas. |
 | `backend/` | El backend en TypeScript (Node): oficinas, agentes, chat, flujos, tareas, biblioteca. La API está en [backend/API.md](backend/API.md). |
+| `android/` | App nativa de Android para hablarle a la secretaría, con widget en la pantalla de inicio. Ver [android/README.md](android/README.md). |
 | `desktop/` | La app de escritorio: carcasa Electron alrededor de `backend/` y `oficina/`. De acá salen el `.dmg` y el `.exe` de las releases. Ver [desktop/README.md](desktop/README.md). |
 | `docs/` | Planes de diseño, `aprendizajes.md` (cómo se comporta el `claude` real) y `caso-prospera/` (el texto con el que se prueba armar una oficina con el Creador). |
 | `tools/` | Utilidades sueltas (pruebas de concepto, como `whatsapp-spike/`). |
@@ -101,6 +102,8 @@ la compu y en el celular (misma cuenta), la app levanta el servidor local, lo pu
 Desde el navegador del celular se instala como app (manifest y service worker en `oficina/`): en el celular
 queda una versión reducida (Bandeja, Charlas, Trabajo), con avisos push y, en Android, «Compartir › Oficina» desde otras apps. La compu tiene que estar
 prendida y con Oficina abierta; mientras el acceso está prendido, no se suspende. Plan completo: [docs/plan-celular.md](docs/plan-celular.md).
+En Android también hay una **app nativa** con un widget para hablarle a la secretaría (Escribir / Hablar abren una charla
+nueva con ella): ver [android/README.md](android/README.md).
 
 **Actualizar la versión web:** `bash actualizar.sh` en la máquina trae lo último de la rama del clon (normalmente `main`),
 recompila y reinicia el servidor (con systemd o sin él). Lo mismo se puede hacer desde el navegador, en Ajustes › Actualizar:

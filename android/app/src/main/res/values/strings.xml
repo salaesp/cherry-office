@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Oficina</string>
+    <string name="widget_nombre">Secretaría</string>
+    <string name="widget_desc">Empezá una charla o dejale un audio a la secretaría</string>
+    <string name="widget_escribir">Escribir</string>
+    <string name="widget_hablar">Hablar</string>
+    <string name="atajo_escribir">Escribirle a la secretaría</string>
+    <string name="atajo_hablar">Dejarle un audio</string>
+</resources>
