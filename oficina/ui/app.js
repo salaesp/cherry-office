@@ -294,10 +294,11 @@
 
   /* «+»: todo lo que empieza algo nuevo, en un solo botón (arriba del riel) */
   function menuNuevo(ancla) {
-    /* en el celular, solo empezar algo: charlar o correr un flujo (armar la oficina es cosa de la compu) */
+    /* en el celular, solo empezar algo: charlar, programar una tarea o correr un flujo (armar la oficina es cosa de la compu) */
     if (App.movil) {
       App.menu(ancla, [
         { texto: 'Charlar con alguien…', icono: 'charla', accion: function () { App.Nav.elegirAgente(ancla, function (id) { App.Agente.nueva(id); }, 'Charlar con'); } },
+        { texto: 'Nueva tarea…', icono: 'reloj', accion: function () { App.Agente.nuevaTarea(null, {}); } },
         { texto: 'Correr un flujo…', icono: 'flujo', accion: function () { App.Nav.ir('#/trabajo/flujos'); App.Flujos.nueva(); } }]);
       return;
     }

@@ -207,7 +207,17 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
   App.fallo = function (e) { App.aviso((e && e.message) || String(e), true); };
 
   /* ---------------- hojas modales (apiladas; Esc cierra la de arriba) ---------------- */
-  var pila = [];
+  /* Atrás cierra la hoja de arriba, como en una app: cada hoja deja una entrada en el historial (misma ruta, con la marca
+     `hoja`). Cerrarla con su ✕ saca esa entrada; si mientras tanto se navegó a otra ruta, la hoja se cierra sola. */
+  var pila = [], nHojas = 0;
+  function alVolverHistorial(e) {
+    var marca = e.state && e.state.hoja;
+    for (var i = pila.length - 1; i >= 0; i--) { if (pila[i].marca === marca) break; pila[i].cerrar(true); }
+  }
+  window.addEventListener('popstate', alVolverHistorial);
+  window.addEventListener('hashchange', function () {
+    for (var i = pila.length - 1; i >= 0; i--) if (pila[i].ruta !== location.hash) pila[i].cerrar(true);
+  });
   App.hoja = function (op) {
     var cuerpo = h('div.hoja-cuerpo'), pie = h('div.hoja-pie');
     var cab = h('div.hoja-cab', h('h2', op.titulo || ''), h('button.btn.fantasma.icono', { title: 'Cerrar', onclick: function () { cerrar(); } }, App.icono('cerrar')));
@@ -216,21 +226,28 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
     var ajuste = moverYAgrandar(caja, cab, op);
     velo.addEventListener('mousedown', function (e) { if (e.target === velo && !op.modal) cerrar(); });
     document.body.appendChild(velo);
-    var obj = { el: caja, cuerpo: cuerpo, pie: pie, cab: cab, cerrar: cerrar, titulo: function (t) { cab.firstChild.textContent = t; },
-      restaurar: ajuste.restaurar };
+    var marca = 'h' + (++nHojas);
+    var obj = { el: caja, cuerpo: cuerpo, pie: pie, cab: cab, cerrar: function () { cerrar(); }, titulo: function (t) { cab.firstChild.textContent = t; },
+      restaurar: ajuste.restaurar, marca: marca, ruta: location.hash };
+    try { history.pushState({ hoja: marca }, '', location.href); } catch (e) { obj.marca = null; }
     pila.push(obj);
     var cerrada = false;
-    function cerrar() {
+    /* porHistorial: la cerró Atrás o un cambio de ruta (su entrada ya no está arriba: no hay que sacarla) */
+    function cerrar(porHistorial) {
       if (cerrada) return; cerrada = true;
       velo.remove();
       pila.splice(pila.indexOf(obj), 1);
+      /* si nadie navegó justo después (al cerrar se suele abrir otra cosa), se saca su entrada del historial */
+      if (porHistorial !== true && obj.marca) setTimeout(function () { if (history.state && history.state.hoja === obj.marca) history.back(); }, 0);
       if (op.alCerrar) op.alCerrar();
     }
     /* el primer campo para escribir (no una hora ni un buscador de una lista larga, que se llevarían la vista hacia abajo) */
-    setTimeout(function () { var f = caja.querySelector('[autofocus]') || caja.querySelector('input:not([type=time]):not([type=search]):not([type=checkbox]):not([type=radio]):not([type=range]),textarea,select'); if (f) f.focus({ preventScroll: true }); }, 30);
+    if (!App.tactil()) setTimeout(function () { var f = caja.querySelector('[autofocus]') || caja.querySelector('input:not([type=time]):not([type=search]):not([type=checkbox]):not([type=radio]):not([type=range]),textarea,select'); if (f) f.focus({ preventScroll: true }); }, 30);
     return obj;
   };
   App.hojaAbierta = function () { return pila.length > 0; };
+  /* pantalla táctil sin mouse (el celular): ahí Enter no manda y las hojas no enfocan solas */
+  App.tactil = function () { return !!App.movil || (window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches); };
 
   /* Hojas que se mueven (arrastrando la barra) y cambian de tamaño (desde los bordes y las esquinas). Sólo en la compu:
      en el celular son paneles que suben desde abajo. Al tocarla por primera vez la hoja deja de estar centrada y pasa a
@@ -336,7 +353,7 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
   App.cabPanel = function (op) {
     var ico = op.icono ? (typeof op.icono === 'string' ? h('div.der-ico', App.icono(op.icono)) : op.icono) : null;
     return h('div.der-cab' + (op.clase ? '.' + op.clase : ''),
-      op.volver ? h('button.btn.fantasma.chico.volver', { title: op.volver.titulo || op.volver.texto, onclick: op.volver.accion }, App.icono('atras'), op.volver.texto) : null,
+      op.volver ? h('button.btn.fantasma.chico.volver', { title: op.volver.titulo || op.volver.texto, 'aria-label': op.volver.titulo || op.volver.texto, onclick: op.volver.accion }, App.icono('atras'), h('span.volver-txt', op.volver.texto)) : null,
       ico,
       h('div.der-tit', h('h2', { title: op.titulo }, op.titulo || ''), op.sub ? h('div.sub', op.sub) : null),
       op.acciones && op.acciones.length ? h('div.der-acciones', op.acciones) : null,

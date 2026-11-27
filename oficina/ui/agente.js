@@ -213,8 +213,10 @@
       }));
   }
 
-  function abrir(id, pest) {
+  /* foco: id de una tarea a destacar si se abre en Tareas */
+  function abrir(id, pest, foco) {
     var a = App.agente(id); if (!a) return;
+    if (foco) tareaFoco = foco;
     var mismo = actual === id;
     ladoMovil = false;   // celular: elegir una charla (o volver a abrirla) muestra la charla, no los detalles
     if (!mismo) { sesionFija = null; lado = 'detalles'; ladoFiltro = ''; visor = null; }
@@ -240,7 +242,12 @@
   /* cambia lo que muestra la columna del costado sin rearmar la charla */
   function verLado(cual) {
     lado = cual || 'detalles'; ladoFiltro = '';
-    if (!esCompu()) { ladoMovil = true; detallesVistos(); }
+    if (!esCompu()) {
+      /* celular: los detalles (y cada lista adentro) dejan una entrada en el historial, así Atrás vuelve un paso */
+      var st = history.state && history.state.lado ? history.state : null;
+      if (!(st && st.lado === lado)) { try { history.pushState({ lado: lado, n: (st ? st.n : 0) + 1 }, '', location.href); } catch (e) { /* sin historial */ } }
+      ladoMovil = true; detallesVistos();
+    }
     if (visor && !visorJunto()) visor = null;   // el archivo tapaba la columna: se cierra para mostrar lo pedido
     pintarSoloLado();
   }
@@ -264,8 +271,10 @@
     pintarSoloLado();
     return obj;
   }
-  /* celular: cierra la columna de detalles y vuelve a la charla */
-  function cerrarLadoMovil() {
+  /* celular: cierra la columna de detalles y vuelve a la charla. Con la ✕ (no por Atrás) saca también sus entradas del
+     historial, si nadie navegó mientras tanto */
+  function cerrarLadoMovil(porHistorial) {
+    if (porHistorial !== true) setTimeout(function () { var st = history.state; if (st && st.lado && st.n > 0) history.go(-st.n); }, 0);
     ladoMovil = false; lado = 'detalles'; ladoFiltro = '';
     var der = App.dom.derecho;
     Array.prototype.forEach.call(der.querySelectorAll(':scope > aside.relacionado'), function (x) { x.remove(); });
@@ -290,6 +299,13 @@
     if (visor) der.setAttribute('data-visor', junto ? 'junto' : 'solo'); else der.removeAttribute('data-visor');
     der.classList.toggle('lado-movil', !esCompu());
   }
+  /* celular: Atrás y Adelante entre la charla, los detalles y sus listas */
+  window.addEventListener('popstate', function (e) {
+    if (esCompu() || !actual || App.modoDerecho() !== 'agente' || pestana !== 'chat') return;
+    var l = e.state && e.state.lado;
+    if (l) { if (!ladoMovil || lado !== l) { lado = l; ladoFiltro = ''; ladoMovil = true; pintarSoloLado(); } }
+    else if (ladoMovil) cerrarLadoMovil(true);
+  });
   /* si cambia el ancho de la ventana, el archivo pasa de al lado a en lugar de los detalles (o al revés) */
   window.addEventListener('resize', function () {
     if (!visor || !actual || App.modoDerecho() !== 'agente') return;
@@ -303,15 +319,16 @@
     var latCab = function () {
       var c = App.add(h('div.lat-cab'), Array.prototype.slice.call(arguments));
       c.appendChild(esCompu() ? h('button.btn.fantasma.icono.lat-cerrar', { title: 'Cerrar la charla', onclick: App.cerrarVentana }, App.icono('cerrar'))
-        : h('button.btn.fantasma.icono.lat-cerrar', { title: 'Volver a la charla', onclick: cerrarLadoMovil }, App.icono('cerrar')));
+        : h('button.btn.fantasma.icono.lat-cerrar', { title: 'Volver a la charla', onclick: function () { cerrarLadoMovil(); } }, App.icono('cerrar')));
       return c;
     };
     if (lado === 'detalles') {
-      var lapiz = esCompu() ? null : h('button.btn.fantasma.icono.solo-compu', { title: 'Perfil, apariencia y permisos de ' + a.nombre, onclick: function () { verLado('perfil'); } }, App.icono('lapiz'));
+      var lapiz = esCompu() ? null : h('button.btn.fantasma.icono', { title: 'Perfil, apariencia y permisos de ' + a.nombre, 'aria-label': 'Perfil, apariencia y permisos de ' + a.nombre, onclick: function () { verLado('perfil'); } }, App.icono('lapiz'));
       App.add(caja, latCab(h('b', 'Detalles'), lapiz), App.Nav.relacionado(a.id));
       return caja;
     }
-    var volver = h('button.btn.fantasma.icono', { title: 'Volver a los detalles', onclick: function () { verLado('detalles'); } }, App.icono('atras'));
+    var volver = h('button.btn.fantasma.icono', { title: 'Volver a los detalles', onclick: function () {
+      if (!esCompu() && history.state && history.state.lado && history.state.n > 1) history.back(); else verLado('detalles'); } }, App.icono('atras'));
     var cuerpo = h('div.der-cuerpo'), pie = h('div.der-pie');
     if (esFicha(lado)) {
       App.add(caja, latCab(volver, h('div.pestanas.lat-pest', FICHA_LADO.map(function (p) {
@@ -442,7 +459,7 @@
           h('div.der-tit', h('h2', a.nombre), sub),
           /* lo que se hace con alguien del equipo, a la vista: charlar, juntarlo en una reunión, darle una tarea */
           h('div.der-acciones',
-            h('button.btn.chico', { title: 'Llamar a reunión con ' + a.nombre, onclick: function () { App.Reunion.nueva([a.id]); } }, App.icono('reunion'), h('span.btn-txt', 'Reunión')),
+            App.movil ? null : h('button.btn.chico', { title: 'Llamar a reunión con ' + a.nombre, onclick: function () { App.Reunion.nueva([a.id]); } }, App.icono('reunion'), h('span.btn-txt', 'Reunión')),
             h('button.btn.chico', { title: 'Nueva tarea para ' + a.nombre, onclick: function () { nuevaTarea(a.id, {}); } }, App.icono('reloj'), h('span.btn-txt', 'Tarea')),
             h('button.btn.chico.primario', { title: 'Ir a la charla con ' + a.nombre, onclick: function () { irPestana('chat'); } }, App.icono('charla'), 'Charlar')),
           cerrarBtn),
@@ -473,7 +490,8 @@
     var parar = h('button.btn.peligro.icono', { style: { display: 'none' }, onclick: function () { detener(a.id); } }, App.icono('parar'));
     var adj = App.Adjuntos();
     adj.zona(cuerpo); adj.zona(pie, txt);
-    txt.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); mandar(); } });
+    /* Enter manda; en el celular no (el teclado no tiene Shift+Enter): ahí Enter es un renglón nuevo y se manda con el botón */
+    txt.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !App.tactil()) { e.preventDefault(); mandar(); } });
     function ajustarAlto() { txt.style.height = 'auto'; txt.style.height = Math.min(160, txt.scrollHeight + 2) + 'px'; }
     txt.addEventListener('input', function () { borradores[a.id] = txt.value; ajustarAlto(); });
     if (borradores[a.id]) { txt.value = borradores[a.id]; setTimeout(ajustarAlto, 0); }

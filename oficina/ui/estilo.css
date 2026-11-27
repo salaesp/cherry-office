@@ -1416,3 +1416,35 @@ textarea.campo.skill-contenido { font-family: ui-monospace, SFMono-Regular, Menl
 .pista-sec-cara { width: 26px; height: 26px; border-radius: 50%; image-rendering: pixelated; background: var(--panel); box-shadow: 0 0 0 1px var(--linea); flex: none; object-fit: cover; }
 .enlace { font: inherit; color: var(--texto); text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; padding: 0; cursor: pointer; white-space: nowrap; }
 .chat-intro-sec { max-width: 40ch; margin-top: 8px; font-size: 13px; line-height: 1.45; color: var(--suave); text-align: center; }
+
+/* ---------- celular: arreglos de la revisión de uso con el teléfono ---------- */
+/* el cuadro de la charla no aplasta Adjuntar ni Enviar */
+.redactar .btn { flex: none; min-width: 38px; }
+/* un rol largo no se come el nombre en los menús (p. ej. «Charlar con») */
+.menu-item small { flex: 0 1 auto; min-width: 0; max-width: 55%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 720px) {
+  /* la ✕ de las hojas, del tamaño de un dedo */
+  .hoja-cab { height: 48px; }
+  .hoja-cab .btn.icono { width: 40px; height: 40px; }
+  .hoja-cab .btn.icono svg { width: 18px; height: 18px; }
+  /* las pantallas de lectura (Tareas, Flujos, la Carpeta) con margen a los costados */
+  .app.en-seccion .derecho[data-modo="tareas"] .der-cuerpo,
+  .app.en-seccion .derecho[data-modo="flujos"] .der-cuerpo { padding-left: 14px; padding-right: 14px; }
+  .carpeta-panel { margin-left: 12px; margin-right: 12px; }
+  /* objetivos táctiles: fichitas de elegir y filtrar, la casilla «Activa», las filas de la carpeta y los menús */
+  .chip, .rev-pestana { min-height: 34px; height: auto; }
+  .lat-sec-tit .lat-nueva { height: 32px; }
+  input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
+  .carpeta { min-height: 44px; }
+  .menu-item { height: 44px; }
+  /* «‹ Para revisar» y otros «volver»: solo la flecha, así el título entra */
+  .der-cab .volver .volver-txt { display: none; }
+  .der-cab .volver { padding: 0 6px; }
+  /* Revisar una entrega: sube desde abajo como las demás hojas */
+  .hoja-revisar { max-width: none; }
+  /* escribiendo en una charla: la barra de abajo y lo que sobra de la cabecera se esconden para que se vea la charla */
+  .app:has(.redactar textarea:focus) .riel { display: none; }
+  .app:has(.redactar textarea:focus) .charla-cuentas,
+  .app:has(.redactar textarea:focus) .agente-pista,
+  .app:has(.redactar textarea:focus) .agente-cab .sub { display: none; }
+}
