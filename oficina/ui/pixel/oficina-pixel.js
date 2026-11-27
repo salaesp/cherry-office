@@ -791,10 +791,13 @@ App.OficinaPixel = (function () {
     if (dir > 0) return k < 1 ? 1 : Math.floor(k + 1e-3) + 1;
     var n = Math.ceil(k - 1e-3) - 1; return n < 1 ? kMin : Math.max(n, kMin);
   }
+  /* zoom de la ruedita: inmediato, como siempre en la compu. Con una animación, cada muesca de una ruedita rápida
+     calculaba el paso desde el zoom a mitad de camino y apuntaba al mismo entero, así que la vista se quedaba trabada */
   function zoom(nk, px0, py0) {
     nk = acotarK(nk); if (Math.abs(nk - cam.k) < 1e-3) return;
-    if (nk <= kMin + 1e-3) { irCamara(encuadreGeneral(), 200); return; }
-    irCamara(anclar(nk, px0, py0, (px0 - cam.dx) / cam.kv, (py0 - cam.dy) / cam.kv), 160);
+    tween = null; inercia = null;
+    Object.assign(cam, nk <= kMin + 1e-3 ? encuadreGeneral() : anclar(nk, px0, py0, (px0 - cam.dx) / cam.kv, (py0 - cam.dy) / cam.kv));
+    moverCam();
   }
   function avanzarInercia(now) {
     var dt = Math.min(50, now - inercia.t); inercia.t = now;
