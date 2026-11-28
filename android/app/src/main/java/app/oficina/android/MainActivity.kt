@@ -81,7 +81,8 @@ class MainActivity : ComponentActivity() {
         val l = lanzador ?: TwaLauncher(this).also { lanzador = it }
         // avisosApp: si Android tiene prendidos los avisos de esta app; la web lo usa para explicar un «bloqueado» de Chrome
         val avisos = if (NotificationManagerCompat.from(this).areNotificationsEnabled()) "si" else "no"
-        l.launch(TrustedWebActivityIntentBuilder(Uri.parse("$base/?movil=1&avisosApp=$avisos$ruta")), null, null, null)
+        val diag = Uri.encode(Delegacion.diagnostico(this))
+        l.launch(TrustedWebActivityIntentBuilder(Uri.parse("$base/?movil=1&avisosApp=$avisos&avisosDiag=$diag$ruta")), null, null, null)
         abierta = true
     }
 

@@ -35,7 +35,7 @@
 
         <!-- Los avisos de la oficina (Web Push del service worker) llegan como avisos de esta app -->
         <service
-            android:name="com.google.androidbrowserhelper.trusted.DelegationService"
+            android:name=".Delegacion"
             android:enabled="true"
             android:exported="true">
             <meta-data

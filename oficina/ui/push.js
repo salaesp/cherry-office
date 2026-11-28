@@ -32,6 +32,8 @@ App.Push = (function () {
   var dondeAjustes = enAppAndroid ? 'en Ajustes › Apps › Oficina › Notificaciones' : 'en los ajustes del sistema';
   /* lo que Android dice de los avisos de la app (MainActivity lo pasa como ?avisosApp=si|no); null si no vino */
   var avisosApp = (location.search.match(/[?&]avisosApp=(si|no)/) || [])[1] || null;
+  /* qué preguntó Chrome a la app y qué le contestó (Delegacion.kt): se muestra con el error para poder diagnosticarlo */
+  var avisosDiag = (function () { try { return decodeURIComponent((location.search.match(/[?&]avisosDiag=([^&]*)/) || [])[1] || ''); } catch (e) { return ''; } })();
   /* abre los ajustes de avisos de la app de Android misma (AjustesAvisos.kt), no los de otra «Oficina» */
   var URL_AJUSTES = 'intent://avisos#Intent;scheme=oficina-android;package=app.oficina.android;end';
   function sinPermiso(p) {
@@ -46,12 +48,14 @@ App.Push = (function () {
         '. Tocá «Abrir ajustes de avisos» para revisar los de esta app (puede haber otra «Oficina», la instalada desde Chrome), y después cerrá y volvé a abrir la app.');
     }
     e.ajustes = enAppAndroid;
+    e.diag = enAppAndroid ? avisosDiag : '';
     return e;
   }
   /* el error en pantalla y, en la app de Android, el botón para ir a sus ajustes */
   function mostrarError(caja, x) {
     App.vaciar(caja);
     App.add(caja, h('div', x.message || String(x)));
+    if (x.diag) App.add(caja, h('div', { style: { marginTop: '6px', fontSize: '12px', opacity: 0.75, userSelect: 'text', wordBreak: 'break-all' } }, 'Detalle: ' + x.diag));
     if (x.ajustes) App.add(caja, h('div', { style: { marginTop: '8px' } },
       h('button.btn.chico', { onclick: function () { location.href = URL_AJUSTES; } }, App.icono('campana'), 'Abrir ajustes de avisos')));
   }
