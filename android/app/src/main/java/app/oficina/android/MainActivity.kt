@@ -56,8 +56,10 @@ class MainActivity : ComponentActivity() {
         val prefs = Prefs(this)
         if (prefs.base == null || i?.action == VINCULAR) { mostrarVincular(); return }
         Secretaria.actualizar(this)
+        AvisosNativos.asegurar(this)
         abrir(
             when (i?.action) {
+                ABRIR -> i.getStringExtra(RUTA)?.takeIf { it.startsWith("#/") } ?: "#/bandeja/hoy"
                 WidgetSecretaria.ESCRIBIR -> "#/secretaria/escribir"
                 WidgetSecretaria.AUDIO -> "#/secretaria/hablar"
                 else -> "#/bandeja/hoy"
@@ -83,7 +85,9 @@ class MainActivity : ComponentActivity() {
         // avisosApp: si Android tiene prendidos los avisos de esta app; la web lo usa para explicar un «bloqueado» de Chrome
         val avisos = if (NotificationManagerCompat.from(this).areNotificationsEnabled()) "si" else "no"
         val diag = Uri.encode("navegador=${l.providerPackage} " + Delegacion.diagnostico(this))
-        l.launch(TrustedWebActivityIntentBuilder(Uri.parse("$base/?movil=1&avisosApp=$avisos&avisosDiag=$diag$ruta")), null, null, null)
+        // avisosId: con él la web prende los avisos de la app (AvisosNativos) en vez de los de Chrome
+        val id = Uri.encode(Prefs(this).dispositivo)
+        l.launch(TrustedWebActivityIntentBuilder(Uri.parse("$base/?movil=1&avisosApp=$avisos&avisosId=$id&avisosDiag=$diag$ruta")), null, null, null)
         abierta = true
     }
 
@@ -114,6 +118,9 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val VINCULAR = "app.oficina.android.VINCULAR"
+        /** abrir la oficina en [RUTA] (al tocar un aviso de AvisosNativos) */
+        const val ABRIR = "app.oficina.android.ABRIR"
+        const val RUTA = "ruta"
         private const val CHROME = "com.android.chrome"
     }
 }

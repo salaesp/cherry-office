@@ -117,4 +117,34 @@ describe('push', () => {
     push.parar()
     fs.rmSync(dir, { recursive: true, force: true })
   })
+
+  test('app de Android: espera abierta hasta que hay algo, no molestar y prueba igual que web, se entera si la borran', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'push-'))
+    let act: object = { avisos: [], permisos: [] }
+    const router = { handle: async () => ({ status: 200, json: Buffer.from(JSON.stringify(act)) }) }
+    const push = new AvisosPush({ dir, router: () => router, nombre: (id) => id, cadaMs: 60_000, fetch: async () => { throw new Error('no va por la red') } })
+    expect(() => push.suscribir({ nativo: { id: 'x' } })).toThrow(/id/)
+    push.suscribir({ nativo: { id: 'abcd1234-ef' }, nombre: 'Android (app)' })
+    push.parar()
+    await expect(push.esperar('otro-id-123', '0', push.epoca, 0)).rejects.toThrow(/anotado/)
+    // sin nada: vuelve vacía al vencer
+    expect(await push.esperar('abcd1234-ef', '0', push.epoca, 10)).toMatchObject({ mensajes: [], epoca: push.epoca })
+    await push.mirar()
+    // queda esperando y se despierta con el aviso nuevo
+    const espera = push.esperar('abcd1234-ef', '0', push.epoca, 5000)
+    act = { avisos: [], permisos: [{ id: 'p1', agente: 'marce', descripcion: 'Mandar un mail' }] }
+    expect(await push.mirar()).toBe(1)
+    const r = await espera as { ultimo: number; mensajes: { titulo: string; permiso?: string }[] }
+    expect(r.mensajes).toEqual([expect.objectContaining({ titulo: 'marce necesita tu permiso', permiso: 'p1' })])
+    // lo ya traído no vuelve; con otra época (la oficina se reinició) se trae lo que haya
+    expect((await push.esperar('abcd1234-ef', String(r.ultimo), push.epoca, 0) as { mensajes: unknown[] }).mensajes).toEqual([])
+    expect((await push.esperar('abcd1234-ef', String(r.ultimo), 'vieja', 0) as { mensajes: unknown[] }).mensajes).toHaveLength(1)
+    await push.probar('nativo:abcd1234-ef')
+    expect((await push.esperar('abcd1234-ef', String(r.ultimo), push.epoca, 0) as { mensajes: { tag: string }[] }).mensajes.map((m) => m.tag)).toEqual(['prueba'])
+    // borrarla corta la espera con 404
+    const otra = push.esperar('abcd1234-ef', '999', push.epoca, 5000)
+    push.desuscribir('nativo:abcd1234-ef')
+    await expect(otra).rejects.toThrow(/anotado/)
+    fs.rmSync(dir, { recursive: true, force: true })
+  })
 })

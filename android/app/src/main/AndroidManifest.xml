@@ -3,6 +3,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Avisos de la app (AvisosNativos): servicio que espera los avisos de la oficina, también al prender el teléfono -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Android 11+: para encontrar Chrome (u otro navegador con Trusted Web Activity) -->
     <queries>
@@ -50,7 +55,7 @@
             android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity"
             android:exported="false" />
 
-        <!-- La oficina web abre desde acá los ajustes de avisos de esta app (AjustesAvisos.kt) -->
+        <!-- La oficina web abre desde acá los ajustes de avisos de esta app y prende sus avisos (AjustesAvisos.kt) -->
         <activity
             android:name=".AjustesAvisos"
             android:exported="true"
@@ -63,8 +68,26 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="oficina-android" android:host="avisos" />
+                <data android:scheme="oficina-android" android:host="avisos-prender" />
             </intent-filter>
         </activity>
+
+        <!-- Los avisos de la oficina como avisos de esta app, sin Chrome (AvisosNativos.kt) -->
+        <service
+            android:name=".AvisosNativos"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Espera los avisos de la oficina del usuario (en su compu, por su red privada) para mostrarlos al instante" />
+        </service>
+        <receiver android:name=".AccionAviso" android:exported="false" />
+        <receiver android:name=".ArranqueAvisos" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name=".WidgetSecretaria"

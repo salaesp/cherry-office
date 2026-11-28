@@ -5,7 +5,11 @@
 // - Qué avisar sale de lo mismo que mira la app (`GET /api/actividad`): cada pocos segundos, si hay suscripciones, se
 //   compara con lo anterior y se manda solo lo nuevo. La primera mirada no avisa (lo que ya estaba, ya estaba).
 // - Las claves y las suscripciones quedan en la carpeta de datos (push.json, push-suscripciones.json).
+// - La app de Android no usa Web Push (Chrome no la reconoce como dueña de la dirección de Tailscale y los avisos salían
+//   como de Chrome): se anota como `nativo:<id>` y espera los avisos con GET /api/push/nativo/esperar, que queda abierto
+//   hasta que hay algo o pasan ~45 s (android/…/AvisosNativos.kt). El resto (no molestar, prueba, borrar) es igual.
 // API: GET /api/push · POST /api/push/suscribir · POST /api/push/desuscribir · POST /api/push/probar · PUT /api/push/silencio
+//      GET /api/push/nativo/esperar?id=&desde=&epoca=
 import { createCipheriv, createECDH, createHash, createHmac, createPrivateKey, randomBytes, sign, type ECDH, type KeyObject } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -76,6 +80,14 @@ type Fetch = (url: string, init: { method: string; headers: Record<string, strin
 
 type Guardada = Suscripcion & { nombre: string; creada: number; silencio?: { desde: number; hasta: number } }
 
+/** Prefijo del endpoint de la app de Android (no es una URL: no hay servicio de push en el medio). */
+export const NATIVO = 'nativo:'
+const idNativo = (x: unknown) => typeof x === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(x) ? x : undefined
+/** Lo que se guarda para un teléfono con la app mientras no lo viene a buscar (se pierde al reiniciar la oficina). */
+type Cola = { mensajes: { n: number; ts: number; m: Mensaje }[]; esperando: Set<() => void> }
+const maxCola = 20
+const vidaCola = 24 * 3600_000
+
 const hhmm = (h: number) => `${String(Math.floor(h / 60)).padStart(2, '0')}:${String(h % 60).padStart(2, '0')}`
 const minutos = (s: unknown): number | undefined => {
   const m = typeof s === 'string' ? /^(\d{1,2}):(\d{2})$/.exec(s) : null
@@ -127,6 +139,10 @@ export class AvisosPush {
   private visto?: Set<string>
   private timer?: NodeJS.Timeout
   private mirando = false
+  private colas = new Map<string, Cola>()
+  private seq = 0
+  /** Cambia en cada arranque: si la app trae otra, su `desde` es de antes y no vale. */
+  readonly epoca = randomBytes(6).toString('base64url')
   /** Sujeto del JWT (lo piden los servicios de push, Apple incluido: tiene que ser mailto: o https:). Es el del proyecto, no
    *  el de la persona; HQ_PUSH_SUJETO lo cambia. */
   sujeto = 'https://github.com/salaesp/cherry-office'
@@ -148,6 +164,9 @@ export class AvisosPush {
   }
 
   suscribir(b: Obj): Obj {
+    const nativo = b.nativo && typeof b.nativo === 'object' ? idNativo((b.nativo as Obj).id) : undefined
+    if (b.nativo !== undefined && !nativo) throw new ErrorAPI(400, 'El id de la app no es válido.')
+    if (nativo) return this.anotar(NATIVO + nativo, '', '', b.nombre)
     const s = (b.suscripcion && typeof b.suscripcion === 'object' ? b.suscripcion : {}) as Obj
     const keys = (s.keys && typeof s.keys === 'object' ? s.keys : {}) as Obj
     const endpoint = typeof s.endpoint === 'string' ? s.endpoint : ''
@@ -156,7 +175,11 @@ export class AvisosPush {
     if (url.protocol !== 'https:') throw new ErrorAPI(400, 'El endpoint de push tiene que ser https.')
     const p256dh = typeof keys.p256dh === 'string' ? keys.p256dh : '', auth = typeof keys.auth === 'string' ? keys.auth : ''
     if (desdeB64u(p256dh).length !== 65 || desdeB64u(auth).length < 16) throw new ErrorAPI(400, 'Las claves de la suscripción no son válidas.')
-    const nombre = typeof b.nombre === 'string' && b.nombre.trim() ? b.nombre.trim().slice(0, 60) : 'Celular'
+    return this.anotar(endpoint, p256dh, auth, b.nombre)
+  }
+
+  private anotar(endpoint: string, p256dh: string, auth: string, nombreDado: unknown): Obj {
+    const nombre = typeof nombreDado === 'string' && nombreDado.trim() ? nombreDado.trim().slice(0, 60) : 'Celular'
     const previa = this.subs.find((x) => x.endpoint === endpoint)
     this.subs = this.subs.filter((x) => x.endpoint !== endpoint)
     this.subs.push({ endpoint, p256dh, auth, nombre, creada: previa?.creada ?? Date.now(), ...(previa?.silencio ? { silencio: previa.silencio } : {}) })
@@ -169,6 +192,8 @@ export class AvisosPush {
     const antes = this.subs.length
     this.subs = this.subs.filter((x) => x.endpoint !== endpoint)
     if (this.subs.length !== antes) this.guardarSubs()
+    // la app que estaba esperando se entera ya de que la borraron (le toca un 404) y deja de buscar
+    if (typeof endpoint === 'string' && endpoint.startsWith(NATIVO)) this.despertar(endpoint.slice(NATIVO.length), true)
     if (!this.subs.length) this.parar()
     return { ok: true }
   }
@@ -237,8 +262,45 @@ export class AvisosPush {
     }
   }
 
+  /** La app de Android espera lo nuevo después de `desde` (de esta `epoca`) hasta `ms`; 404 si no está anotada. */
+  async esperar(id: unknown, desde: unknown, epoca: unknown, ms = 45_000): Promise<Obj> {
+    const nid = idNativo(id)
+    if (!nid || !this.subs.some((x) => x.endpoint === NATIVO + nid)) throw new ErrorAPI(404, 'Este teléfono no está anotado para avisos.')
+    const d = epoca === this.epoca && typeof desde === 'string' && /^\d+$/.test(desde) ? Number(desde) : 0
+    const cola = this.cola(nid)
+    const nuevos = () => cola.mensajes.filter((x) => x.n > d)
+    if (!nuevos().length && ms > 0) {
+      let listo!: () => void
+      const espera = new Promise<void>((r) => { listo = r })
+      cola.esperando.add(listo)
+      const t = setTimeout(listo, ms)
+      try { await espera } finally { clearTimeout(t); cola.esperando.delete(listo) }
+      if (!this.subs.some((x) => x.endpoint === NATIVO + nid)) throw new ErrorAPI(404, 'Este teléfono no está anotado para avisos.')
+    }
+    return { epoca: this.epoca, ultimo: this.seq, mensajes: nuevos().map((x) => x.m) }
+  }
+
+  private cola(id: string): Cola {
+    let c = this.colas.get(id)
+    if (!c) this.colas.set(id, (c = { mensajes: [], esperando: new Set() }))
+    return c
+  }
+
+  private despertar(id: string, borrar = false) {
+    const c = this.colas.get(id)
+    if (!c) return
+    for (const f of [...c.esperando]) f()
+    if (borrar) this.colas.delete(id)
+  }
+
   /** true si el servicio lo aceptó; si no, el estado HTTP (404/410: la suscripción ya no existe y se borra). */
   async enviar(s: Guardada, m: Mensaje): Promise<true | number | string> {
+    if (s.endpoint.startsWith(NATIVO)) {
+      const id = s.endpoint.slice(NATIVO.length), c = this.cola(id), ahora = Date.now()
+      c.mensajes = [...c.mensajes.filter((x) => ahora - x.ts < vidaCola), { n: ++this.seq, ts: ahora, m }].slice(-maxCola)
+      this.despertar(id)
+      return true
+    }
     const cuerpo = cifrar(Buffer.from(JSON.stringify(m).slice(0, 3500)), s)
     const f = this.op.fetch ?? (globalThis.fetch as unknown as Fetch)
     try {
@@ -290,7 +352,7 @@ export class AvisosPush {
 export class PushRouter implements SubRouter {
   constructor(private readonly push: AvisosPush) {}
 
-  async handle(method: string, ruta: string, _q: Query, body?: Buffer) {
+  async handle(method: string, ruta: string, q: Query, body?: Buffer) {
     if (ruta !== '/api/push' && !ruta.startsWith('/api/push/')) return null
     return atrapar(async () => {
       const b = body && body.length ? (JSON.parse(body.toString('utf8')) as Obj) : {}
@@ -299,6 +361,7 @@ export class PushRouter implements SubRouter {
       if (ruta === '/api/push/desuscribir') return method === 'POST' ? [200, this.push.desuscribir(b.endpoint)] : no405
       if (ruta === '/api/push/probar') return method === 'POST' ? [200, await this.push.probar(b.endpoint)] : no405
       if (ruta === '/api/push/silencio') return method === 'PUT' ? [200, this.push.silencio(b)] : no405
+      if (ruta === '/api/push/nativo/esperar') return method === 'GET' ? [200, await this.push.esperar(q.id, q.desde, q.epoca)] : no405
       return no404
     })
   }

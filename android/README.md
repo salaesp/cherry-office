@@ -8,9 +8,13 @@ con sus tarjetas, revisar entregas, audio, adjuntar). Lo nativo es solo lo que l
   toma el color de la ropa de la secretaría, su busto pixel se asoma por arriba y va su nombre. **Escribir** abre una
   charla nueva con ella con el cursor en el campo (`#/secretaria/escribir`); **Hablar** abre una charla nueva y empieza
   a grabar (`#/secretaria/hablar`; si Chrome pide un toque antes de usar el micrófono, el botón queda resaltado).
-- **Avisos como avisos de la app:** son los Web Push de siempre (`backend/src/push.ts`, `oficina/sw.js`); el
-  `DelegationService` de android-browser-helper hace que Android los muestre como de «Oficina» y no de Chrome. Se
-  prenden igual que en la PWA (Bandeja › Hoy o «Más › Avisos en este teléfono»).
+- **Avisos como avisos de la app** (`AvisosNativos.kt`): Chrome no puede verificar `assetlinks.json` en la dirección de
+  Tailscale (no es pública), así que muestra la barra con la dirección y el Web Push saldría como aviso de Chrome. En
+  vez de eso, con los avisos prendidos (Bandeja › Hoy o «Más › Avisos en este teléfono»), la app se anota en la oficina
+  como `nativo:<id>` y un servicio deja abierto `GET /api/push/nativo/esperar` (`backend/src/push.ts`), que vuelve en
+  cuanto hay algo para avisar. Android pide un aviso fijo mientras corre (canal «Conexión con la oficina», silencioso).
+  Al prenderlos la app pide que Android no la frene para ahorrar batería; vuelve a arrancar al reiniciar el teléfono.
+  Los avisos de permisos traen «Permitir» / «No».
 - **Vincular con el QR** de Ajustes › Celular (o escribiendo la dirección). Los atajos del ícono: «Dejarle un audio»,
   «Escribirle a la secretaría» y «Cambiar de oficina».
 
@@ -43,6 +47,9 @@ es la de `desktop/package.json`.
 | Archivo | Qué hace |
 |---|---|
 | `MainActivity.kt` | Abre la oficina en Chrome (TWA) en la ruta que toca; sin oficina vinculada, la pantalla de vincular |
+| `AvisosNativos.kt` | Espera los avisos de la oficina y los muestra; «Permitir» / «No» (`AccionAviso`); arranque con el teléfono |
+| `AjustesAvisos.kt` | Lo que pide la web: abrir los ajustes de avisos de la app, prender los avisos |
+| `Delegacion.kt` | El DelegationService de la TWA, con un diagnóstico de lo que pregunta el navegador |
 | `Vincular.kt` | Vincular con el QR o la dirección; desvincular |
 | `WidgetSecretaria.kt`, `res/layout/widget_secretaria.xml` | El widget (solo vistas que acepta RemoteViews: lo revisa `WidgetLayoutTest`) |
 | `Secretaria.kt`, `Api.kt`, `Prefs.kt` | Quién atiende la secretaría y su apariencia, para el widget |

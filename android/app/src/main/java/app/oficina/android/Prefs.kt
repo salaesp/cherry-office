@@ -31,6 +31,23 @@ class Prefs(private val ctx: Context) {
         get() = sp.getString("sec_firma", null)
         set(v) = sp.edit().putString("sec_firma", v).apply()
 
+    /** id de este teléfono para los avisos de la app (la oficina lo anota como `nativo:<id>`, backend/src/push.ts) */
+    val dispositivo: String
+        get() = sp.getString("dispositivo", null) ?: java.util.UUID.randomUUID().toString().also { sp.edit().putString("dispositivo", it).apply() }
+
+    /** los avisos de la app están prendidos (AvisosNativos corre) */
+    var avisosActivos: Boolean
+        get() = sp.getBoolean("avisos_activos", false)
+        set(v) = sp.edit().putBoolean("avisos_activos", v).apply()
+
+    /** hasta dónde ya se trajeron avisos, y de qué arranque de la oficina */
+    var avisosDesde: String
+        get() = sp.getString("avisos_desde", "0") ?: "0"
+        set(v) = sp.edit().putString("avisos_desde", v).apply()
+    var avisosEpoca: String
+        get() = sp.getString("avisos_epoca", "") ?: ""
+        set(v) = sp.edit().putString("avisos_epoca", v).apply()
+
     private val archivoBusto get() = File(ctx.filesDir, "busto.png")
 
     fun guardarBusto(b: Bitmap) {

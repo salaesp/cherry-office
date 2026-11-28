@@ -4,7 +4,10 @@
    - En iPhone solo anda con la app agregada a la pantalla de inicio (iOS 16.4+): si no, se explica cómo instalarla.
    - Una tarjeta en Bandeja › Hoy lo ofrece una vez (y la de instalar, si hace falta); se apaga con «Ahora no».
    - En «Más»: avisos prendidos o apagados, una prueba y un horario de no molestar.
-   Al tocar un aviso con la app abierta, el service worker le pide ir a esa pantalla. */
+   Al tocar un aviso con la app abierta, el service worker le pide ir a esa pantalla.
+   En la app de Android (?avisosId=… en la dirección) no se usa Web Push: Chrome no reconoce la app como dueña de la
+   dirección de Tailscale y los avisos salían como de Chrome. Se anota el teléfono como `nativo:<id>` y la app los espera
+   ella misma (android/…/AvisosNativos.kt); prenderlos le pide a la app que arranque (oficina-android://avisos-prender). */
 window.App = window.App || {};
 App.Push = (function () {
   'use strict';
@@ -15,6 +18,7 @@ App.Push = (function () {
   var cache = null;   // último estado: {soportado, permiso, suscripto, endpoint, silencio}
 
   function soportado() {
+    if (modoApp) return true;
     return !(App.nativo && App.nativo.hay) && window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
   }
   /* iPhone en Safari, sin instalar: no hay push hasta agregarla a inicio */
@@ -34,8 +38,14 @@ App.Push = (function () {
   var avisosApp = (location.search.match(/[?&]avisosApp=(si|no)/) || [])[1] || null;
   /* qué preguntó Chrome a la app y qué le contestó (Delegacion.kt): se muestra con el error para poder diagnosticarlo */
   var avisosDiag = (function () { try { return decodeURIComponent((location.search.match(/[?&]avisosDiag=([^&]*)/) || [])[1] || ''); } catch (e) { return ''; } })();
+  /* id de la app de Android para sus propios avisos (MainActivity): con él, los avisos son de la app y no de Chrome */
+  var avisosId = (location.search.match(/[?&]avisosId=([A-Za-z0-9-]{8,64})(&|$)/) || [])[1] || null;
+  var modoApp = !!avisosId;
+  var endpointApp = modoApp ? 'nativo:' + avisosId : null;
   /* abre los ajustes de avisos de la app de Android misma (AjustesAvisos.kt), no los de otra «Oficina» */
   var URL_AJUSTES = 'intent://avisos#Intent;scheme=oficina-android;package=app.oficina.android;end';
+  /* le pide a la app que empiece a esperar avisos (y, si hace falta, que Android no la frene para ahorrar batería) */
+  var URL_PRENDER = 'intent://avisos-prender#Intent;scheme=oficina-android;package=app.oficina.android;end';
   function sinPermiso(p) {
     var e;
     if (!enAppAndroid) {
@@ -74,7 +84,43 @@ App.Push = (function () {
     return /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : 'Celular';
   }
 
+  /* ---------------- avisos de la app de Android ---------------- */
+  function estadoApp() {
+    return api().get('/api/push').then(function (r) {
+      var mia = (r.suscripciones || []).filter(function (x) { return x.endpoint === endpointApp; })[0];
+      if (mia) quitarWebPush();
+      return { soportado: true, app: true, permiso: avisosApp === 'no' ? 'denied' : 'granted', suscripto: !!mia, endpoint: endpointApp, silencio: mia && mia.silencio };
+    }).then(function (e) { cache = e; return e; })
+      .catch(function () { return cache = { soportado: true, app: true, permiso: 'granted', suscripto: false, endpoint: endpointApp }; });
+  }
+  /* los de Chrome (si quedaron de antes) se borran: si no, cada aviso llegaría dos veces */
+  var webQuitado = false;
+  function quitarWebPush() {
+    if (webQuitado || !('serviceWorker' in navigator)) return;
+    webQuitado = true;
+    navigator.serviceWorker.getRegistration().then(function (reg) { return reg && reg.pushManager && reg.pushManager.getSubscription(); }).then(function (sub) {
+      if (!sub) return;
+      var ep = sub.endpoint;
+      return sub.unsubscribe().then(function () { return api().post('/api/push/desuscribir', { endpoint: ep }); });
+    }).catch(function () {});
+  }
+  function activarApp() {
+    if (avisosApp === 'no') {
+      var e = new Error('Android tiene apagados los avisos de esta app. Tocá «Abrir ajustes de avisos», prendelos, y después cerrá y volvé a abrir la app.');
+      e.ajustes = true;
+      return Promise.reject(e);
+    }
+    /* primero, todavía dentro del toque (si no, Chrome puede no dejar abrir la app): que la app empiece a esperar */
+    location.href = URL_PRENDER;
+    return api().post('/api/push/suscribir', { nativo: { id: avisosId }, nombre: 'Android (app)' }).then(function () {
+      quitarWebPush();
+      /* la prueba queda guardada en la oficina hasta que la app la venga a buscar */
+      api().post('/api/push/probar', { endpoint: endpointApp }).catch(function () {});
+    }).then(estadoApp);
+  }
+
   function estado() {
+    if (modoApp) return estadoApp();
     if (!soportado()) return Promise.resolve(cache = { soportado: false, permiso: 'no', suscripto: false });
     return registro().then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) {
       if (!sub) return { soportado: true, permiso: Notification.permission, suscripto: false };
@@ -87,6 +133,7 @@ App.Push = (function () {
 
   /* prender: permiso del sistema → suscripción con la clave de la oficina → anotarla. Rechaza con un texto para mostrar. */
   function activar() {
+    if (modoApp) return activarApp();
     if (!soportado()) return Promise.reject(new Error(faltaInstalar() ? 'Primero agregá la app a la pantalla de inicio.' : 'Este navegador no puede recibir avisos.'));
     var pedido = Notification.permission === 'granted' ? Promise.resolve('granted') : Notification.requestPermission();
     return conTope(pedido, 60000, 'El teléfono no contestó el pedido de permiso. Habilitá los avisos ' + dondeAjustes + ' y probá de nuevo.').then(function (p) {
@@ -109,6 +156,7 @@ App.Push = (function () {
   }
 
   function desactivar() {
+    if (modoApp) return api().post('/api/push/desuscribir', { endpoint: endpointApp }).then(estadoApp);
     return registro().then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) {
       if (!sub) return null;
       var ep = sub.endpoint;
@@ -135,7 +183,8 @@ App.Push = (function () {
       var espera = h('p.ayuda');
       App.add(c,
         h('p.ayuda', { style: { marginTop: 0 } }, 'Te aviso cuando algo te espera: un permiso, una pregunta, te toca en un flujo o hay algo para revisar. ' +
-          'Llegan desde la compu de la oficina: si está apagada o dormida, no hay avisos.'),
+          'Llegan desde la compu de la oficina: si está apagada o dormida, no hay avisos.' +
+          (e.app ? ' Mientras estén prendidos, Android muestra un aviso fijo de la app («Avisos de la oficina»): lo podés silenciar desde el mismo aviso.' : '')),
         App.ajuste('Avisos', null, llave), espera, err);
       if (!e.suscripto) return;
       var sil = !!e.silencio, desde = (e.silencio && e.silencio.desde) || '23:00', hasta = (e.silencio && e.silencio.hasta) || '08:00';
@@ -177,7 +226,7 @@ App.Push = (function () {
 
   /* para el menú «Más» del modo celular */
   function itemMenu() {
-    if (App.nativo && App.nativo.hay) return null;
+    if (App.nativo && App.nativo.hay && !modoApp) return null;
     var nota = !soportado() ? (faltaInstalar() ? 'instalá la app' : 'no disponible') : cache && cache.suscripto ? 'Prendidos' : 'Apagados';
     return { texto: 'Avisos en este teléfono', icono: 'campana', nota: nota, accion: hoja };
   }
@@ -192,7 +241,7 @@ App.Push = (function () {
         h('div.acciones', h('button.btn.chico', { onclick: function () { descartar('instalar'); t1.remove(); } }, 'Ahora no')));
       return t1;
     }
-    if (!soportado() || descartado('ofrecer') || (cache && cache.suscripto) || Notification.permission === 'denied') return null;
+    if (!soportado() || descartado('ofrecer') || (cache && cache.suscripto) || (!modoApp && Notification.permission === 'denied')) return null;
     if (!cache) { estado().then(function (e) { if (!e.suscripto && alCambiar) alCambiar(); }); return null; }
     var err = h('div.error-txt');
     var t2 = h('div.push-tarjeta',
