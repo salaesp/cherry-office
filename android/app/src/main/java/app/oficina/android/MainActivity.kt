@@ -78,13 +78,19 @@ class MainActivity : ComponentActivity() {
             return
         }
         pendiente = null
-        val l = lanzador ?: TwaLauncher(this).also { lanzador = it }
+        // Chrome si está: la librería elige el navegador predeterminado, y no todos le pasan los avisos a la app
+        val l = lanzador ?: TwaLauncher(this, chrome()).also { lanzador = it }
         // avisosApp: si Android tiene prendidos los avisos de esta app; la web lo usa para explicar un «bloqueado» de Chrome
         val avisos = if (NotificationManagerCompat.from(this).areNotificationsEnabled()) "si" else "no"
-        val diag = Uri.encode(Delegacion.diagnostico(this))
+        val diag = Uri.encode("navegador=${l.providerPackage} " + Delegacion.diagnostico(this))
         l.launch(TrustedWebActivityIntentBuilder(Uri.parse("$base/?movil=1&avisosApp=$avisos&avisosDiag=$diag$ruta")), null, null, null)
         abierta = true
     }
+
+    /** Chrome estable, si está instalado y habilitado; si no, null (la librería elige). */
+    private fun chrome(): String? = try {
+        if (packageManager.getApplicationInfo(CHROME, 0).enabled) CHROME else null
+    } catch (_: Exception) { null }
 
     private fun mostrarVincular() {
         abierta = false
@@ -108,5 +114,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val VINCULAR = "app.oficina.android.VINCULAR"
+        private const val CHROME = "com.android.chrome"
     }
 }
