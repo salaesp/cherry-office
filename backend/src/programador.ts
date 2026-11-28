@@ -233,6 +233,14 @@ export class Programador implements ProgramadorEntregas {
   static readonly prefijoOrden = 'secretaria-orden:'
   /** Algo que un agente le pasó a un colega desde una charla (o el coordinador en una corrida): `delegar:<tarjeta>` (delegar.ts). */
   static readonly prefijoDelegar = 'delegar:'
+  /** Una delegación con fecha («mañana a las 9»): queda como tarea programada `delegar-<tarjeta>` (delegar.ts). */
+  static readonly prefijoDelegarProgramada = 'delegar-'
+
+  /** ¿La conversación de esta corrida es una charla? Las delegaciones entre agentes sí (se listan en las charlas del que
+   *  la recibe); el resto (tareas, encargos, flujos, la secretaría…) no. */
+  static esCharla(id: string): boolean {
+    return id.startsWith(Programador.prefijoDelegar) || id.startsWith(Programador.prefijoDelegarProgramada)
+  }
 
   readonly ejecuciones: Ejecuciones
   /** Pedidos de permiso de las corridas que esperan a la persona (permisos-tareas.ts). */
@@ -639,7 +647,7 @@ export class Programador implements ProgramadorEntregas {
       const envExtra: Record<string, string> = { ...entorno(ctx) }
       if (mcpUrl !== undefined && mcp) envExtra[variableTokenMCP] = mcp.emitir({ oficina: carpeta, agente, sid, perfil: ctx.perfilMCP })
       try {
-        store.asegurarSesion(sid, agente, carpeta, true)
+        store.asegurarSesion(sid, agente, carpeta, !Programador.esCharla(ej.tarea))
         store.agregar(sid, 'u', v.mensaje)
         const res = await runner.actividad.seguir({ oficina: carpeta, agente, origen, tarea: nombre, extra: caja.observador(escritos.observador()) },
           (obs) => runner.ejecutarChatDetalle({ agente, mensaje: v.mensaje, sid, activa: v.activa, carpeta, obs, envExtra, armar: (p) => argumentos(config, ctx, p) }))
