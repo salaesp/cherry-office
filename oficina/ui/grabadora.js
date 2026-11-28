@@ -106,8 +106,9 @@ App.Grabadora = (function () {
   function franja(op) {
     var t = h('span.grab-tiempo', '0:00'), onda = h('canvas.grab-onda', { 'aria-hidden': 'true' });
     var mic = h('span.grab-mic', { 'aria-hidden': 'true' }, icono());
-    var mandar = h('button.btn.primario', { onclick: op.alMandar }, App.icono('enviar'), 'Mandar');
-    var cancelar = h('button.btn.fantasma', { onclick: op.alCancelar }, 'Cancelar');
+    /* en el celular y en el micrófono flotante quedan redondos, solo el ícono (tarjetas.css) */
+    var mandar = h('button.btn.primario.grab-mandar', { onclick: op.alMandar, 'aria-label': 'Mandar' }, App.icono('enviar'), h('span.grab-lbl', 'Mandar'));
+    var cancelar = h('button.btn.fantasma.grab-cancelar', { onclick: op.alCancelar, 'aria-label': 'Cancelar' }, App.icono('cerrar'), h('span.grab-lbl', 'Cancelar'));
     var vum = h('div.grab-vum', { role: 'status', title: op.para || '', 'aria-label': (op.para ? op.para + ' · ' : '') + 'Grabando' }, mic, t, onda);
     var el = h('div.grab-franja', cancelar, vum, mandar);
     var parar = op.grabacion && op.grabacion.nivel ? ondear(onda, op.grabacion) : function () {};

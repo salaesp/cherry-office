@@ -80,6 +80,17 @@
 .grab-mic { color: var(--peligro); display: grid; place-items: center; flex: none; animation: grab-latido 1.2s ease-in-out infinite; }
 .grab-mic svg { width: 18px; height: 18px; }
 .grab-onda { flex: 1; min-width: 30px; height: 28px; display: block; }
+.grab-cancelar svg { display: none; }
+/* en el micrófono flotante y en el celular: ✕ y mandar redondos, como WhatsApp */
+.mic-sec-grabando .grab-franja .btn { width: 38px; height: 38px; padding: 0; border-radius: 50%; }
+.mic-sec-grabando .grab-lbl { display: none; }
+.mic-sec-grabando .grab-cancelar svg { display: block; width: 18px; height: 18px; }
+@media (max-width: 720px) {
+  .grab-franja .btn { width: 44px; height: 44px; padding: 0; border-radius: 50%; }
+  .grab-franja .btn svg { width: 19px; height: 19px; }
+  .grab-lbl { display: none; }
+  .grab-cancelar svg { display: block; }
+}
 @keyframes grab-latido { 50% { opacity: .35; } }
 @media (prefers-reduced-motion: reduce) { .grab-mic { animation: none; } }
 .redactar .btn-mic { flex: none; }
