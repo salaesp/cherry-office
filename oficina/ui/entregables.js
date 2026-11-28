@@ -77,22 +77,33 @@ App.Entregables = (function () {
     var porEstado = App.elegir({ forma: 'chips', etiqueta: 'Estado', valor: filtro.estado,
       opciones: [{ valor: 'sin_revisar', titulo: 'Sin revisar' + (sinRevisar ? ' (' + sinRevisar + ')' : '') }, { valor: '', titulo: 'Todas' }],
       alCambiar: function (v) { filtro.estado = v; pintarLista(); } });
-    /* origen: un menú «Filtrar» (son once y no hacen falta a la vista) */
-    var botonOrigen = h('button.chip' + (filtro.origen ? '.sel' : ''), { type: 'button', onclick: function (ev) {
-      App.menu(ev.currentTarget, [{ texto: 'Cualquier origen', accion: function () { filtro.origen = ''; pintarLista(); } }]
+    /* origen (y en el celular, también de quién): un menú «Filtrar»; en el celular los chips de cada agente ocupaban tres
+       renglones y empujaban la lista para abajo */
+    var angosto = window.matchMedia('(max-width: 720px)').matches;
+    var agenteTxt = filtro.agente === '__reunion' ? 'Actas de reunión' : filtro.agente ? nombre(filtro.agente) : '';
+    var etiquetaFiltro = [angosto ? agenteTxt : '', filtro.origen ? origenTxt(filtro.origen) : ''].filter(Boolean).join(' · ');
+    var botonOrigen = h('button.chip' + (filtro.origen || (angosto && filtro.agente) ? '.sel' : ''), { type: 'button', onclick: function (ev) {
+      var items = [];
+      if (angosto) {
+        items.push({ titulo: 'De quién' }, { texto: 'De todos', accion: function () { filtro.agente = ''; pintarLista(); } },
+          { texto: 'Actas de reunión', icono: 'reunion', accion: function () { filtro.agente = '__reunion'; pintarLista(); } });
+        o.agentes.forEach(function (a) { items.push({ texto: a.nombre, retrato: a, accion: function () { filtro.agente = a.id; pintarLista(); } }); });
+        items.push('-', { titulo: 'Origen' });
+      }
+      App.menu(ev.currentTarget, items.concat([{ texto: 'Cualquier origen', accion: function () { filtro.origen = ''; pintarLista(); } }])
         .concat(Object.keys(ORIGEN).map(function (k) { return { texto: ORIGEN[k], accion: function () { filtro.origen = k; pintarLista(); } }; })));
-    } }, App.icono('deslizadores'), filtro.origen ? origenTxt(filtro.origen) : 'Filtrar');
-    /* de quién: chips con el retrato de cada agente */
-    var porAgente = App.elegir({ forma: 'chips', etiqueta: 'De quién', valor: filtro.agente,
+    } }, App.icono('deslizadores'), etiquetaFiltro || 'Filtrar');
+    /* de quién: chips con el retrato de cada agente (en la compu) */
+    var porAgente = angosto ? null : App.elegir({ forma: 'chips', etiqueta: 'De quién', valor: filtro.agente,
       opciones: [{ valor: '', titulo: 'De todos' }, { valor: '__reunion', titulo: 'Actas de reunión', icono: 'reunion' }]
         .concat(o.agentes.map(function (a) { return { valor: a.id, titulo: a.nombre, retrato: a }; })),
       alCambiar: function (v) { filtro.agente = v; pintarLista(); } });
     App.add(App.vaciar(der),
-      cabecera('Para revisar', sinRevisar ? (sinRevisar === 1 ? '1 sin revisar' : sinRevisar + ' sin revisar') : 'Todo revisado'),
+      cabecera(filtro.estado ? 'Para revisar' : 'Todas las entregas', sinRevisar ? (sinRevisar === 1 ? '1 sin revisar' : sinRevisar + ' sin revisar') : 'Todo revisado'),
       cuerpo);
     App.add(cuerpo,
       h('div.entregas-filtros', porEstado, botonOrigen),
-      h('div.entregas-filtros', porAgente),
+      porAgente ? h('div.entregas-filtros', porAgente) : null,
       lista);
     var q = { limite: 100 };
     if (filtro.estado) q.estado = filtro.estado;
@@ -104,7 +115,7 @@ App.Entregables = (function () {
       if (!es.length) {
         lista.appendChild(filtro.estado === 'sin_revisar'
           ? App.vacio('ok', 'Nada para revisar', 'Cuando un agente termine una tarea o un encargo, aparece acá.',
-            [h('button.btn', { onclick: function () { filtro.estado = 'todas'; pintarLista(); } }, 'Ver lo ya revisado')])
+            [h('button.btn', { onclick: function () { filtro.estado = ''; pintarLista(); } }, 'Ver lo ya revisado')])
           : h('div.vacio', 'Todavía no hay entregas con ese filtro.'));
         return;
       }
@@ -118,6 +129,15 @@ App.Entregables = (function () {
       return h('div.retrato', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel-2)', color: 'var(--suave)', border: '1px solid var(--linea)' } }, App.icono(e.origen === 'flujo' ? 'flujo' : 'libro'));
     }
     return a ? App.retratoImg(a, 'retrato', 64) : h('div.retrato', { style: { display: 'flex', alignItems: 'center', justifyContent: 'center', background: d ? d.color : '#0a5fb4' } }, App.icono('reunion'));
+  }
+
+  /* la lista con un estado elegido: «Hoy» la abre en «Sin revisar» (el número de entregas nuevas) o en «Todas» (el
+     historial, que en el celular no tiene otra entrada) */
+  function lista(estado) {
+    filtro.estado = estado || '';
+    abierta = null;
+    if (abiertoPanel()) pintarLista();
+    App.Nav.ir('#/bandeja/revisar');
   }
 
   /* ---------------- tarjetas (lista y «Hoy») ---------------- */
@@ -614,7 +634,7 @@ App.Entregables = (function () {
   if (App.on) App.on('actividad', alActividad);
 
   return {
-    abrir: abrir, siguiente: siguiente, pintarTarjetas: pintarTarjetas,
+    abrir: abrir, lista: lista, siguiente: siguiente, pintarTarjetas: pintarTarjetas,
     abierta: function () { return abierta; },
     sinRevisar: function () { return sinRevisar; },
     refrescar: refrescarUltimas,

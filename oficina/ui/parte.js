@@ -163,7 +163,7 @@ App.Parte = (function () {
       cifras.push(h((alTocar ? 'button' : 'div') + '.qp-cifra' + (clase ? '.' + clase : ''), alTocar ? { type: 'button', onclick: alTocar } : null,
         h('b', String(n)), h('span', n === 1 ? uno : varios)));
     };
-    cifra(p.entregas, 'entrega nueva', 'entregas nuevas', null, function () { App.Nav.ir('#/bandeja/revisar'); });
+    cifra(p.entregas, 'entrega nueva', 'entregas nuevas', null, function () { verEntregas(''); });
     cifra(p.ejecucionesOk, 'tarea hecha', 'tareas hechas');
     cifra(p.ejecucionesError, 'tarea con error', 'tareas con error', 'error');
     cifra(p.pasosTerminados, 'paso de flujo', 'pasos de flujo');
@@ -200,6 +200,11 @@ App.Parte = (function () {
       })));
     }
     return out;
+  }
+
+  /* la lista de entregas en un estado: '' = todas (el historial), 'sin_revisar' = lo que falta */
+  function verEntregas(estado) {
+    if (App.Entregables && App.Entregables.lista) App.Entregables.lista(estado); else App.Nav.ir('#/bandeja/revisar');
   }
 
   /* ---------------- panel ---------------- */
@@ -242,7 +247,8 @@ App.Parte = (function () {
 
     if (vacio) {
       App.add(cuerpo, h('div.nav-vacio', App.icono('ok'), h('b', 'Todo en orden'), h('p', 'No hay nada que te espere. Cuando un agente te entregue algo o te pida permiso, aparece acá.'),
-        h('div.acciones', { style: { justifyContent: 'center' } },
+        h('div.acciones', { style: { justifyContent: 'center', flexWrap: 'wrap' } },
+          h('button.btn', { onclick: function () { verEntregas(''); } }, App.icono('bandeja'), 'Entregas anteriores'),
           h('button.btn', { onclick: function (ev) { App.Nav.elegirAgente(ev.currentTarget, function (id) { App.Agente.nueva(id); }); } }, App.icono('charla'), 'Charlar con alguien'),
           h('button.btn.solo-compu', { onclick: function () { App.Reunion.nueva(); } }, App.icono('reunion'), 'Llamar a reunión'))));
     } else {
@@ -250,7 +256,12 @@ App.Parte = (function () {
       if (entregas.length) {
         App.add(cuerpo, seccion('Para revisar' + (rev.total > entregas.length ? ' (' + rev.total + ')' : ''),
           [App.Entregables.pintarTarjetas ? tarjetasHoy(entregas) : h('div.parte-filas', entregas.map(filaEntrega)),
-            rev.total > entregas.length ? h('button.btn.chico.fantasma', { onclick: function () { App.Nav.ir('#/bandeja/revisar'); } }, 'Ver las ' + rev.total) : null]));
+            h('div.parte-mas',
+              rev.total > entregas.length ? h('button.btn.chico.fantasma', { onclick: function () { verEntregas('sin_revisar'); } }, 'Ver las ' + rev.total + ' sin revisar') : null,
+              h('button.btn.chico.fantasma', { onclick: function () { verEntregas(''); } }, 'Todas las entregas', App.icono('flecha')))]));
+      } else {
+        /* sin nada que revisar, igual queda el historial a mano (en el celular no hay otra entrada) */
+        App.add(cuerpo, h('div.parte-mas', h('button.btn.chico.fantasma', { onclick: function () { verEntregas(''); } }, 'Entregas anteriores', App.icono('flecha'))));
       }
       if (flujos.length) App.add(cuerpo, seccion('Flujos en curso', h('div.parte-filas', flujos.map(filaFlujo))));
       if (esperas.length) App.add(cuerpo, seccion('En espera', h('div.parte-filas', esperas.map(filaEspera))));
