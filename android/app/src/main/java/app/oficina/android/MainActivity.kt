@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.trusted.TrustedWebActivityIntentBuilder
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.google.androidbrowserhelper.trusted.TwaLauncher
 
@@ -78,7 +79,10 @@ class MainActivity : ComponentActivity() {
         }
         pendiente = null
         val l = lanzador ?: TwaLauncher(this).also { lanzador = it }
-        l.launch(TrustedWebActivityIntentBuilder(Uri.parse("$base/?movil=1$ruta")), null, null, null)
+        // avisosApp: si Android tiene prendidos los avisos de esta app; la web lo usa para explicar un «bloqueado» de Chrome
+        val avisos = if (NotificationManagerCompat.from(this).areNotificationsEnabled()) "si" else "no"
+        val diag = Uri.encode(Delegacion.diagnostico(this))
+        l.launch(TrustedWebActivityIntentBuilder(Uri.parse("$base/?movil=1&avisosApp=$avisos&avisosDiag=$diag$ruta")), null, null, null)
         abierta = true
     }
 
