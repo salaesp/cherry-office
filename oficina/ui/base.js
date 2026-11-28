@@ -474,10 +474,11 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
     return el;
   };
   /* Renglón de ajuste compacto: marca opcional · título y una línea de resumen · control a la derecha.
-     op: {marca?: nodo, titulo, sub?: texto o nodo, subError?: bool, control?: nodo o lista, alTocar?, abierto?: bool (muestra el chevrón)} */
+     op: {marca?: nodo, titulo, sub?: texto o nodo, subError?: bool, control?: nodo o lista, alTocar?, abierto?: bool (muestra el chevrón),
+          apilar?: bool (control ancho: en una hoja angosta, como el celular, baja abajo del título en vez de apretarlo)} */
   App.renglon = function (op) {
     var chev = op.abierto === undefined ? null : h('span.renglon-chev', App.icono('abajo'));
-    var el = h('div.renglon' + (op.alTocar ? '.tocable' : '') + (op.abierto ? '.abierto' : ''), op.alTocar ? { onclick: op.alTocar } : null,
+    var el = h('div.renglon' + (op.alTocar ? '.tocable' : '') + (op.abierto ? '.abierto' : '') + (op.apilar ? '.apilado' : ''), op.alTocar ? { onclick: op.alTocar } : null,
       op.marca || null,
       h('div.renglon-txt', h('div.renglon-tit', op.titulo), op.sub ? h('div.renglon-sub' + (op.subError ? '.error' : ''), op.sub) : null),
       op.control ? h('div.renglon-ctl', { onclick: function (ev) { ev.stopPropagation(); } }, op.control) : null,

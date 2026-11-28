@@ -1162,6 +1162,27 @@ button.adjunto:hover { background: var(--panel-2); }
 .sec-puntos i.corre { background: var(--acento); animation: latido 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .sec-puntos i.corre { animation: none; } }
 @media (max-width: 560px) { .renglon-abierto { margin-left: 0; } }
+/* hoja angosta (el celular): los controles anchos bajan abajo del título y las opciones ocupan el ancho */
+@container hoja (max-width: 560px) {
+  /* el control se desarma: el interruptor queda junto al título y el resto baja a su propia línea */
+  .renglon.apilado { flex-wrap: wrap; row-gap: 8px; column-gap: 8px; }
+  .renglon.apilado .renglon-ctl { display: contents; }
+  .renglon.apilado .renglon-txt { order: -2; }
+  .renglon.apilado .renglon-ctl > .elegir-interruptor { order: -1; }
+  .renglon.apilado::after { content: ''; order: 0; flex-basis: 100%; }
+  .renglon.apilado .renglon-ctl > * { order: 1; }
+  .renglon.apilado .renglon-ctl > .chips-ed { flex: 1 1 100%; }
+  .renglon.apilado .renglon-ctl > input.campo { flex: 1 1 0; min-width: 0; width: auto !important; }
+  .renglon.apilado .renglon-sub, .sec .renglon-sub { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .renglon-abierto { margin-left: 0; }
+  .renglon-abierto .renglon-par { gap: 6px; }
+  .renglon-abierto .renglon-par > .renglon-etq { width: 100%; }
+  .renglon-abierto .renglon-par > .elegir-segmento { display: flex; width: 100%; }
+  .renglon-abierto .elegir-segmento .seg-op { flex: 1 1 0; min-width: 0; justify-content: center; text-align: center; padding: 4px 6px; height: auto; min-height: 32px; white-space: normal; line-height: 1.2; }
+  .renglon-abierto .renglon-par > .nota-chica { width: 100%; }
+  .renglon-abierto .renglon-par > div[style] { min-width: 0 !important; width: 100%; }
+  .sec-cabeza .renglon-txt { min-width: 0; flex: 1 1 120px; }
+}
 .opcion-ui { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; padding: 9px 12px; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--panel); cursor: pointer; font: inherit; color: inherit; }
 .opcion-ui:hover { border-color: var(--linea-fuerte); }
 .opcion-ui.sel { border-color: var(--acento); box-shadow: inset 0 0 0 1px var(--acento); }

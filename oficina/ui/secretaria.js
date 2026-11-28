@@ -17,7 +17,7 @@
   function pintar(crear) {
     var vivo = true, reloj = null, datos = null, filtro = '';
     var hj = crear({ titulo: 'Secretaría', ancho: 720, alCerrar: function () { vivo = false; clearTimeout(reloj); } });
-    var caja = h('div', App.cargando('Mirando la secretaría…'));
+    var caja = h('div.sec', App.cargando('Mirando la secretaría…'));
     App.add(hj.cuerpo, caja);
     if (!hj.enVentana) App.add(hj.pie, h('button.btn.primario', { onclick: hj.cerrar }, 'Listo'));
 
@@ -322,7 +322,7 @@
         } }, App.icono('mas'));
         chips.push(mas);
       }
-      return App.renglon({ titulo: 'A las', control: h('div.chips-ed', chips) });
+      return App.renglon({ titulo: 'A las', apilar: true, control: h('div.chips-ed', chips) });
     }
 
     /* Franja para revisar: desde, hasta y un interruptor */
@@ -335,7 +335,7 @@
           prendida ? 'Revisa solo entre las ' + desde.value + ' y las ' + hasta.value + '.' : 'Revisa a cualquier hora.');
       };
       desde.addEventListener('change', poner); hasta.addEventListener('change', poner);
-      return App.renglon({ titulo: 'Revisar solo entre', sub: prendida ? 'Lo de afuera lo ve en la primera vuelta del día' : 'A cualquier hora',
+      return App.renglon({ titulo: 'Revisar solo entre', sub: prendida ? 'Lo de afuera lo ve en la primera vuelta del día' : 'A cualquier hora', apilar: true,
         control: [desde, h('span.nota-chica', '–'), hasta, App.interruptor(prendida, function (si) { prendida = si; poner(); }, 'Revisar solo en un horario')] });
     }
 
