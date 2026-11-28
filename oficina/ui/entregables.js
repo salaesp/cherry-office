@@ -320,6 +320,16 @@ App.Entregables = (function () {
     /* una importación: con los temas y fichas que dejó, para abrirlos desde acá */
     var importacion = { ver: verMemoria, abrirMemoria: App.SecretariaMemoria ? function () { App.SecretariaMemoria.abrir(); } : null };
     if (e.origen !== 'propuesta' && e.origen !== 'secretaria') pintarTexto(null, []);
+    /* una «Acción aprobada»: la acción que ejecutó con la forma de la propuesta (ticket, tabla…) y lo que contó como resultado */
+    var idAcc = e.origen === 'accion' && /^accion:(\d+)$/.exec(e.ref || '');
+    if (idAcc) api().get('/api/acciones', { id: idAcc[1] }).then(function (r) {
+      var ac = r.accion;
+      if (!ac || !abiertoPanel() || abierta !== e.id) return;
+      var estado = ac.estado === 'hecha' ? h('span.insignia.ok', 'Hecha') : ac.estado === 'error' ? h('span.insignia.error', 'Con error')
+        : ac.estado === 'ejecutando' ? h('span.insignia.aviso', h('span.giro'), ' Ejecutando…') : null;
+      var ver = ac.entrega ? h('button.btn.chico.fantasma', { onclick: function () { verEntrega(ac.entrega); } }, 'Ver la propuesta') : null;
+      App.add(App.vaciar(textoCaja), cajaAccion(ac, estado, e.texto || ac.resultado || '', ver));
+    }).catch(function () { /* sin la acción: queda el texto */ });
     var idImp = e.origen === 'importacion' && /^importar:(\d+)$/.exec(e.ref || '');
     if (idImp) Promise.all([
       api().get('/api/secretaria/memoria/importar/' + idImp[1]),
@@ -496,11 +506,14 @@ App.Entregables = (function () {
       error: h('span.insignia.error', 'Con error'),
       descartada: h('span.insignia', 'Descartada')
     }[ac.estado] || h('span.insignia', ac.estado);
-    App.add(caja, h('div.entrega-accion.prop-caja',
-      h('div.prop-cab', App.Propuestas.etiqueta(App.Propuestas.tipo(ac)), estado),
+    App.add(caja, cajaAccion(ac, estado, ac.resultado));
+  }
+  function cajaAccion(ac, estado, resultado, extra) {
+    return h('div.entrega-accion.prop-caja',
+      h('div.prop-cab', App.Propuestas.etiqueta(App.Propuestas.tipo(ac)), estado, extra || null),
       App.Propuestas.tarjeta(ac),
-      ac.resultado && ac.estado !== 'pendiente' ? h('div.prop-resultado', h('div.etiqueta-campo', ac.estado === 'error' ? 'Qué pasó' : 'Resultado'),
-        App.htmlSeguro(h('div.md-doc.doc-panel'), App.markdown(ac.resultado))) : null));
+      resultado && ac.estado !== 'pendiente' ? h('div.prop-resultado', h('div.etiqueta-campo', ac.estado === 'error' ? 'Qué pasó' : 'Resultado'),
+        App.htmlSeguro(h('div.md-doc.doc-panel'), App.markdown(resultado))) : null);
   }
 
   function vigilarAccion(id) {

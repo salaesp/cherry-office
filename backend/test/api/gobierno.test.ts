@@ -298,6 +298,10 @@ describe('Gobierno: instrucciones, conectores y acciones', () => {
     expect(dict(a.detalle).fecha).toBe('2026-11-16')
     const todas = lista((await f.get('/api/acciones', { estado: 'pendiente' })).obj.acciones)
     expect(todas.length).toBe(1)
+    // por id (la entrega «Acción aprobada» lleva ref «accion:<id>» y la busca así)
+    expect(str(dict((await f.get('/api/acciones', { id: String(a.id) })).obj.accion).resumen)).toBe(str(a.resumen))
+    expect((await f.get('/api/acciones', { id: '999' })).obj.accion).toBe(null)
+    expect((await f.get('/api/acciones', { id: 'x' })).status).toBe(400)
     expect(lista((await f.get('/api/acciones', { estado: 'hecha' })).obj.acciones)).toEqual([])
     expect((await f.get('/api/acciones', { estado: 'rara' })).status).toBe(400)
 

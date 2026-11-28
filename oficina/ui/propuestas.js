@@ -141,16 +141,25 @@ App.Propuestas = (function () {
   function sinMarcas(s) { return String(s).replace(/^\s*[-*•]\s+/, '').trim(); }
 
   /* el texto con el formato de la consigna → {urgente, resumen, secciones:[{nombre, clave, items}]}; null si no lo sigue */
+  function claveSeccion(nombre) {
+    var n = nombre.toLowerCase(), k;
+    if (SECCIONES[n]) return SECCIONES[n];
+    for (k in SECCIONES) if (n.indexOf(k + ' ') === 0) return SECCIONES[k];   // «Agenda próximas 48 h»
+    return '';
+  }
   function parsear(texto) {
     var lineas = String(texto || '').replace(/\r/g, '').split('\n');
-    var r = { urgente: [], resumen: [], secciones: [] }, actual = null, hay = false;
+    var r = { urgente: [], resumen: [], secciones: [], cierre: [] }, actual = null, hay = false;
     lineas.forEach(function (l) {
       var t = l.trim();
       var m = /^#{2,3}\s+(.+?)\s*:?$/.exec(t);
-      if (m) {
+      /* también «**Agenda próximas 48 h** (nada nuevo):» en una línea sola, si es una sección conocida */
+      var b = !m && /^\*\*([^*]+?):?\*\*\s*(?:\(([^)]*)\))?\s*:?\s*$/.exec(t);
+      if (b && !claveSeccion(b[1].trim())) b = null;
+      if (m || b) {
         hay = true;
-        var nombre = m[1].replace(/\*\*/g, '').trim();
-        actual = { nombre: nombre, clave: SECCIONES[nombre.toLowerCase()] || '', items: [] };
+        var nombre = (m ? m[1] : b[1]).replace(/\*\*/g, '').replace(/:$/, '').trim();
+        actual = { nombre: nombre, clave: claveSeccion(nombre), items: [], nota: b && b[2] ? b[2].trim() : '' };
         r.secciones.push(actual);
         return;
       }
@@ -158,7 +167,9 @@ App.Propuestas = (function () {
       var u = /^\**URGENTE\**\s*:\s*\**\s*(.+?)\**$/i.exec(t);
       if (u && !actual) { r.urgente.push(u[1]); return; }
       if (!actual) { r.resumen.push(t); return; }
-      if (/^\s*[-*•]\s+/.test(l)) actual.items.push(sinMarcas(l));
+      if (/^\s*[-*•]\s+/.test(l)) { actual.items.push(sinMarcas(l)); actual.lista = true; }
+      /* una línea suelta después de una lista («No propuse nada.»): es un cierre, no parte del último punto */
+      else if (actual.lista && l === l.trimStart()) r.cierre.push(t);
       else if (actual.items.length) actual.items[actual.items.length - 1] += ' ' + t;
       else actual.items.push(t);
     });
@@ -192,7 +203,8 @@ App.Propuestas = (function () {
   function inicial(s) { var c = String(s || '?').replace(/[^\p{L}\p{N}]/gu, '').charAt(0); return (c || '?').toUpperCase(); }
   function md(s) { return App.htmlSeguro(h('span.prop-md'), App.markdown(s).replace(/^<p>|<\/p>\s*$/g, '')); }
 
-  function seccion(titulo, cuerpo) { return h('div.rep-sec', h('h3', titulo), cuerpo); }
+  function seccion(titulo, cuerpo, nota) { return h('div.rep-sec', h('h3', titulo), nota ? h('div.rep-sec-nota', nota) : null, cuerpo); }
+  function seccionDe(s, cuerpo) { return seccion(s.nombre, cuerpo, s.nota); }
 
   /* ---------------- «Para hacer» y la memoria de la secretaría ----------------
      La secretaría deja cada pendiente como tema de su memoria y en el reporte termina la línea con «(tema: <slug>)».
@@ -302,26 +314,28 @@ App.Propuestas = (function () {
     r.secciones.forEach(function (s) {
       if (s.clave === 'hacer') return;
       if (s.clave === 'saber') {
-        caja.appendChild(seccion(s.nombre, h('div.rep-lista', s.items.map(function (it) {
+        caja.appendChild(seccionDe(s, h('div.rep-lista', s.items.map(function (it) {
           var x = itemSaber(it);
           if (!x) return h('div.rep-item', h('span.rep-punto'), h('div.min', md(it)), h('span'));
           return h('div.rep-item', h('span.rep-ini.' + (claseFuente(x.fuente) || 'otro'), { title: x.fuente || '' }, inicial(x.quien)),
             h('div.min', h('div.q', x.quien), x.que ? h('div.que', md(x.que)) : null), h('span.cu', x.hora));
         }))));
       } else if (s.clave === 'seguimiento') {
-        caja.appendChild(seccion(s.nombre, h('div.rep-lista', s.items.map(function (it) {
+        caja.appendChild(seccionDe(s, h('div.rep-lista', s.items.map(function (it) {
           var p = partirFinal(it);
           return h('div.rep-seg', h('div.min', md(p[0])), p[1] ? h('span.cu.aviso', p[1]) : null);
         }))));
       } else if (s.clave === 'agenda') {
-        caja.appendChild(seccion(s.nombre, h('div.rep-agenda', s.items.map(function (it) {
-          var p = /^(.+?)\s[—–-]\s(.+)$/.exec(it);
+        caja.appendChild(seccionDe(s, h('div.rep-agenda', s.items.map(function (it) {
+          /* «vie 09:30 — evento» o «Vie 27, 06:30: evento» */
+          var p = /^(.+?)\s[—–]\s(.+)$/.exec(it) || /^(.*?\d{1,2}:\d{2}[^:]*?):\s+(.+)$/.exec(it) || /^(.+?)\s-\s(.+)$/.exec(it);
           return p ? [h('div.h', p[1].replace(/\*\*/g, '')), h('div.e', md(p[2]))] : [h('div.h'), h('div.e', md(it))];
         }))));
       } else {
-        caja.appendChild(seccion(s.nombre, App.htmlSeguro(h('div.md-doc'), App.markdown(s.items.map(function (x) { return '- ' + x; }).join('\n')))));
+        caja.appendChild(seccionDe(s, App.htmlSeguro(h('div.md-doc'), App.markdown(s.items.map(function (x) { return '- ' + x; }).join('\n')))));
       }
     });
+    r.cierre.forEach(function (c) { caja.appendChild(h('div.prop-nota.rep-cierre', App.icono('ok'), md(c))); });
     return caja;
   }
 
