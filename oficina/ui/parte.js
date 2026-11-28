@@ -1,6 +1,6 @@
 /* Parte del día (docs/plan-creador-flujos.md §10 y §12): panel derecho en modo «parte».
    Secciones: te necesita, para revisar, flujos en curso, qué pasó, bloqueos y próximas tareas. Arriba, el parte narrado por el
-   coordinador si existe; si no, un botón para pedírselo. El pie «Listo, ya lo vi» marca el parte como visto. */
+   coordinador si existe; si no, un botón para pedírselo. El pie «Listo, ya lo vi» marca el parte como visto; solo aparece si hay «Qué pasó» o parte narrado. */
 window.App = window.App || {};
 App.Parte = (function () {
   'use strict';
@@ -263,6 +263,8 @@ App.Parte = (function () {
     if (bloq.length) App.add(cuerpo, seccion('Bloqueos', h('div.parte-filas', bloq.map(function (b) { return filaBloqueo(b, porId); }))));
     if (prox.length) App.add(cuerpo, seccion('Próximas tareas', h('div.parte-filas', prox.map(filaProxima))));
 
+    /* «visto» solo corre el inicio de «Qué pasó» (y del narrado, que lo cuenta): sin eso no hay nada que marcar y el pie no va */
+    if (!qp && !narrado) { pie.remove(); return; }
     var listo = h('button.btn.primario', { onclick: function () {
       listo.disabled = true;
       api().post('/api/parte/visto').then(function () { App.aviso('Listo: el próximo parte arranca desde acá.'); cargar(false); }).catch(function (e) { App.fallo(e); listo.disabled = false; });
