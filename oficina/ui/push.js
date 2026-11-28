@@ -20,9 +20,20 @@ App.Push = (function () {
   /* iPhone en Safari, sin instalar: no hay push hasta agregarla a inicio */
   function faltaInstalar() { return esIOS && !instalada; }
 
+  /* corta una espera que no termina nunca (en la app de Android, Chrome a veces no contesta) con un mensaje que diga dónde */
+  function conTope(p, ms, mensaje) {
+    return new Promise(function (res, rej) {
+      var t = setTimeout(function () { rej(new Error(mensaje)); }, ms);
+      p.then(function (v) { clearTimeout(t); res(v); }, function (e) { clearTimeout(t); rej(e); });
+    });
+  }
+  /* la app de Android abre la oficina en Chrome (Trusted Web Activity): Chrome pasa el paquete como referrer */
+  var enAppAndroid = /^android-app:\/\/app\.oficina\.android/.test(document.referrer || '');
+  var dondeAjustes = enAppAndroid ? 'en Ajustes › Apps › Oficina › Notificaciones' : 'en los ajustes del sistema';
+
   function registro() {
-    return navigator.serviceWorker.getRegistration().then(function (r) { return r || navigator.serviceWorker.register('sw.js'); })
-      .then(function () { return navigator.serviceWorker.ready; });
+    return conTope(navigator.serviceWorker.getRegistration().then(function (r) { return r || navigator.serviceWorker.register('sw.js'); })
+      .then(function () { return navigator.serviceWorker.ready; }), 15000, 'La parte de la oficina que recibe avisos no arrancó. Cerrá la app y volvé a abrirla.');
   }
   function claveBytes(b64) {
     var s = (b64 + '==='.slice((b64.length + 3) % 4)).replace(/-/g, '+').replace(/_/g, '/'), bin = atob(s), out = new Uint8Array(bin.length);
@@ -48,20 +59,23 @@ App.Push = (function () {
   /* prender: permiso del sistema → suscripción con la clave de la oficina → anotarla. Rechaza con un texto para mostrar. */
   function activar() {
     if (!soportado()) return Promise.reject(new Error(faltaInstalar() ? 'Primero agregá la app a la pantalla de inicio.' : 'Este navegador no puede recibir avisos.'));
-    return Notification.requestPermission().then(function (p) {
-      if (p !== 'granted') throw new Error(p === 'denied' ? 'El teléfono tiene los avisos bloqueados para esta app: habilitalos en los ajustes del sistema.' : 'No diste permiso para avisos.');
+    var pedido = Notification.permission === 'granted' ? Promise.resolve('granted') : Notification.requestPermission();
+    return conTope(pedido, 60000, 'El teléfono no contestó el pedido de permiso. Habilitá los avisos ' + dondeAjustes + ' y probá de nuevo.').then(function (p) {
+      if (p !== 'granted') throw new Error(p === 'denied' ? 'El teléfono tiene los avisos bloqueados para esta app: habilitalos ' + dondeAjustes + '.' : 'No diste permiso para avisos.');
       return Promise.all([registro(), api().get('/api/push')]);
     }).then(function (rs) {
       var reg = rs[0], clave = claveBytes(rs[1].clave);
       var suscribir = function () { return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: clave }); };
       /* una suscripción vieja con otra clave (otra instalación) no sirve: se cambia */
-      return reg.pushManager.getSubscription().then(function (vieja) {
+      return conTope(reg.pushManager.getSubscription().then(function (vieja) {
         return vieja ? vieja.unsubscribe().then(suscribir) : suscribir();
-      }).catch(function (e) { throw new Error('No pude anotar este teléfono para avisos (' + (e && e.message || e) + ').'); });
+      }), 30000, 'Chrome no terminó de anotarse para avisos: necesita los servicios de Google Play e internet (no alcanza con Tailscale)')
+        .catch(function (e) { throw new Error('No pude anotar este teléfono para avisos (' + (e && e.message || e) + ').'); });
     }).then(function (sub) {
       return api().post('/api/push/suscribir', { suscripcion: sub.toJSON(), nombre: nombreDispositivo() }).then(function () { return sub; });
     }).then(function (sub) {
-      return api().post('/api/push/probar', { endpoint: sub.endpoint }).catch(function () {});
+      /* la prueba sale sola: no hace falta esperar a que llegue para mostrar que quedaron prendidos */
+      api().post('/api/push/probar', { endpoint: sub.endpoint }).catch(function () {});
     }).then(estado);
   }
 
@@ -86,12 +100,14 @@ App.Push = (function () {
         opciones: [{ valor: true, titulo: 'Prendidos' }, { valor: false, titulo: 'Apagados' }],
         alCambiar: function (v) {
           err.textContent = '';
-          (v ? activar() : desactivar()).then(pintar).catch(function (x) { err.textContent = x.message; llave.poner(!v); });
+          espera.textContent = v ? 'Prendiendo los avisos…' : 'Apagando…';
+          (v ? activar() : desactivar()).then(pintar).catch(function (x) { espera.textContent = ''; err.textContent = x.message || String(x); llave.poner(!v); });
         } });
+      var espera = h('p.ayuda');
       App.add(c,
         h('p.ayuda', { style: { marginTop: 0 } }, 'Te aviso cuando algo te espera: un permiso, una pregunta, te toca en un flujo o hay algo para revisar. ' +
           'Llegan desde la compu de la oficina: si está apagada o dormida, no hay avisos.'),
-        App.ajuste('Avisos', null, llave), err);
+        App.ajuste('Avisos', null, llave), espera, err);
       if (!e.suscripto) return;
       var sil = !!e.silencio, desde = (e.silencio && e.silencio.desde) || '23:00', hasta = (e.silencio && e.silencio.hasta) || '08:00';
       var horas = function (v, alCambiar) {
@@ -157,7 +173,11 @@ App.Push = (function () {
       h('div.acciones',
         h('button.btn.chico', { onclick: function () { descartar('ofrecer'); t2.remove(); } }, 'Ahora no'),
         h('button.btn.chico.primario', { onclick: function () {
-          activar().then(function () { t2.remove(); App.aviso('Avisos prendidos.'); }).catch(function (x) { err.textContent = x.message; });
+          var b = this;
+          err.textContent = '';
+          b.disabled = true; b.textContent = 'Prendiendo…';
+          activar().then(function () { t2.remove(); App.aviso('Avisos prendidos.'); })
+            .catch(function (x) { err.textContent = x.message || String(x); b.disabled = false; b.textContent = 'Prender avisos'; });
         } }, 'Prender avisos')));
     return t2;
   }
