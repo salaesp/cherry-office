@@ -30,6 +30,31 @@ App.Push = (function () {
   /* la app de Android abre la oficina en Chrome (Trusted Web Activity): Chrome pasa el paquete como referrer */
   var enAppAndroid = /^android-app:\/\/app\.oficina\.android/.test(document.referrer || '');
   var dondeAjustes = enAppAndroid ? 'en Ajustes › Apps › Oficina › Notificaciones' : 'en los ajustes del sistema';
+  /* lo que Android dice de los avisos de la app (MainActivity lo pasa como ?avisosApp=si|no); null si no vino */
+  var avisosApp = (location.search.match(/[?&]avisosApp=(si|no)/) || [])[1] || null;
+  /* abre los ajustes de avisos de la app de Android misma (AjustesAvisos.kt), no los de otra «Oficina» */
+  var URL_AJUSTES = 'intent://avisos#Intent;scheme=oficina-android;package=app.oficina.android;end';
+  function sinPermiso(p) {
+    var e;
+    if (!enAppAndroid) {
+      e = new Error(p === 'denied' ? 'El teléfono tiene los avisos bloqueados para esta app: habilitalos ' + dondeAjustes + '.' : 'No diste permiso para avisos.');
+    } else if (avisosApp === 'no') {
+      e = new Error('Android tiene apagados los avisos de esta app. Tocá «Abrir ajustes de avisos», prendelos, y después cerrá y volvé a abrir la app.');
+    } else {
+      e = new Error('Chrome no le da permiso de avisos a la oficina (contestó «' + p + '»)' +
+        (avisosApp === 'si' ? ', aunque Android dice que esta app los tiene prendidos' : '') +
+        '. Tocá «Abrir ajustes de avisos» para revisar los de esta app (puede haber otra «Oficina», la instalada desde Chrome), y después cerrá y volvé a abrir la app.');
+    }
+    e.ajustes = enAppAndroid;
+    return e;
+  }
+  /* el error en pantalla y, en la app de Android, el botón para ir a sus ajustes */
+  function mostrarError(caja, x) {
+    App.vaciar(caja);
+    App.add(caja, h('div', x.message || String(x)));
+    if (x.ajustes) App.add(caja, h('div', { style: { marginTop: '8px' } },
+      h('button.btn.chico', { onclick: function () { location.href = URL_AJUSTES; } }, App.icono('campana'), 'Abrir ajustes de avisos')));
+  }
 
   function registro() {
     return conTope(navigator.serviceWorker.getRegistration().then(function (r) { return r || navigator.serviceWorker.register('sw.js'); })
@@ -61,7 +86,7 @@ App.Push = (function () {
     if (!soportado()) return Promise.reject(new Error(faltaInstalar() ? 'Primero agregá la app a la pantalla de inicio.' : 'Este navegador no puede recibir avisos.'));
     var pedido = Notification.permission === 'granted' ? Promise.resolve('granted') : Notification.requestPermission();
     return conTope(pedido, 60000, 'El teléfono no contestó el pedido de permiso. Habilitá los avisos ' + dondeAjustes + ' y probá de nuevo.').then(function (p) {
-      if (p !== 'granted') throw new Error(p === 'denied' ? 'El teléfono tiene los avisos bloqueados para esta app: habilitalos ' + dondeAjustes + '.' : 'No diste permiso para avisos.');
+      if (p !== 'granted') throw sinPermiso(p);
       return Promise.all([registro(), api().get('/api/push')]);
     }).then(function (rs) {
       var reg = rs[0], clave = claveBytes(rs[1].clave);
@@ -101,7 +126,7 @@ App.Push = (function () {
         alCambiar: function (v) {
           err.textContent = '';
           espera.textContent = v ? 'Prendiendo los avisos…' : 'Apagando…';
-          (v ? activar() : desactivar()).then(pintar).catch(function (x) { espera.textContent = ''; err.textContent = x.message || String(x); llave.poner(!v); });
+          (v ? activar() : desactivar()).then(pintar).catch(function (x) { espera.textContent = ''; mostrarError(err, x); llave.poner(!v); });
         } });
       var espera = h('p.ayuda');
       App.add(c,
@@ -177,7 +202,7 @@ App.Push = (function () {
           err.textContent = '';
           b.disabled = true; b.textContent = 'Prendiendo…';
           activar().then(function () { t2.remove(); App.aviso('Avisos prendidos.'); })
-            .catch(function (x) { err.textContent = x.message || String(x); b.disabled = false; b.textContent = 'Prender avisos'; });
+            .catch(function (x) { mostrarError(err, x); b.disabled = false; b.textContent = 'Prender avisos'; });
         } }, 'Prender avisos')));
     return t2;
   }
