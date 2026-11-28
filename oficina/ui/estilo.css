@@ -650,6 +650,8 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   .archivo { padding: 9px 16px; }
   .inicio { padding: 24px 16px; align-items: flex-start; }
   .menu { min-width: 0; max-width: calc(100vw - 16px); }
+  .emergente.menu-charlas { left: 8px !important; right: 8px; top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom)); width: auto; border-radius: 16px; padding: 8px; }
+  .menu-charlas .menu-cuerpo { max-height: 65vh; }
   .menu-item { height: 40px; }
 }
 
@@ -1288,6 +1290,22 @@ button.adjunto:hover { background: var(--panel-2); }
 .agente-herr .btn[aria-pressed="true"] { background: var(--panel-2); color: var(--texto); box-shadow: inset 0 0 0 1px var(--linea-fuerte); }
 .charla-barra { display: flex; align-items: center; gap: 8px; padding: 6px 16px 8px; border-bottom: 1px solid var(--linea); min-height: 38px; }
 .charla-tit { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* el título es el menú de charlas (nueva y las anteriores): un botón que se lee como título, con su flechita */
+.charla-menu { display: inline-flex; align-items: center; gap: 4px; flex: 0 1 auto; max-width: 100%; height: 28px; margin-left: -8px; padding: 0 8px;
+  border: 0; border-radius: var(--radio-chico); background: none; color: var(--texto); font-family: inherit; cursor: pointer; text-align: left; }
+.charla-menu:hover, .charla-menu[aria-expanded="true"] { background: var(--panel-2); }
+.charla-menu:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+.charla-menu .charla-tit-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.charla-menu svg { width: 14px; height: 14px; flex: none; color: var(--suave); }
+.charla-barra .charla-menu + * { margin-left: auto; }
+.menu-charlas { width: 300px; max-width: calc(100vw - 16px); }
+.menu-charlas .menu-item:first-child { font-weight: 600; }
+/* volviste a una charla vieja: ¿seguimos acá o empezamos otra? */
+.aviso-vieja { align-self: stretch; margin: 10px 0 4px; padding: 10px 12px; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--panel-2);
+  display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.aviso-vieja p { margin: 0; color: var(--suave); }
+.aviso-vieja p b { color: var(--texto); font-weight: 600; }
+.aviso-vieja-acc { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* columna de detalles */
 .lat-cab { display: flex; align-items: center; gap: 6px; padding: 14px 10px 8px 14px; min-height: 52px; flex: none; }

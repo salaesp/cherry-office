@@ -358,7 +358,7 @@
   /* la lista de charlas cambió (mandaste un mensaje, empezaste otra): título de la charla y columna al día */
   function repintarLado(cual) {
     if (App.modoDerecho() !== 'agente' || !actual) return;
-    var t = App.dom.derecho.querySelector('.charla-tit'); if (t && App.Nav.tituloCharla) t.textContent = App.Nav.tituloCharla(actual);
+    var t = App.dom.derecho.querySelector('.charla-tit-txt'); if (t && App.Nav.tituloCharla) t.textContent = App.Nav.tituloCharla(actual);
     if (lado === 'detalles' || lado === cual) pintarSoloLado();
   }
   /* la pista «Tocá para ver…» bajo el nombre: hasta que abriste los detalles una vez en este navegador */
@@ -388,6 +388,42 @@
     return fila;
   }
   /* chip de contexto de la charla (contexto.js): el desglose se pide con lo elegido en la charla (modelo, esfuerzo…) */
+  /* Volviste a una charla vieja (bocetos/nueva-charla.html, D): al final, «La última charla con Lucía es de ayer a las
+     18:40. ¿Seguimos acá o empezamos otra?». Solo con la charla quieta (sin respuesta en curso ni cola) y hasta que
+     mandás algo o tocás «Seguir acá». */
+  var VIEJA = 4 * 3600;
+  var avisoVisto = {};   // sesión -> true
+  function cuandoFue(ts) {
+    var d = new Date(ts * 1000), hoy = new Date(), ayer = new Date(); ayer.setDate(hoy.getDate() - 1);
+    var hora = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    if (d.toDateString() === hoy.toDateString()) return 'de hoy a las ' + hora;
+    if (d.toDateString() === ayer.toDateString()) return 'de ayer a las ' + hora;
+    var opc = { day: 'numeric', month: 'short' };
+    if (d.getFullYear() !== hoy.getFullYear()) opc.year = 'numeric';
+    return 'del ' + d.toLocaleDateString('es-AR', opc).replace('.', '');
+  }
+  function avisoVieja(a, msgs) {
+    var sid = sesiones[a.id];
+    if (!sid || avisoVisto[sid] || !msgs.length || enCurso[a.id] || (colas[a.id] || []).length) return null;
+    var ts = App.Nav.tsCharla ? App.Nav.tsCharla(a.id) : null;
+    if (!ts || Date.now() / 1000 - ts < VIEJA) return null;
+    var el = h('div.aviso-vieja', { role: 'note' },
+      h('p', 'La última charla con ' + a.nombre + ' es ', h('b', cuandoFue(ts)), '. ¿Seguimos acá o empezamos otra?'),
+      h('div.aviso-vieja-acc',
+        h('button.btn.chico.primario', { type: 'button', onclick: function () { nueva(a.id); } }, App.icono('mas'), 'Charla nueva'),
+        h('button.btn.chico', { type: 'button', onclick: function () { avisoVisto[sid] = true; el.remove(); } }, 'Seguir acá')));
+    return el;
+  }
+  /* el título de la charla abierta es un botón: abre el menú con «Nueva charla» y las últimas charlas
+     (bocetos/nueva-charla.html, B). Igual en la compu y en el celular. */
+  function tituloMenu(a) {
+    return h('button.charla-tit.charla-menu', { type: 'button', 'aria-haspopup': 'menu',
+      title: 'Empezar una charla nueva con ' + a.nombre + ' o volver a otra',
+      /* sin sacarle el foco al campo: en el celular, al perderlo la cabecera vuelve a crecer y el título se corre bajo el dedo */
+      onmousedown: function (e) { e.preventDefault(); },
+      onclick: function (e) { App.Nav.menuCharlas(e.currentTarget, a.id); } },
+      h('span.charla-tit-txt', App.Nav.tituloCharla ? App.Nav.tituloCharla(a.id) : 'Charla nueva'), App.icono('abajo'));
+  }
   function chipContexto(a) {
     return App.ChipContexto.chip(a.id, function () {
       var s = sesiones[a.id];
@@ -416,7 +452,7 @@
             h('button.btn.fantasma.icono.solo-compu', { title: 'Ver dónde está ' + a.nombre + ' en la oficina', onclick: function () {
               if (App.Oficina.marcar) App.Oficina.marcar(a.id); else if (App.Oficina.enfocarAgente) App.Oficina.enfocarAgente(a.id); } }, App.icono('pin')),
             /* cerrar no va acá: queda arriba a la derecha del todo, en la cabecera de la columna del costado */)),
-        h('div.charla-barra', h('b.charla-tit', App.Nav.tituloCharla ? App.Nav.tituloCharla(a.id) : ''), chipContexto(a),
+        h('div.charla-barra', tituloMenu(a), chipContexto(a),
           botonSkill(a, true)),
         cuerpo, pie);
       der.classList.add('con-relacionado');
@@ -427,7 +463,7 @@
     if (pestana === 'chat' && !esCompu()) {
       /* celular: como en una app de mensajes, la cabecera entera (cara y nombre, con su flechita) abre los detalles
          encima de la charla; debajo, lo que tiene a la vista con cuántos (charlas, tareas, archivos, notas), y cada uno
-         abre su lista. Nueva charla y la ficha (perfil, permisos) están adentro de los detalles. */
+         abre su lista. Debajo, el título de la charla: tocándolo, «Nueva charla» y las otras charlas. */
       var verDet = function () { verLado('detalles'); };
       var pista = pistaDetalles() ? h('div.agente-pista', 'Tocá para ver sus charlas, archivos y notas') : null;
       App.add(App.vaciar(der),
@@ -439,6 +475,7 @@
             botonSkill(a)),
           cerrarBtn),
         filaCuentas(a),
+        h('div.charla-barra', tituloMenu(a)),
         cuerpo, pie);
     } else if (pestana === 'chat') {
       App.add(App.vaciar(App.dom.derecho),
@@ -446,11 +483,11 @@
           h('button.agente-cara', { title: 'Ver la ficha de ' + a.nombre + ' (perfil, permisos, notas, tareas, archivos)', onclick: function () { irPestana('perfil'); } },
             App.retratoImg(a, 'retrato', 120), h('span.agente-lapiz', App.icono('lapiz'))),
           h('div.der-tit', h('h2', a.nombre), sub),
-          /* con texto: un ícono solo no dice qué hace. La charla actual no se pierde: queda en la lista de Charlas */
           h('div.der-acciones', chipContexto(a),
-            botonSkill(a),
-            h('button.btn.chico', { title: 'Empezar de cero con ' + a.nombre + '. Esta charla queda guardada en Charlas.', onclick: function () { nueva(a.id); } }, App.icono('mas'), 'Nueva charla')),
+            botonSkill(a)),
           cerrarBtn),
+        /* «Nueva charla» está en el menú del título; la charla actual no se pierde: queda en la lista */
+        h('div.charla-barra', tituloMenu(a)),
         cuerpo, pie);
     } else {
       App.add(App.vaciar(App.dom.derecho),
@@ -590,6 +627,8 @@
         } };
       }
       if ((colas[a.id] || []).length) lista.appendChild(bloqueCola(a));
+      var av = avisoVieja(a, msgs);
+      if (av) lista.appendChild(av);
       cuerpo.scrollTop = cuerpo.scrollHeight;
       /* con el agente trabajando se puede seguir escribiendo (queda en cola) y aparece «Detener» */
       var ocup = !!enCurso[a.id];
@@ -620,6 +659,7 @@
         guardarEleccion(sesiones[a.id], eleccionDe('nueva:' + a.id)); guardarEleccion('nueva:' + a.id, null);
       }
       var id = a.id, nombres = adj.nombres(), eleccion = selector.valor(), sesion = sesiones[a.id];
+      avisoVisto[sesion] = true;   // seguiste en esta charla: el aviso de «charla vieja» no vuelve
       leyendo = true;
       adj.leer().then(function (archivos) {
         txt.value = ''; txt.style.height = '';
