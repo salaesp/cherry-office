@@ -682,6 +682,36 @@ App.Nav = (function () {
     var sid = App.Agente.sesion(id), s = charlasDe(id).filter(function (x) { return x.session === sid; })[0];
     return s ? titulo(s) : 'Charla nueva';
   }
+  /* cuándo fue lo último de la charla abierta (segundos epoch), o null si es nueva o todavía no se sabe */
+  function tsCharla(id) {
+    var sid = App.Agente.sesion(id), s = charlasDe(id).filter(function (x) { return x.session === sid; })[0];
+    return s && s.ts ? s.ts : null;
+  }
+  /* el título de la charla es el menú (bocetos/nueva-charla.html, B): primero «Nueva charla» y después las últimas
+     charlas con esa persona; «Ver todas» abre la lista completa en los detalles. En el celular sube desde abajo. */
+  var MAX_MENU = 5;
+  function menuCharlas(ancla, id) {
+    var a = App.agente(id); if (!a) return;
+    function armar() {
+      var actualSid = App.Agente.sesion(id), ss = charlasDe(id);
+      var items = [{ texto: 'Nueva charla', icono: 'mas', nota: 'esta queda guardada', accion: function () { App.Agente.nueva(id); } }];
+      if (ss.length) {
+        items.push('-', { titulo: 'Charlas con ' + a.nombre });
+        var vis = ss.slice(0, MAX_MENU), abierta = ss.filter(function (s) { return s.session === actualSid; })[0];
+        if (abierta && vis.indexOf(abierta) < 0) vis.push(abierta);   // la charla abierta siempre está, aunque sea vieja
+        vis.forEach(function (s) {
+          var act = s.session === actualSid;
+          items.push({ texto: titulo(s), icono: act ? 'ok' : 'charla', nota: act ? 'abierta' : corto(s.ts), accion: function () {
+            if (act) return;
+            App.Agente.alElegirCharla(); ir('#/equipo/' + encodeURIComponent(id) + '/' + s.session);
+          } });
+        });
+        if (ss.length > MAX_MENU) items.push({ texto: 'Ver las ' + ss.length + ' charlas', icono: 'flecha', accion: function () { App.Agente.verLado('charlas'); } });
+      }
+      App.menu(ancla, items, 'menu-charlas');
+    }
+    if (sesiones) armar(); else cargarSesiones().then(armar);
+  }
 
   /* ---------------- arranque ---------------- */
   window.addEventListener('hashchange', function () { if (App.dom && App.dom.app) aplicar(); });
@@ -704,6 +734,6 @@ App.Nav = (function () {
     seccion: function () { return seccion; }, enSeccion: function () { return !!seccion && seccion !== 'oficina'; },
     nombreSeccion: function () { var s = SECCIONES.filter(function (x) { return x.id === seccion; })[0]; return s ? s.texto : ''; },
     pintarLista: pintarLista, elegirAgente: elegirAgente, relacionado: relacionado, menuNueva: menuNueva,
-    todasLasCharlas: todasLasCharlas, tituloCharla: tituloCharla, acomodar: acomodar, cuentas: cuentas
+    todasLasCharlas: todasLasCharlas, tituloCharla: tituloCharla, tsCharla: tsCharla, menuCharlas: menuCharlas, acomodar: acomodar, cuentas: cuentas
   };
 })();

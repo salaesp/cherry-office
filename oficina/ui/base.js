@@ -744,8 +744,8 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
     return { cerrar: cerrarEmergente };
   };
   /* Menú: con tope de alto y scroll, ↑↓ y Enter, y un filtro arriba cuando pasa de 8 opciones.
-     Ítems: '-' (separador), {titulo}, {texto, icono?, nota?, accion, peligro?, retrato?: agente} */
-  App.menu = function (ancla, items) {
+     Ítems: '-' (separador), {titulo}, {texto, icono?, nota?, accion, peligro?, retrato?: agente}. `clase`: otra clase más */
+  App.menu = function (ancla, items, clase) {
     var botones = [];
     var cuerpo = h('div.menu-cuerpo', items.map(function (it) {
       if (it === '-') return h('div.menu-sep');
@@ -757,7 +757,7 @@ App.E = { estado: null, carpeta: null, oficina: null, ocupados: {}, reunion: nul
       return b;
     }));
     var filtro = botones.length > 8 ? h('input.campo.chico.menu-filtro', { placeholder: 'Filtrar…' }) : null;
-    var m = App.emergente(ancla, h('div', filtro, cuerpo), 'menu');
+    var m = App.emergente(ancla, h('div', filtro, cuerpo), 'menu' + (clase ? '.' + clase : ''));
     function visibles() { return botones.filter(function (b) { return !b.classList.contains('oculto'); }); }
     if (filtro) {
       filtro.addEventListener('input', function () {
