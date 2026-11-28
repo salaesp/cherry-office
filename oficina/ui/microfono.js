@@ -52,7 +52,7 @@ App.Microfono = (function () {
     if (!a) { App.Ajustes.abrir('secretaria'); return; }
     if (estado !== 'reposo') return;
     grab = App.Grabadora.crear({ alTiempo: function (s) { if (franja) franja.tiempo(s); }, alTope: terminar });
-    franja = App.Grabadora.franja({ para: 'Para ' + a.nombre + ' · secretaría', alCancelar: cancelar, alMandar: terminar });
+    franja = App.Grabadora.franja({ para: 'Para ' + a.nombre + ' · secretaría', grabacion: grab, alCancelar: cancelar, alMandar: terminar });
     grab.empezar().then(function () { estado = 'grabando'; pintar(true); }).catch(function (e) { grab = null; franja = null; App.aviso(e.message, true); });
   }
   function cancelar() {

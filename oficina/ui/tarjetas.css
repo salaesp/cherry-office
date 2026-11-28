@@ -75,11 +75,13 @@
 .grab-franja { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; }
 .grab-vum { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--suave); }
 .grab-tiempo { font-variant-numeric: tabular-nums; color: var(--texto); font-weight: 600; }
-.grab-estado { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grab-trans { display: inline-flex; align-items: center; gap: 8px; }
-.grab-punto { width: 10px; height: 10px; border-radius: 50%; background: var(--peligro); animation: grab-latido 1.2s ease-in-out infinite; flex: none; }
+.grab-tiempo { flex: none; }
+.grab-mic { color: var(--peligro); display: grid; place-items: center; flex: none; animation: grab-latido 1.2s ease-in-out infinite; }
+.grab-mic svg { width: 18px; height: 18px; }
+.grab-onda { flex: 1; min-width: 30px; height: 28px; display: block; }
 @keyframes grab-latido { 50% { opacity: .35; } }
-@media (prefers-reduced-motion: reduce) { .grab-punto { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .grab-mic { animation: none; } }
 .redactar .btn-mic { flex: none; }
 
 /* micrófono flotante de la secretaría */

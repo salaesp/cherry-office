@@ -27,8 +27,14 @@ App.Grabadora = (function () {
       return navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } }).then(function (stream) {
         var Ctx = window.AudioContext || window.webkitAudioContext, ctx = new Ctx();
         var fuente = ctx.createMediaStreamSource(stream), nodo = ctx.createScriptProcessor(4096, 1, 1);
-        g = { stream: stream, ctx: ctx, fuente: fuente, nodo: nodo, partes: [], inicio: Date.now(), frecuencia: ctx.sampleRate };
-        nodo.onaudioprocess = function (e) { if (g) g.partes.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+        g = { stream: stream, ctx: ctx, fuente: fuente, nodo: nodo, partes: [], inicio: Date.now(), frecuencia: ctx.sampleRate, pico: 0 };
+        nodo.onaudioprocess = function (e) {
+          if (!g) return;
+          var d = new Float32Array(e.inputBuffer.getChannelData(0)), q = 0;
+          for (var i = 0; i < d.length; i++) q += d[i] * d[i];
+          g.pico = Math.max(g.pico, Math.min(1, Math.sqrt(q / d.length) * 5));   // volumen del tramo, para la onda de la franja
+          g.partes.push(d);
+        };
         fuente.connect(nodo); nodo.connect(ctx.destination);
         g.timer = setInterval(function () {
           if (!g) return;
@@ -52,7 +58,9 @@ App.Grabadora = (function () {
       /* termina y devuelve el WAV en base64 (null si quedó vacío) */
       terminar: function () { var x = soltar(); return x ? aWav(x.partes, x.frecuencia) : null; },
       cancelar: function () { soltar(); },
-      grabando: function () { return !!g; }
+      grabando: function () { return !!g; },
+      /* el volumen más alto desde la última vez que se preguntó (0 a 1) */
+      nivel: function () { if (!g) return 0; var p = g.pico; g.pico = 0; return p; }
     };
   }
 
@@ -91,21 +99,57 @@ App.Grabadora = (function () {
     return t.indexOf(MARCA) === 0 ? { voz: true, texto: t.slice(MARCA.length) } : { voz: false, texto: t };
   }
 
-  /* La franja que reemplaza el campo de escribir mientras se graba: Cancelar · ● 0:07 Grabando… · Mandar.
-     `op`: {para (texto, p. ej. «Para Sofía»), alCancelar, alMandar}. Devuelve {el, tiempo(s), transcribiendo()} */
+  /* La franja que reemplaza el campo de escribir mientras se graba, como en WhatsApp:
+     Cancelar · 🎙 0:07 ·····▌▌▌▌ · Mandar. El micrófono rojo titila y la onda se llena de barras desde la derecha con tu voz.
+     `op`: {para (texto, p. ej. «Para Sofía»; va como título), grabacion (lo que devuelve crear(), para la onda), alCancelar, alMandar}.
+     Devuelve {el, tiempo(s), transcribiendo()} */
   function franja(op) {
-    var t = h('span.grab-tiempo', '0:00'), estado = h('span.grab-estado', op.para ? op.para : 'Grabando…');
+    var t = h('span.grab-tiempo', '0:00'), onda = h('canvas.grab-onda', { 'aria-hidden': 'true' });
+    var mic = h('span.grab-mic', { 'aria-hidden': 'true' }, icono());
     var mandar = h('button.btn.primario', { onclick: op.alMandar }, App.icono('enviar'), 'Mandar');
     var cancelar = h('button.btn.fantasma', { onclick: op.alCancelar }, 'Cancelar');
-    var el = h('div.grab-franja', cancelar, h('div.grab-vum', h('span.grab-punto'), t, estado), mandar);
+    var vum = h('div.grab-vum', { role: 'status', title: op.para || '', 'aria-label': (op.para ? op.para + ' · ' : '') + 'Grabando' }, mic, t, onda);
+    var el = h('div.grab-franja', cancelar, vum, mandar);
+    var parar = op.grabacion && op.grabacion.nivel ? ondear(onda, op.grabacion) : function () {};
     return {
       el: el,
       tiempo: function (s) { t.textContent = tiempo(s); },
       transcribiendo: function () {
+        parar();
         mandar.disabled = true; cancelar.disabled = true;
-        App.vaciar(el.querySelector('.grab-vum')).appendChild(h('span.grab-trans', h('span.giro'), 'Pasando el audio a texto…'));
+        App.vaciar(vum).appendChild(h('span.grab-trans', h('span.giro'), 'Pasando el audio a texto…'));
       }
     };
+  }
+
+  /* Dibuja la onda en el canvas: una barra cada 90 ms con el volumen de ese tramo; lo viejo se corre a la izquierda y
+     el silencio queda en puntitos. Para sola cuando la grabación termina. Devuelve la función para pararla a mano. */
+  function ondear(cv, grab) {
+    var barras = [], ult = 0, vivo = true, empezo = false, PASO = 5, ANCHO = 3, CADA = 90;
+    function cuadro(ahora) {
+      if (!vivo) return;
+      if (grab.grabando()) empezo = true; else if (empezo) { vivo = false; return; }
+      if (ahora - ult >= CADA) { ult = ahora; barras.push(grab.nivel()); if (barras.length > 400) barras.shift(); }
+      var w = cv.clientWidth, alto = cv.clientHeight;
+      if (w && alto) {
+        var dpr = window.devicePixelRatio || 1;
+        if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(alto * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(alto * dpr); }
+        var x = cv.getContext('2d'), cs = getComputedStyle(cv), mid = alto / 2, n = Math.floor(w / PASO);
+        var tinta = cs.getPropertyValue('--texto').trim() || '#1d1d1f', tenue = cs.getPropertyValue('--linea-fuerte').trim() || '#d3cfc7';
+        x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, alto);
+        for (var i = 0; i < n; i++) {
+          var v = barras[barras.length - n + i], px = i * PASO + PASO / 2;
+          if (v == null || v < 0.06) { x.fillStyle = tenue; x.beginPath(); x.arc(px, mid, 1.2, 0, 7); x.fill(); continue; }
+          var a = Math.max(ANCHO, v * (alto - 2));
+          x.fillStyle = tinta; x.beginPath();
+          if (x.roundRect) x.roundRect(px - ANCHO / 2, mid - a / 2, ANCHO, a, ANCHO / 2); else x.rect(px - ANCHO / 2, mid - a / 2, ANCHO, a);
+          x.fill();
+        }
+      }
+      requestAnimationFrame(cuadro);
+    }
+    requestAnimationFrame(cuadro);
+    return function () { vivo = false; };
   }
 
   return { crear: crear, transcribir: transcribir, icono: icono, puede: puede, partir: partir, franja: franja, tiempo: tiempo, MARCA: MARCA, aWav: aWav };

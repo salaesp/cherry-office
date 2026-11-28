@@ -535,7 +535,7 @@
           mandar();
         }).catch(function (e) { volver(); App.aviso(e.message, true); });
       }
-      franja = App.Grabadora.franja({ para: 'Para ' + a.nombre, alCancelar: function () { g.cancelar(); volver(); }, alMandar: terminar });
+      franja = App.Grabadora.franja({ para: 'Para ' + a.nombre, grabacion: g, alCancelar: function () { g.cancelar(); volver(); }, alMandar: terminar });
       g.empezar().then(function () { redactar.replaceWith(franja.el); }).catch(function (e) { App.aviso(e.message, true); });
     }
     App.add(pie, adj.lista, adj.error, adj.input, redactar,
