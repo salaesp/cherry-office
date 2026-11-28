@@ -627,7 +627,7 @@ Un 404/410 del servicio de push borra la suscripción. `HQ_PUSH_SUJETO` cambia e
 | POST | `/api/push/probar` | `{endpoint}` | `{ok}`; manda un aviso de prueba. 404 si no está anotado, 502 si el servicio de push no lo aceptó |
 | PUT | `/api/push/silencio` | `{endpoint, desde:"HH:MM", hasta:"HH:MM"}` o `{endpoint, desde:null}` | `{ok}`; horario de no molestar (puede cruzar la medianoche) |
 | POST | `/api/push/suscribir` | `{nativo:{id}, nombre?}` | `{ok}`; la app de Android se anota como `nativo:<id>` (sin Web Push). El resto (`desuscribir`, `probar`, `silencio`) va con `endpoint: "nativo:<id>"` |
-| GET | `/api/push/nativo/esperar?id=&desde=&epoca=` | | `{epoca, ultimo, mensajes:[Mensaje]}`; queda abierto hasta que hay un aviso nuevo después de `desde` o pasan ~45 s. Si `epoca` no es la del arranque actual, `desde` no vale. 404 si el id no está anotado (o lo borran mientras espera) |
+| GET | `/api/push/nativo/esperar?id=&desde=&epoca=&ms=` | | `{epoca, ultimo, mensajes:[Mensaje]}`; queda abierto hasta que hay un aviso nuevo después de `desde` o pasan `ms` (hasta 45 s, el valor por defecto; `ms=0` contesta ya). Si `epoca` no es la del arranque actual, `desde` no vale. 404 si el id no está anotado (o lo borran mientras espera) |
 
 El aviso que recibe el service worker (`oficina/sw.js`) es JSON: `{titulo, texto, url, tag, permiso?, acciones?}`. Con `acciones`
 muestra «Permitir» / «No», que contestan `POST /api/permisos/<permiso>` sin abrir la app.

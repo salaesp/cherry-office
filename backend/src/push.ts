@@ -9,7 +9,7 @@
 //   como de Chrome): se anota como `nativo:<id>` y espera los avisos con GET /api/push/nativo/esperar, que queda abierto
 //   hasta que hay algo o pasan ~45 s (android/…/AvisosNativos.kt). El resto (no molestar, prueba, borrar) es igual.
 // API: GET /api/push · POST /api/push/suscribir · POST /api/push/desuscribir · POST /api/push/probar · PUT /api/push/silencio
-//      GET /api/push/nativo/esperar?id=&desde=&epoca=
+//      GET /api/push/nativo/esperar?id=&desde=&epoca=&ms=
 import { createCipheriv, createECDH, createHash, createHmac, createPrivateKey, randomBytes, sign, type ECDH, type KeyObject } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -361,7 +361,11 @@ export class PushRouter implements SubRouter {
       if (ruta === '/api/push/desuscribir') return method === 'POST' ? [200, this.push.desuscribir(b.endpoint)] : no405
       if (ruta === '/api/push/probar') return method === 'POST' ? [200, await this.push.probar(b.endpoint)] : no405
       if (ruta === '/api/push/silencio') return method === 'PUT' ? [200, this.push.silencio(b)] : no405
-      if (ruta === '/api/push/nativo/esperar') return method === 'GET' ? [200, await this.push.esperar(q.id, q.desde, q.epoca)] : no405
+      if (ruta === '/api/push/nativo/esperar') {
+        // ms: cuánto esperar como mucho (0 = contestar ya; la app lo usa para confirmar que llega a la oficina)
+        const ms = /^\d+$/.test(q.ms ?? '') ? Math.min(Number(q.ms), 45_000) : 45_000
+        return method === 'GET' ? [200, await this.push.esperar(q.id, q.desde, q.epoca, ms)] : no405
+      }
       return no404
     })
   }

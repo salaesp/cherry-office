@@ -33,6 +33,8 @@ import kotlin.concurrent.thread
  */
 class AvisosNativos : Service() {
     @Volatile private var corriendo = false
+    /** lo que dice ahora el aviso fijo (si el servicio se vuelve a arrancar, no vuelve a «Conectando…») */
+    @Volatile private var textoFijo = "Conectando con la oficina…"
     private var hilo: Thread? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -42,7 +44,7 @@ class AvisosNativos : Service() {
         crearCanales(this)
         val tipo = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE else 0
         try {
-            ServiceCompat.startForeground(this, ID_FIJO, fijo("Conectando con la oficina…"), tipo)
+            ServiceCompat.startForeground(this, ID_FIJO, fijo(textoFijo), tipo)
         } catch (_: Exception) {
             // Android no deja arrancarlo ahora (p. ej. desde segundo plano): se vuelve a intentar al abrir la app
             stopSelf()
@@ -69,9 +71,11 @@ class AvisosNativos : Service() {
         while (corriendo) {
             val base = prefs.base ?: break
             try {
+                // sin conexión confirmada, una consulta que vuelve enseguida; después, la que queda esperando avisos
                 val r = Api(base).get(
                     "/api/push/nativo/esperar",
-                    mapOf("id" to prefs.dispositivo, "desde" to prefs.avisosDesde, "epoca" to prefs.avisosEpoca),
+                    mapOf("id" to prefs.dispositivo, "desde" to prefs.avisosDesde, "epoca" to prefs.avisosEpoca,
+                        "ms" to if (estado == true) "45000" else "0"),
                     espera = 75_000,
                 )
                 if (estado != true) { actualizarFijo("Conectada a la oficina"); estado = true }
@@ -106,11 +110,16 @@ class AvisosNativos : Service() {
         .setContentText(texto)
         .setOngoing(true)
         .setSilent(true)
+        .setOnlyAlertOnce(true)
         .setPriority(NotificationCompat.PRIORITY_MIN)
         .setContentIntent(abrirApp(this, "#/bandeja/hoy", 0))
         .build()
 
-    private fun actualizarFijo(texto: String) = notificar(this, null, ID_FIJO, fijo(texto))
+    private fun actualizarFijo(texto: String) {
+        if (texto == textoFijo) return
+        textoFijo = texto
+        notificar(this, null, ID_FIJO, fijo(texto))
+    }
 
     private fun mostrar(m: JSONObject) {
         val tag = m.optString("tag").ifBlank { "oficina" }
