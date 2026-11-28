@@ -629,3 +629,12 @@ Un 404/410 del servicio de push borra la suscripción. `HQ_PUSH_SUJETO` cambia e
 
 El aviso que recibe el service worker (`oficina/sw.js`) es JSON: `{titulo, texto, url, tag, permiso?, acciones?}`. Con `acciones`
 muestra «Permitir» / «No», que contestan `POST /api/permisos/<permiso>` sin abrir la app.
+
+## App de Android (Trusted Web Activity)
+La app de `android/` abre la oficina del celular en Chrome como Trusted Web Activity (ver [android/README.md](../android/README.md)).
+
+| Método | Ruta | Respuesta |
+|---|---|---|
+| GET | `/.well-known/assetlinks.json` | Digital Asset Links: el sitio confía en el paquete `app.oficina.android` firmado con la huella de `android/app/debug.keystore` (`backend/src/app-android.ts`). Con eso Chrome la muestra sin barra de direcciones y le pasa los avisos push a la app |
+
+Rutas de la interfaz que usa el widget (`oficina/ui/nav.js`): `#/secretaria/escribir` abre una charla nueva con quien atiende la secretaría con el cursor en el campo, y `#/secretaria/hablar` abre una charla nueva y empieza a grabar (si el navegador pide un toque para el audio, resalta el micrófono). Sin secretaría, van a la Bandeja.

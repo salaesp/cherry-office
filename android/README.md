@@ -1,46 +1,49 @@
 # Oficina para Android
 
-App nativa (Kotlin + Jetpack Compose) para hablarle a la secretaría desde el celular, con un **widget** en la pantalla
-de inicio. El resto de la oficina sigue en la versión web para celular (la PWA de `oficina/`): la app la abre desde
-«Abrir la oficina completa».
+La app de Android es **la oficina web del celular** (la PWA de `oficina/`, en modo celular) abierta en Chrome como
+**Trusted Web Activity**: pantalla completa, sin barra de direcciones, con todo lo que tiene la web (Bandeja, charlas
+con sus tarjetas, revisar entregas, audio, adjuntar). Lo nativo es solo lo que la web no puede:
 
-## Qué hace
-- **Widget 2×2** («sale del marco», opción D de `bocetos/widget-android/tarjeta.html`): la tarjeta toma el color de la
-  ropa de la secretaría, su busto pixel se asoma por arriba y va su nombre. **Escribir** abre una charla nueva con el
-  teclado listo; **Hablar** abre una charla nueva y empieza a grabar. Tocar el busto abre la última charla.
-- **Chat con la secretaría**: la última charla al abrir, charla nueva (+), charlas anteriores, lo que va haciendo
-  mientras responde (`/api/chat/vivo`) y «Detener».
-- **Audio**: graba WAV de 16 kHz y lo transcribe la compu (`POST /api/audio/transcribir`), igual que el micrófono de
-  la web; el mensaje lleva la misma marca «(nota de voz)», así que en la compu se ve como audio.
-- **Atajos** del ícono (mantener apretado): «Dejarle un audio» y «Escribirle a la secretaría».
+- **Widget 2×2 de la secretaría** («sale del marco», opción D de `bocetos/widget-android/tarjeta.html`): la tarjeta
+  toma el color de la ropa de la secretaría, su busto pixel se asoma por arriba y va su nombre. **Escribir** abre una
+  charla nueva con ella con el cursor en el campo (`#/secretaria/escribir`); **Hablar** abre una charla nueva y empieza
+  a grabar (`#/secretaria/hablar`; si Chrome pide un toque antes de usar el micrófono, el botón queda resaltado).
+- **Avisos como avisos de la app:** son los Web Push de siempre (`backend/src/push.ts`, `oficina/sw.js`); el
+  `DelegationService` de android-browser-helper hace que Android los muestre como de «Oficina» y no de Chrome. Se
+  prenden igual que en la PWA (Bandeja › Hoy o «Más › Avisos en este teléfono»).
+- **Vincular con el QR** de Ajustes › Celular (o escribiendo la dirección). Los atajos del ícono: «Dejarle un audio»,
+  «Escribirle a la secretaría» y «Cambiar de oficina».
 
 ## Cómo se conecta
-Igual que la PWA: por Tailscale (docs/plan-celular.md). En la compu, Ajustes › **Celular** muestra un QR; la app lo
-escanea (o se escribe la dirección `compu.tu-red.ts.net`) y queda vinculada. Hace falta Tailscale prendido en la compu y
-en el celular, con la misma cuenta, y Oficina abierta en la compu. No hay cambios en el backend: la app usa la API de
-siempre y manda el `Origin` de la oficina en las escrituras, que es lo que pide `servidor-dev.ts`.
+Por Tailscale, como la PWA (docs/plan-celular.md): Tailscale prendido en la compu y en el celular, con la misma cuenta,
+y Oficina abierta en la compu. Hace falta Chrome en el celular.
+
+Para que Chrome confíe en la app (sin barra de direcciones y con los avisos delegados), el servidor de la oficina sirve
+`/.well-known/assetlinks.json` (`backend/src/app-android.ts`) con el paquete `app.oficina.android` y la huella de la
+clave con la que se firma el APK (`app/debug.keystore`). Si Chrome no logra verificarlo, la app funciona igual pero con
+una barrita arriba que muestra la dirección. Si algún día cambia la clave, hay que cambiar la huella ahí también.
 
 ## El busto del widget
 Se dibuja con el mismo código que la oficina pixel: el build copia `oficina/ui/pixel/personajes.js` y `avatar.js` a los
-assets (tarea `copiarPixel`) y `Retrato.kt` los corre en un WebView que no se muestra. Se vuelve a dibujar solo cuando
-cambia la apariencia de la secretaría o quién la atiende; queda guardado para que el widget se dibuje sin red.
+assets (tarea `copiarPixel`) y `Retrato.kt` los corre en un WebView que no se muestra. Cada vez que se abre la app se
+pide a la oficina quién atiende la secretaría y su apariencia (`Secretaria.kt`); si cambió, se vuelve a dibujar.
+Queda guardado para que el widget se dibuje sin red.
 
 ## Armar e instalar
-Cada push que toca `android/` arma el APK en GitHub Actions (workflow «Android», artefacto `Oficina-android`). A mano:
+Cada release lleva `Oficina-android-<versión>.apk` (workflow «Release»), y cada push que toca `android/` lo arma en el
+workflow «Android» (artefacto `Oficina-android`). A mano:
 ```bash
 cd android && ./gradlew assembleDebug    # necesita el SDK de Android (ANDROID_HOME o local.properties)
 ```
-y se instala `app/build/outputs/apk/debug/app-debug.apk` (en el celular, permitir «instalar apps desconocidas»). Va
-firmado con una clave de depuración fija (`app/debug.keystore`, la contraseña de siempre de Android), así cada APK
-nuevo se instala encima del anterior.
+En el celular hay que permitir «instalar apps desconocidas». Va firmado con una clave de depuración fija
+(`app/debug.keystore`, la contraseña de siempre de Android): cada APK nuevo se instala encima del anterior. La versión
+es la de `desktop/package.json`.
 
 ## Archivos
 | Archivo | Qué hace |
 |---|---|
-| `WidgetSecretaria.kt`, `res/layout/widget_secretaria.xml` | El widget |
-| `MainActivity.kt` | Recibe los botones del widget y los atajos; permiso del micrófono |
-| `Charla.kt` | Estado: oficina vinculada, secretaría, charla abierta, mandar, audio |
-| `Pantallas.kt`, `Tema.kt` | Vincular y chat (Compose), con los colores de `oficina/ui/estilo.css` |
-| `Api.kt` | Cliente de la API (backend/API.md) |
-| `Grabadora.kt` | Graba PCM 16 kHz y arma el WAV |
+| `MainActivity.kt` | Abre la oficina en Chrome (TWA) en la ruta que toca; sin oficina vinculada, la pantalla de vincular |
+| `Vincular.kt` | Vincular con el QR o la dirección; desvincular |
+| `WidgetSecretaria.kt`, `res/layout/widget_secretaria.xml` | El widget (solo vistas que acepta RemoteViews: lo revisa `WidgetLayoutTest`) |
+| `Secretaria.kt`, `Api.kt`, `Prefs.kt` | Quién atiende la secretaría y su apariencia, para el widget |
 | `Retrato.kt`, `assets/retrato.html` | El busto pixel con el código de la oficina |

@@ -2,7 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Android 11+: para encontrar Chrome (u otro navegador con Trusted Web Activity) -->
+    <queries>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -11,6 +18,7 @@
         android:supportsRtl="true"
         android:theme="@style/Tema">
 
+        <!-- Abre la oficina en Chrome (Trusted Web Activity); sin oficina vinculada, la pantalla de vincular -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -24,6 +32,23 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/atajos" />
         </activity>
+
+        <!-- Los avisos de la oficina (Web Push del service worker) llegan como avisos de esta app -->
+        <service
+            android:name="com.google.androidbrowserhelper.trusted.DelegationService"
+            android:enabled="true"
+            android:exported="true">
+            <meta-data
+                android:name="android.support.customtabs.trusted.SMALL_ICON"
+                android:resource="@drawable/ic_aviso" />
+            <intent-filter>
+                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+        <activity
+            android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity"
+            android:exported="false" />
 
         <receiver
             android:name=".WidgetSecretaria"

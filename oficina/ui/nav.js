@@ -205,6 +205,18 @@ App.Nav = (function () {
         empujar('#/bandeja/hoy', true); r = leer();
         setTimeout(function () { if (App.Compartir) App.Compartir.abrir(!!comp[1]); }, 0);
       }
+      /* #/secretaria/escribir y #/secretaria/hablar: charla nueva con la secretaría, con el cursor en el campo o grabando
+         (los botones del widget de la app de Android, android/README.md) */
+      var sec = /^#\/secretaria\/(escribir|hablar)/.exec(location.hash);
+      if (sec) {
+        var sa = App.secretaria && App.secretaria();
+        if (!sa) { empujar(App.movil ? '#/bandeja/hoy' : '#/oficina', true); r = leer(); }
+        else {
+          empujar('#/equipo/' + encodeURIComponent(sa.id), true); r = leer();
+          setTimeout(function () { App.Agente.nueva(sa.id); setTimeout(function () { arrancarSecretaria(sec[1]); }, 60); }, 0);
+          return;
+        }
+      }
       /* modo celular: sin oficina ni pantallas de la compu; la Bandeja abre directo en Hoy (que junta todo lo que espera) */
       if (App.movil && deLaCompu(r)) { empujar('#/bandeja/hoy', true); r = leer(); }
       if (App.movil && r.sec === 'bandeja' && !r.a) { empujar('#/bandeja/hoy', true); r = leer(); }
@@ -323,6 +335,25 @@ App.Nav = (function () {
     refrescoPendiente = setTimeout(function () {
       if (seccion === 'equipo') { cargarSesiones().then(function () { if (App.Agente.repintarLado) App.Agente.repintarLado('charlas'); }); cargarReuniones(); } else pintarLista();
     }, 150);
+  }
+
+  /* después de abrir la charla nueva con la secretaría: «escribir» pone el cursor en el campo; «hablar» empieza a grabar.
+     Si el navegador no deja arrancar el audio sin un toque (Chrome al abrir desde el widget), resalta el micrófono. */
+  function arrancarSecretaria(que) {
+    var raiz = App.dom && App.dom.derecho;
+    var campo = raiz && raiz.querySelector('.redactar textarea'), mic = raiz && raiz.querySelector('.redactar-accion.es-mic');
+    if (que === 'escribir') { if (campo) campo.focus(); return; }
+    if (!mic) return;
+    var libre = false;
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext, prueba = new Ctx();
+      libre = prueba.state === 'running';
+      prueba.close();
+    } catch (e) {}
+    if (libre) { mic.click(); return; }
+    mic.classList.add('llamar');
+    mic.addEventListener('click', function () { mic.classList.remove('llamar'); }, { once: true });
+    App.aviso('Tocá el micrófono para grabar.');
   }
 
   function ir(ruta) { if (App.dom && App.dom.app) App.dom.app.classList.remove('lista-ver'); if (location.hash === ruta) aplicar(); else location.hash = ruta; }

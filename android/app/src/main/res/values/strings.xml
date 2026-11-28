@@ -7,4 +7,5 @@
     <string name="widget_hablar">Hablar</string>
     <string name="atajo_escribir">Escribirle a la secretaría</string>
     <string name="atajo_hablar">Dejarle un audio</string>
+    <string name="atajo_vincular">Cambiar de oficina</string>
 </resources>

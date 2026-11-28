@@ -18,4 +18,13 @@
             android:targetClass="app.oficina.android.MainActivity"
             android:targetPackage="app.oficina.android" />
     </shortcut>
+    <shortcut
+        android:icon="@drawable/atajo_escribir"
+        android:shortcutId="vincular"
+        android:shortcutShortLabel="@string/atajo_vincular">
+        <intent
+            android:action="app.oficina.android.VINCULAR"
+            android:targetClass="app.oficina.android.MainActivity"
+            android:targetPackage="app.oficina.android" />
+    </shortcut>
 </shortcuts>

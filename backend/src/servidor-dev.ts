@@ -5,6 +5,7 @@
 import fs from 'node:fs'
 import http from 'node:http'
 import path from 'node:path'
+import { assetLinks } from './app-android.js'
 import { codificar } from './json.js'
 import type { APIHandler, Query } from './router.js'
 
@@ -99,6 +100,8 @@ export class ServidorDev {
       return { status: r.status, tipo: 'application/json; charset=utf-8', cuerpo: r.json }
     }
     if (metodo !== 'GET' && metodo !== 'HEAD') return json({ error: 'método no permitido' }, 405)
+    // la app de Android (Trusted Web Activity): ver app-android.ts
+    if (ruta === '/.well-known/assetlinks.json') return json(assetLinks())
     const f = this.archivo(ruta)
     let datos: Buffer
     try {

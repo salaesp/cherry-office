@@ -73,6 +73,17 @@ describe('Servidor de desarrollo (oficina-dev)', () => {
     expect((await tipo('/iconos/../otro.js'))[0]).toBe(404)
   })
 
+  test('assetlinks.json para la app de Android (Trusted Web Activity)', async () => {
+    const { b } = await servidor()
+    const r = await crudo(b, 'GET', '/.well-known/assetlinks.json')
+    expect(r.status).toBe(200)
+    expect(String(r.cabeceras['content-type'])).toContain('application/json')
+    const lista = JSON.parse(r.texto)
+    expect(lista[0].relation).toEqual(['delegate_permission/common.handle_all_urls'])
+    expect(lista[0].target.package_name).toBe('app.oficina.android')
+    expect(lista[0].target.sha256_cert_fingerprints[0]).toMatch(/^([0-9A-F]{2}:){31}[0-9A-F]{2}$/)
+  })
+
   test('Host de loopback obligatorio (contra DNS rebinding)', async () => {
     const { b } = await servidor()
     expect((await b.pedir('GET', '/', { headers: { Host: 'evil.com' } })).status).toBe(403)
