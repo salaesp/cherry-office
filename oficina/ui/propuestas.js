@@ -478,7 +478,7 @@ App.Propuestas = (function () {
     }
     if (e.archivos && e.archivos.length) cuerpo.push(h('div.tl-chips', h('span.prop-tag', App.icono('clip'), e.archivos.length === 1 ? '1 archivo' : e.archivos.length + ' archivos')));
     if (e.estado === 'cambios') estado = h('span.insignia', 'Reemplazada');
-    return h('div.tl' + (nueva ? '.nueva' : '.vista') + (urgente ? '.urg' : ''), { role: 'button', tabindex: '0', title: 'Abrir', onclick: op.abrir,
+    return h('div.tl' + (nueva ? '.nueva' : '.leida') + (urgente ? '.urg' : ''), { role: 'button', tabindex: '0', title: 'Abrir', onclick: op.abrir,
       onkeydown: function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); op.abrir(); } } },
       h('div.tl-cab', op.retrato, h('div.tl-tit', h('div.t', op.titulo), op.sub ? h('div.s', op.sub) : null), estado, h('span.tl-cuando', op.cuando)),
       cuerpo, pie);

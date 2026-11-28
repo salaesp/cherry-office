@@ -164,12 +164,13 @@
 .entrega-doc.md strong { font-weight: 600; }
 
 /* tarjetas de la lista de la bandeja (propuestas.js › tarjetaLista) */
+/* ojo: no usar la clase «vista» acá (es la del lienzo de la app: overflow hidden + container-type size aplasta la tarjeta) */
 .entregas.tarjetas { gap: 8px; padding: 6px 10px 14px; }
 .tl { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--panel); cursor: pointer; text-align: left; transition: border-color .12s, box-shadow .12s; }
 .tl:hover { border-color: var(--linea-fuerte); box-shadow: 0 1px 2px rgba(20, 18, 15, .06), 0 4px 12px rgba(20, 18, 15, .06); }
 .tl:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
-.tl.vista { background: var(--panel-2); }
-.tl.vista .tl-tit .t { font-weight: 500; color: var(--suave); }
+.tl.leida { background: var(--panel-2); }
+.tl.leida .tl-tit .t { font-weight: 500; color: var(--suave); }
 .tl.urg { border-color: color-mix(in srgb, var(--peligro) 40%, var(--linea)); background: var(--urg-suave); }
 .tl.urg .tl-tit .t { color: var(--peligro); }
 .tl-cab { display: flex; gap: 8px; align-items: center; min-width: 0; }
