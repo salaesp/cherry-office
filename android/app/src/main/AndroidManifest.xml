@@ -50,6 +50,22 @@
             android:name="com.google.androidbrowserhelper.trusted.NotificationPermissionRequestActivity"
             android:exported="false" />
 
+        <!-- La oficina web abre desde acá los ajustes de avisos de esta app (AjustesAvisos.kt) -->
+        <activity
+            android:name=".AjustesAvisos"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="oficina-android" android:host="avisos" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".WidgetSecretaria"
             android:exported="false"
