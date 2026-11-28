@@ -305,7 +305,9 @@ App.Entregables = (function () {
       var armado = e.origen === 'secretaria' ? App.Propuestas.reporte(e.texto || '', propuestas, { ver: function (id) { App.Nav.ir('#/bandeja/revisar/' + id); },
           temas: memoriaSec.temas, verTema: function (slug, titulo) { verMemoria('temas', slug, titulo); }, alCambiar: function () { leerMemoriaSec(accion, propuestas); } })
         : e.origen === 'importacion' ? App.Propuestas.importacion(e.texto || '', importacion) : null;
-      App.add(textoCaja, armado ? h('div.entrega-texto', armado) : App.htmlSeguro(h('div.md-doc.doc-panel.entrega-texto.entrega-doc'), App.markdown(e.texto || '(sin texto)')));
+      if (armado) { App.add(textoCaja, h('div.entrega-texto', armado)); return; }
+      var doc = App.htmlSeguro(h('div.md-doc.doc-panel.entrega-texto.entrega-doc'), App.markdown(e.texto || '(sin texto)'));
+      App.add(textoCaja, conPregunta(e, doc) || doc);
     };
     /* un reporte de la secretaría: sus temas, para ver qué «Para hacer» sigue y contestarle desde acá */
     var memoriaSec = { temas: null };
@@ -349,6 +351,56 @@ App.Entregables = (function () {
       pintarPie(e, extra, pie);
       if (extra.accion && extra.accion.estado === 'ejecutando') vigilarAccion(e.id);
     });
+  }
+
+  /* una entrega en texto que termina preguntando qué hacer («¿Qué hago?» + opciones numeradas): con la forma de las
+     propuestas (etiqueta, contexto, opciones como tarjetas y las aclaraciones chicas abajo), en vez del texto suelto.
+     Elegir una opción se la contesta al agente en la misma conversación (como «Pedir cambios»). */
+  function conPregunta(e, doc) {
+    var hijos = Array.prototype.slice.call(doc.children), iLista = -1;
+    for (var i = 1; i < hijos.length; i++) {
+      var prev = hijos[i - 1];
+      if (hijos[i].tagName === 'OL' && prev.tagName === 'P' && /\?\s*$/.test(prev.textContent || '') && hijos[i].children.length >= 2) { iLista = i; break; }
+    }
+    if (iLista < 0) return null;
+    var pregunta = hijos[iLista - 1], lista = hijos[iLista];
+    var md = function (nodos) {
+      if (!nodos.length) return null;
+      var d = h('div.md-doc.md.preg-md');
+      nodos.forEach(function (n) { d.appendChild(n); });
+      return d;
+    };
+    var antes = hijos.slice(0, iLista - 1), despues = hijos.slice(iLista + 1);
+    var puede = e.estado === 'sin_revisar' && !!e.sid && !!e.agente && !e.enCambios;
+    var elegir = function (n, li, btn) {
+      var txt = (li.textContent || '').replace(/\s+/g, ' ').trim();
+      App.confirmar('¿Le contestás a ' + nombre(e.agente) + ' con la opción ' + n + '?', txt, 'Contestar').then(function (si) {
+      if (!si) return;
+      btn.disabled = true;
+      api().post('/api/entregas/' + e.id + '/cambios', { texto: 'Elijo la opción ' + n + ': ' + txt }).then(function () {
+        App.aviso('Le contestaste a ' + nombre(e.agente) + ': opción ' + n + '.');
+        refrescarUltimas(); if (App.Actividad) App.Actividad.ya();
+        verEntrega(e.id);
+      }).catch(function (x) { App.fallo(x); btn.disabled = false; });
+      });
+    };
+    var opciones = Array.prototype.slice.call(lista.children).map(function (li, k) {
+      var n = k + 1, cuerpo = h('div.md-doc.md.preg-op-txt');
+      while (li.firstChild) cuerpo.appendChild(li.firstChild);
+      var fila = h(puede ? 'button.preg-op.elegible' : 'div.preg-op', puede ? { title: 'Contestarle con esta opción' } : null, h('span.preg-num', String(n)), cuerpo);
+      if (puede) fila.onclick = function () { elegir(n, cuerpo, fila); };
+      return fila;
+    });
+    var notas = despues.map(function (n) {
+      return n.tagName === 'P' ? h('div.prop-nota', App.icono('alerta'), h('span', Array.prototype.slice.call(n.childNodes))) : md([n]);
+    });
+    return h('div.entrega-accion.prop-caja.preg-caja',
+      h('div.prop-cab', h('span.prop-tag.pregunta', App.icono('charla'), 'Pregunta'),
+        e.estado === 'sin_revisar' ? h('span.insignia.aviso', 'Esperando tu respuesta') : null),
+      antes.length ? h('div.preg-contexto', md(antes)) : null,
+      h('div.preg-titulo', Array.prototype.slice.call(pregunta.childNodes)),
+      h('div.preg-ops', opciones),
+      notas.length ? h('div.preg-notas', notas) : null);
   }
 
   /* ---------------- esperas entre agentes (docs/plan-dependencias.md) ---------------- */

@@ -264,3 +264,23 @@ button.qp-error:hover { border-color: var(--linea-fuerte); }
 .pend-hechos .fila-dec { opacity: .75; }
 details.avanzado > summary { cursor: pointer; color: var(--suave); font-size: 12px; padding: 4px 0; }
 details.avanzado[open] > summary { margin-bottom: 6px; }
+
+/* una entrega que pregunta qué hacer (entregables.js › conPregunta): con la forma de las propuestas */
+.prop-tag.pregunta { color: var(--aviso, var(--suave)); background: var(--aviso-suave, var(--panel-2)); }
+.preg-contexto { border: 1px solid var(--linea); border-radius: var(--radio); background: var(--panel); padding: 10px 12px; }
+.preg-md { font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+.preg-md > * + * { margin-top: 6px; }
+.preg-md strong { font-weight: 600; }
+.preg-titulo { font-weight: 600; font-size: 15px; margin-top: 2px; }
+.preg-ops { display: grid; gap: 6px; }
+.preg-op { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: start; width: 100%; text-align: left; font: inherit; color: inherit;
+  padding: 9px 12px; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--panel); }
+.preg-op.elegible { cursor: pointer; transition: border-color .12s, background .12s; }
+.preg-op.elegible:hover { border-color: var(--linea-fuerte); background: var(--panel-2); }
+.preg-op:disabled { opacity: .6; cursor: default; }
+.preg-num { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 11px; background: var(--panel-2); color: var(--suave); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.preg-op-txt { font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; min-width: 0; }
+.preg-op-txt strong { font-weight: 600; }
+.preg-op-txt > * + * { margin-top: 4px; }
+.preg-notas { display: grid; gap: 4px; }
+.preg-notas .prop-nota svg { color: var(--tenue); }
