@@ -240,6 +240,17 @@ App.Propuestas = (function () {
     }).catch(App.fallo);
   }
   function filaHacer(it, op) {
+    var c = controlesHacer(it, op);
+    return h('div.rep-prop.hacer' + (c.cerrado ? '.cerrado' : ''), App.icono(c.cerrado ? 'ok' : 'parte'), h('div.min', md(c.texto)), c.estado, c.principal, c.menu);
+  }
+  /* lo urgente: el mismo seguimiento que un «Para hacer» (Ya lo hice, No hace falta, dárselo a un agente…), con los
+     botones abajo del texto para que no quede como un cartel sin salida */
+  function filaUrgente(it, op) {
+    var c = controlesHacer(it, op);
+    var acc = c.estado || c.principal || c.menu ? h('div.rep-urg-acc', c.estado, c.principal, c.menu) : null;
+    return h('div.rep-urg' + (c.cerrado ? '.cerrado' : ''), App.icono(c.cerrado ? 'ok' : 'alerta'), h('div.min', md(c.texto), acc));
+  }
+  function controlesHacer(it, op) {
     var p = partirTema(it), t = temaDe(p, op.temas);
     var cerrado = t && (t.estado === 'resuelto' || t.estado === 'descartado');
     var mas = [];
@@ -271,7 +282,7 @@ App.Propuestas = (function () {
       });
     }
     var menu = mas.length ? h('button.btn.fantasma.icono.chico', { title: 'Más opciones', onclick: function (ev) { ev.stopPropagation(); App.menu(ev.currentTarget, mas); } }, App.icono('puntos')) : null;
-    return h('div.rep-prop.hacer' + (cerrado ? '.cerrado' : ''), App.icono(cerrado ? 'ok' : 'parte'), h('div.min', md(p.texto)), estado, principal, menu);
+    return { texto: p.texto, cerrado: cerrado, estado: estado, principal: principal, menu: menu };
   }
 
   /* el reporte armado; null si el texto no sigue el formato (se muestra el markdown de siempre) */
@@ -280,7 +291,7 @@ App.Propuestas = (function () {
     if (!r) return null;
     op = op || {};
     var caja = h('div.rep');
-    r.urgente.forEach(function (u) { caja.appendChild(h('div.rep-urg', App.icono('alerta'), md(u))); });
+    r.urgente.forEach(function (u) { caja.appendChild(filaUrgente(u, op)); });
     if (r.resumen.length) caja.appendChild(h('div.rep-resumen', md(r.resumen.join(' '))));
 
     var porClave = {};

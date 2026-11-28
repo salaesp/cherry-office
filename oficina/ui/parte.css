@@ -113,7 +113,10 @@
 .rep { display: grid; gap: 14px; font-size: 13px; }
 .rep .min { min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .rep-urg { display: flex; gap: 8px; align-items: flex-start; background: var(--urg-suave); color: var(--peligro); border-radius: var(--radio-chico); padding: 8px 10px; font-weight: 600; }
-.rep-urg svg { flex: none; margin-top: 1px; }
+.rep-urg > svg { flex: none; margin-top: 1px; }
+.rep-urg-acc { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; font-weight: 400; color: var(--texto); }
+.rep-urg.cerrado { background: transparent; border: 1px solid var(--linea-fuerte); color: var(--suave); font-weight: 400; }
+.rep-urg.cerrado > svg { color: var(--ok); }
 .rep-resumen { font-size: 15px; line-height: 1.45; text-wrap: pretty; }
 .rep-chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .rep-sec { display: grid; gap: 8px; }
