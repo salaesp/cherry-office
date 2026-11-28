@@ -19,6 +19,12 @@ import java.util.Locale
  * resumen que MainActivity le pasa a la web (?avisosDiag=…) para mostrarlo si Chrome dice que los avisos están bloqueados.
  */
 class Delegacion : DelegationService() {
+    /** El navegador se conectó (si después no aparece ninguna pregunta, la app lo rechazó por no ser el navegador que la abrió). */
+    override fun onCreate() {
+        super.onCreate()
+        anotar(this, "conectó")
+    }
+
     override fun onExtraCommand(commandName: String, args: Bundle, callbackRemote: TrustedWebActivityCallbackRemote?): Bundle? {
         val r = super.onExtraCommand(commandName, args, callbackRemote)
         val canal = args.getString("notificationChannelName")
@@ -36,7 +42,7 @@ class Delegacion : DelegationService() {
     companion object {
         private const val CLAVE = "diag_avisos"
 
-        private fun anotar(ctx: Context, que: String) {
+        internal fun anotar(ctx: Context, que: String) {
             val sp = ctx.getSharedPreferences("oficina", Context.MODE_PRIVATE)
             val hora = SimpleDateFormat("dd/MM HH:mm", Locale.ROOT).format(Date())
             val lista = (sp.getString(CLAVE, "") ?: "").split(" | ").filter { it.isNotBlank() }.takeLast(5) + "$hora $que"
