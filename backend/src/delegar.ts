@@ -226,7 +226,7 @@ export class Delegaciones {
   readonly manejadores = new Map<TipoTarjeta, ManejadorTarjeta>()
   /** Estados que esperan a la persona, por tipo (para «Te esperan» y la insignia). */
   readonly esperanPersona = new Map<TipoTarjeta, string[]>([['pregunta', ['abierta']], ['delegacion', ['propuesta']]])
-  static readonly prefijoTarea = 'delegar-'
+  static readonly prefijoTarea = Programador.prefijoDelegarProgramada
   private readonly timers = new Map<number, NodeJS.Timeout>()
   /** `oficina \u001f agente \u001f sid` de los mensajes de la persona que corren ahora. */
   private readonly charlas = new Set<string>()

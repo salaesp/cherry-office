@@ -43,7 +43,8 @@ export class Store {
 
   /** v2: `sesiones.oficina` ('' = chats anteriores a las oficinas). v3: `costos`. v4: `sesiones.ctx_usados` y
    *  `ctx_ventana` (cuánto contexto ocupa la charla, del último turno; 0 = no se sabe). v5: `sesiones.tarea` (1 = la
-   *  conversación de una corrida de tarea o encargo: no es una charla y no va en la lista de charlas). */
+   *  conversación de una corrida de tarea o encargo: no es una charla y no va en la lista de charlas). v6: las delegaciones
+   *  entre agentes sí son charlas (del que la recibe): se desmarcan las que v5 había marcado como tarea. */
   private static migrarEsquema(db: SQLiteDB) {
     const cols = db.query('PRAGMA table_info(sesiones)').map((f) => txt(f.name))
     if (!cols.includes('oficina')) db.exec("ALTER TABLE sesiones ADD COLUMN oficina TEXT NOT NULL DEFAULT ''")
@@ -54,6 +55,11 @@ export class Store {
       // las corridas de antes: su sesión es la que guardó la ejecución (tabla del programador, en esta misma base)
       if (db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ejecuciones'").length > 0)
         db.exec("UPDATE sesiones SET tarea=1 WHERE id IN (SELECT sid FROM ejecuciones WHERE sid<>'')")
+    }
+    if (db.query("SELECT 1 FROM meta WHERE clave='esquema_v6'").length === 0) {
+      if (db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='ejecuciones'").length > 0)
+        db.exec("UPDATE sesiones SET tarea=0 WHERE id IN (SELECT sid FROM ejecuciones WHERE sid<>'' AND (tarea LIKE 'delegar:%' OR tarea LIKE 'delegar-%'))")
+      db.run("INSERT OR REPLACE INTO meta(clave,valor) VALUES('esquema_v6','1')", [])
     }
     db.exec('CREATE INDEX IF NOT EXISTS sesiones_oficina ON sesiones(oficina, agente)')
     db.exec(`

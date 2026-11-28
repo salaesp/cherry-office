@@ -5,6 +5,7 @@ import path from 'node:path'
 import { afterEach, expect, test } from 'vitest'
 import { SQLiteDB } from '../../src/sqlite.js'
 import { Store } from '../../src/store.js'
+import { Programador } from '../../src/programador.js'
 
 const dirs: string[] = []
 afterEach(() => { for (const d of dirs.splice(0)) fs.rmSync(d, { recursive: true, force: true }) })
@@ -38,5 +39,30 @@ test('la migración marca como tarea las sesiones de corridas viejas', () => {
   db.close()
   const s = new Store(ruta)
   expect(s.sesiones('/of').map((x) => x.sid)).toEqual([A])
+  s.close()
+})
+
+test('las delegaciones entre agentes sí son charlas; el resto de las corridas no', () => {
+  expect(Programador.esCharla('delegar:12')).toBe(true)
+  expect(Programador.esCharla('delegar-12')).toBe(true)
+  for (const id of ['encargo:x', 'secretaria:gmail', 'flujo:3', 'coord:1', 'tarea-diaria']) expect(Programador.esCharla(id)).toBe(false)
+})
+
+test('la migración desmarca las delegaciones que habían quedado como tarea', () => {
+  const ruta = tmp()
+  const s0 = new Store(ruta)
+  s0.asegurarSesion(A, 'ana', '/of', true)
+  s0.agregar(A, 'u', 'revisá Gmail')
+  s0.asegurarSesion(B, 'ana', '/of', true)
+  s0.agregar(B, 'u', 'encargo de Marce')
+  s0.close()
+  const db = new SQLiteDB(ruta)
+  db.exec("CREATE TABLE IF NOT EXISTS ejecuciones (id INTEGER PRIMARY KEY AUTOINCREMENT, tarea TEXT NOT NULL, sid TEXT NOT NULL DEFAULT '')")
+  db.run('INSERT INTO ejecuciones(tarea,sid) VALUES(?,?)', ['secretaria:gmail', A])
+  db.run('INSERT INTO ejecuciones(tarea,sid) VALUES(?,?)', ['delegar:7', B])
+  db.run("DELETE FROM meta WHERE clave='esquema_v6'", [])
+  db.close()
+  const s = new Store(ruta)
+  expect(s.sesiones('/of').map((x) => x.sid)).toEqual([B])
   s.close()
 })
